@@ -1,23 +1,23 @@
-import { OlxPdpAd } from "@/types/olx.types";
+import { AmazonPdpAd } from "@/types/amazon.types";
 import { JSDOM } from "jsdom";
 
-export class OlxPdpAdBuilder {
-  private _ad?: OlxPdpAd;
+export class AmazonPdpAdBuilder {
+  private _ad?: AmazonPdpAd;
 
   build(dom: JSDOM) {
     const userLink = dom.window.document.querySelector(
       "a[data-testid='user-profile-link']"
     );
-    const olxUserId = userLink
+    const amazonUserId = userLink
       ?.getAttribute("href")
       ?.replace("oferty", "")
       .replace("uzytkownik", "")
       .replaceAll("/", "");
 
-    if (!olxUserId) return this;
+    if (!amazonUserId) return this;
 
     this._ad = {
-      olxUserId,
+      amazonUserId,
     };
 
     return this;
