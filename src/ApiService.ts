@@ -59,7 +59,33 @@ export class ApiService {
         })
         .catch((e) => {
           callback?.onError?.(e);
-          this.handleError(e);
+          //this.handleError(e);
+        })
+        .finally(() => {
+          callback?.onFinally?.();
+        });
+    });
+  }
+
+  put<T>(
+    path: string,
+    data: unknown,
+    callback?: {
+      onSuccess?: (data: T) => void;
+      onError?: (e: any) => void;
+      onFinally?: () => void;
+    }
+  ) {
+    return new Promise<T>(async (resolve) => {
+      return axios
+        .put<T>(this.url(path), data)
+        .then((response) => {
+          callback?.onSuccess?.(response.data);
+          resolve(response.data);
+        })
+        .catch((e) => {
+          callback?.onError?.(e);
+          //this.handleError(e);
         })
         .finally(() => {
           callback?.onFinally?.();
