@@ -5,7 +5,16 @@ export interface AmazonAdCategory {
 
 export interface AmazonPlpAd {
   asin: string;
+  name: string;
+  image: string;
   categoryName: string;
+}
+
+export interface AmazonPlpAdPage {
+  number: number;
+  sort: string;
+  pending: boolean;
+  complete: boolean;
 }
 
 export interface AmazonPdpAd {
@@ -20,6 +29,7 @@ export interface AmazonAd {
 export interface AmazonAdPrice {
   adId: number;
   currencyId: number;
+  country: Country;
   value?: number;
   pending: boolean;
   complete: boolean;

@@ -59,7 +59,7 @@ export class ApiService {
         })
         .catch((e) => {
           callback?.onError?.(e);
-          //this.handleError(e);
+          this.handleError(e);
         })
         .finally(() => {
           callback?.onFinally?.();
@@ -85,7 +85,7 @@ export class ApiService {
         })
         .catch((e) => {
           callback?.onError?.(e);
-          //this.handleError(e);
+          this.handleError(e);
         })
         .finally(() => {
           callback?.onFinally?.();

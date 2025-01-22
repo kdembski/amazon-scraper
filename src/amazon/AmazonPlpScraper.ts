@@ -1,14 +1,16 @@
 import { parseHTML } from "linkedom";
-import { AmazonPlpAd } from "../types/amazon.types";
+import { AmazonPlpAd, AmazonPlpAdPage } from "../types/amazon.types";
 import { ApiService } from "../ApiService";
 import { AmazonPlpAdBuilder } from "./AmazonPlpAdBuilder";
 import { AmazonService } from "./AmazonService";
+import { resolve } from "path";
 
 export class AmazonPlpScraper {
   private baseUrl = "https://www.amazon.pl/";
   private apiService;
   private amazonService;
-  private builder;
+  private category: string;
+  private pages: AmazonPlpAdPage[];
   private sorts = [
     "exact-aware-popularity-rank",
     "date-desc-rank",
@@ -16,54 +18,74 @@ export class AmazonPlpScraper {
   ];
 
   constructor(
+    category: string,
+    pages: number,
     apiService = ApiService.getInstance(),
-    amazonService = AmazonService.getInstance(),
-    builder = new AmazonPlpAdBuilder()
+    amazonService = AmazonService.getInstance()
   ) {
+    this.category = category;
     this.apiService = apiService;
     this.amazonService = amazonService;
-    this.builder = builder;
+
+    this.pages = new Array(pages).fill(null).flatMap((_, i) =>
+      this.sorts.map((sort) => ({
+        number: i + 1,
+        sort,
+        pending: false,
+        complete: false,
+      }))
+    );
   }
 
-  async executeMultiple(category: string, pages: number) {
-    for (let i = 1; i <= pages; i++) {
-      this.execute(category, i);
-    }
+  execute() {
+    return this.pages.map(
+      (page) =>
+        new Promise<void>((resolve) => {
+          this.handlePage(page, resolve);
+        })
+    );
   }
 
-  async execute(category: string, page: number) {
-    this.sorts.forEach((sort) => {
-      const url = `${this.baseUrl}s?i=${category}&s=${sort}&page=${page}`;
+  private handlePage(page: AmazonPlpAdPage, resolve: () => void) {
+    const ref = Math.floor(Math.random() * 100000000000);
+    const referer = `${this.baseUrl}b?node=${ref}`;
+    const url = `${this.baseUrl}s?i=${this.category}&rh=n%3A${ref}&s=${page.sort}&page=${page.number}&fs=true&ref=lp_${ref}_sar`;
 
-      this.amazonService.get<string>(url, {
-        onSuccess: (data) => this.onSuccess(data, category, page),
-        onError: () => this.onError(category, page),
-      });
+    if (page.complete || page.pending) return;
+    page.pending = true;
+
+    this.amazonService.get<string>(url, referer, {
+      onSuccess: (data) => this.onSuccess(data, page, resolve),
+      onError: () => this.onError(page, resolve),
     });
   }
 
-  private onSuccess(data: string, category: string, page: number) {
+  private onSuccess(data: string, page: AmazonPlpAdPage, resolve: () => void) {
     const listItemSelector = "div[role='listitem']";
     const { document } = parseHTML(data);
     const items = [...document.querySelectorAll(listItemSelector)];
 
     const ads = items.reduce((accum: AmazonPlpAd[], item) => {
-      this.builder.build(item, category);
-      if (!this.builder.ad) return accum;
+      const ad = new AmazonPlpAdBuilder().build(item, this.category).ad;
+      if (!ad) return accum;
 
-      accum.push(this.builder.ad);
+      accum.push(ad);
       return accum;
     }, []);
 
     if (ads.length === 0) {
-      this.execute(category, page);
+      page.pending = false;
+      this.handlePage(page, resolve);
       return;
     }
 
+    page.complete = true;
     this.apiService.post("amazon/ads", ads);
+    resolve();
   }
 
-  private onError(category: string, page: number) {
-    this.execute(category, page);
+  private onError(page: AmazonPlpAdPage, resolve: () => void) {
+    page.pending = false;
+    this.handlePage(page, resolve);
   }
 }

@@ -4,7 +4,7 @@ import { HttpsProxyAgent } from "https-proxy-agent";
 export class AmazonService {
   private static instance: AmazonService;
   private static pending = 0;
-  private static pendingLimit = 30;
+  private static pendingLimit = 15;
   private static queue: Function[] = [];
   private proxies = [
     "http://156.228.87.49:3128",
@@ -134,15 +134,15 @@ export class AmazonService {
 
   get<T>(
     url: string,
+    referer?: string,
     callback?: {
       onSuccess?: (data: T) => void;
       onError?: (e: any) => void;
       onFinally?: () => void;
-    },
-    referer?: string
+    }
   ) {
     if (AmazonService.pending >= AmazonService.pendingLimit) {
-      AmazonService.queue.push(() => this.get(url, callback));
+      AmazonService.queue.push(() => this.get(url, referer, callback));
       return;
     }
 

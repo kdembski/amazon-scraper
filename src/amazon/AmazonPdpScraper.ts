@@ -28,6 +28,7 @@ export class AmazonPdpScraper {
     this.prices = this.countries.map((country) => ({
       adId: this.ad.id,
       currencyId: country.currencyId,
+      country,
       pending: false,
       complete: false,
     }));
@@ -47,17 +48,13 @@ export class AmazonPdpScraper {
     if (price.complete || price.pending) return;
 
     const url = `${this.baseUrl}.${country.code}/dp/${this.ad.asin}`;
-
-    price.pending = true;
     const referer = `${this.baseUrl}.${country.code}/s?k=${this.ad.asin}"`;
-    this.amazonService.get<string>(
-      url,
-      {
-        onSuccess: (data) => this.onSuccess(data, price, resolve),
-        onError: (e) => this.onError(e, country, price, resolve),
-      },
-      referer
-    );
+    price.pending = true;
+
+    this.amazonService.get<string>(url, referer, {
+      onSuccess: (data) => this.onSuccess(data, price, resolve),
+      onError: (e) => this.onError(e, country, price, resolve),
+    });
   }
 
   private async onSuccess(
@@ -66,18 +63,17 @@ export class AmazonPdpScraper {
     resolve: () => void
   ) {
     const { document } = parseHTML(data);
-    const builder = new AmazonPdpAdBuilder();
-    builder.build(document);
 
-    price.value = builder.ad?.price;
+    price.value = new AmazonPdpAdBuilder().build(document).ad?.price;
     price.complete = true;
 
     if (this.isComplete()) {
       this.apiService.put("amazon/ads/" + this.ad.id, {
-        prices: this.prices?.map(({ adId, currencyId, value }) => ({
+        prices: this.prices?.map(({ adId, currencyId, country, value }) => ({
           adId,
           currencyId,
           value,
+          country,
         })),
       });
       resolve();
