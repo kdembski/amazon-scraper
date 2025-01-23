@@ -12,7 +12,9 @@ export class AmazonService {
 
   private constructor() {
     const data = readFileSync("proxies.txt", "utf-8");
-    this.proxies = data.split("\r\n");
+    this.proxies = data.includes("\r\n")
+      ? data.split("\r\n")
+      : data.split("\n");
   }
 
   public static getInstance(): AmazonService {
