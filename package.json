@@ -7,7 +7,9 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "start": "tsx ./src/index.ts",
-    "build": "pkgroll"
+    "build": "pkgroll",
+    "scrap:pdp": "npx scrap pdp",
+    "scrap:plp": "npx scrap plp"
   },
   "bin": {
     "scrap":"./dist/index.js"
