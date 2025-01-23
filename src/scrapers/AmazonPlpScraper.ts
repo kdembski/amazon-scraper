@@ -1,9 +1,8 @@
+import { AmazonPlpAdBuilder } from "@/builders/AmazonPlpAdBuilder";
+import { AmazonService } from "@/services/AmazonService";
+import { ApiService } from "@/services/ApiService";
+import { AmazonPlpAdPage, AmazonPlpAd } from "@/types/amazon.types";
 import { parseHTML } from "linkedom";
-import { AmazonPlpAd, AmazonPlpAdPage } from "../types/amazon.types";
-import { ApiService } from "../ApiService";
-import { AmazonPlpAdBuilder } from "./AmazonPlpAdBuilder";
-import { AmazonService } from "./AmazonService";
-import { resolve } from "path";
 
 export class AmazonPlpScraper {
   private baseUrl = "https://www.amazon.pl/";

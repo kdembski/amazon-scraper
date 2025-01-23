@@ -93,6 +93,31 @@ export class ApiService {
     });
   }
 
+  delete<T>(
+    path: string,
+    callback?: {
+      onSuccess?: (data: T) => void;
+      onError?: (e: any) => void;
+      onFinally?: () => void;
+    }
+  ) {
+    return new Promise<T>(async (resolve) => {
+      return axios
+        .delete<T>(this.url(path))
+        .then((response) => {
+          callback?.onSuccess?.(response.data);
+          resolve(response.data);
+        })
+        .catch((e) => {
+          callback?.onError?.(e);
+          this.handleError(e);
+        })
+        .finally(() => {
+          callback?.onFinally?.();
+        });
+    });
+  }
+
   private handleError(e: any) {
     console.error(e?.response?.data.replaceAll("\n", " "));
   }

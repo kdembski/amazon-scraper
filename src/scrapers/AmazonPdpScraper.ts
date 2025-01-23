@@ -1,8 +1,8 @@
+import { AmazonPdpAdBuilder } from "@/builders/AmazonPdpAdBuilder";
+import { AmazonService } from "@/services/AmazonService";
+import { ApiService } from "@/services/ApiService";
+import { AmazonAd, Country, AmazonAdPrice } from "@/types/amazon.types";
 import { parseHTML } from "linkedom";
-import { AmazonAd, AmazonAdPrice, Country } from "../types/amazon.types";
-import { ApiService } from "../ApiService";
-import { AmazonService } from "./AmazonService";
-import { AmazonPdpAdBuilder } from "./AmazonPdpAdBuilder";
 
 export class AmazonPdpScraper {
   private baseUrl = "https://www.amazon";
@@ -31,6 +31,7 @@ export class AmazonPdpScraper {
       country,
       pending: false,
       complete: false,
+      deleted: false,
     }));
 
     return new Promise<void>((resolve) => {
@@ -45,7 +46,7 @@ export class AmazonPdpScraper {
     const price = this.getPrice(this.ad.id, currencyId);
 
     if (!price) return;
-    if (price.complete || price.pending) return;
+    if (price.complete || price.pending || price.deleted) return;
 
     const url = `${this.baseUrl}.${country.code}/dp/${this.ad.asin}`;
     const referer = `${this.baseUrl}.${country.code}/s?k=${this.ad.asin}"`;
@@ -89,6 +90,8 @@ export class AmazonPdpScraper {
     price.pending = false;
 
     if (e.status === 404) {
+      this.apiService.delete("amazon/ads/" + this.ad.id);
+      price.deleted = true;
       resolve();
       return;
     }

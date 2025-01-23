@@ -1,26 +1,34 @@
 {
   "name": "amazon-scraper",
-  "version": "1.0.1",
+  "version": "1.0.0",
   "type": "module",
-  "main": "dist/index.js",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
   "scripts": {
-    "start": "vite-node src/index.ts",
-    "watch": "vite-node --watch src/index.ts"
+    "start": "tsx ./src/index.ts",
+    "build": "pkgroll"
+  },
+  "bin": {
+    "scrap":"./dist/index.js"
   },
   "license": "ISC",
   "dependencies": {
-    "axios": "^1.7.9",
-    "dotenv": "^16.4.7",
-    "jsdom": "^26.0.0",
-    "linkedom": "^0.18.6",
-    "lodash": "^4.17.21"
-  },
-  "devDependencies": {
     "@types/axios": "^0.14.4",
-    "@types/jsdom": "^21.1.7",
     "@types/lodash": "^4.17.14",
     "@types/node": "^22.10.7",
-    "typescript": "^5.7.3",
-    "vite-node": "^3.0.2"
+    "@types/user-agents": "^1.0.4",
+    "axios": "^1.7.9",
+    "commander": "^13.1.0",
+    "dotenv": "^16.4.7",
+    "https-proxy-agent": "^7.0.6",
+    "linkedom": "^0.18.6",
+    "lodash": "^4.17.21",
+    "user-agents": "^1.1.427"
+  },
+  "devDependencies": {
+    "pkgroll": "^2.6.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
   }
 }

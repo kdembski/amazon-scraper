@@ -33,6 +33,7 @@ export interface AmazonAdPrice {
   value?: number;
   pending: boolean;
   complete: boolean;
+  deleted: boolean;
 }
 
 export interface Country {
