@@ -6,9 +6,9 @@ import { readFileSync } from "node:fs";
 export class AmazonService {
   private static instance: AmazonService;
   private static pending = 0;
-  private static pendingLimit = 10;
   private static queue: Function[] = [];
   private proxies;
+  static pendingLimit = 10;
 
   private constructor() {
     const data = readFileSync("proxies.txt", "utf-8");
@@ -59,11 +59,11 @@ export class AmazonService {
         .then((response) => {
           callback?.onSuccess?.(response.data);
           resolve(response.data);
-          console.log(response.status);
+          console.log(`Amazon: ${response.status}`);
         })
         .catch((e) => {
           callback?.onError?.(e);
-          console.error(e.status, e.message);
+          console.error(`Amazon: ${e.status} ${e.message}`);
         })
         .finally(() => {
           callback?.onFinally?.();

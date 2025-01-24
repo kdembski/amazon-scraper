@@ -12,9 +12,13 @@ export interface AmazonPlpAd {
 
 export interface AmazonPlpAdPage {
   number: number;
-  sort: string;
+  range: AmazonPlpAdPageSort;
   pending: boolean;
   complete: boolean;
+}
+export interface AmazonPlpAdPageSort {
+  min: number;
+  max?: number;
 }
 
 export interface AmazonPdpAd {

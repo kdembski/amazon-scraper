@@ -4,12 +4,13 @@ import { AmazonPlpScraper } from "@/scrapers/AmazonPlpScraper";
 import { AmazonPdpScraper } from "@/scrapers/AmazonPdpScraper";
 import { ApiService } from "@/services/ApiService";
 import { AmazonAd, Country } from "@/types/amazon.types";
+import { AmazonService } from "@/services/AmazonService";
 
 configDotenv();
 // Ignore the certificate
 process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = "0";
 
-export const scrapPlp = (timeout = 60) => {
+export const scrapPlp = async () => {
   const categories = [
     "sporting",
     "fashion",
@@ -19,18 +20,17 @@ export const scrapPlp = (timeout = 60) => {
     "home",
   ];
 
-  setInterval(async () => {
-    const pages = Array.from(
-      { length: 5 },
-      () => Math.floor(Math.random() * 399) + 2
-    );
+  const pages = Array.from(
+    { length: 5 },
+    () => Math.floor(Math.random() * 399) + 2
+  );
 
-    for (const category of categories) {
-      await Promise.all(
-        new AmazonPlpScraper(category, [1, ...pages]).execute()
-      );
-    }
-  }, timeout * 1000);
+  const promises = categories.flatMap((category) =>
+    new AmazonPlpScraper(category, pages).execute()
+  );
+
+  await Promise.all(promises);
+  scrapPlp();
 };
 
 export const scrapPdp = async () => {
@@ -48,13 +48,18 @@ export const scrapPdp = async () => {
 
 program
   .command("plp")
-  .option("-t, --timeout <timeout>")
+  .option("-l, --limit <limit>")
   .action((options) => {
-    scrapPlp(options.timeout);
+    AmazonService.pendingLimit = options.limit;
+    scrapPlp();
   });
 
-program.command("pdp").action(() => {
-  scrapPdp();
-});
+program
+  .command("pdp")
+  .option("-l, --limit <limit>")
+  .action((options) => {
+    AmazonService.pendingLimit = options.limit;
+    scrapPdp();
+  });
 
 program.parse(process.argv);

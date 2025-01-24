@@ -1,7 +1,11 @@
 import { AmazonPlpAdBuilder } from "@/builders/AmazonPlpAdBuilder";
 import { AmazonService } from "@/services/AmazonService";
 import { ApiService } from "@/services/ApiService";
-import { AmazonPlpAdPage, AmazonPlpAd } from "@/types/amazon.types";
+import {
+  AmazonPlpAdPage,
+  AmazonPlpAd,
+  AmazonPlpAdPageSort,
+} from "@/types/amazon.types";
 import { parseHTML } from "linkedom";
 import lodash from "lodash";
 
@@ -11,10 +15,13 @@ export class AmazonPlpScraper {
   private amazonService;
   private category: string;
   private pages: AmazonPlpAdPage[];
-  private sorts = [
-    "exact-aware-popularity-rank",
-    "date-desc-rank",
-    "review-rank",
+  private ranges = [
+    { min: 0, max: 20 },
+    { min: 20, max: 50 },
+    { min: 50, max: 100 },
+    { min: 100, max: 250 },
+    { min: 250, max: 500 },
+    { min: 500 },
   ];
 
   constructor(
@@ -29,14 +36,14 @@ export class AmazonPlpScraper {
 
     if (lodash.isArray(pages)) {
       this.pages = pages.flatMap((number) =>
-        this.sorts.map((sort) => this.buildPage(number, sort))
+        this.ranges.map((range) => this.buildPage(number, range))
       );
       return;
     }
 
     this.pages = new Array(pages)
       .fill(null)
-      .flatMap((_, i) => this.sorts.map((sort) => this.buildPage(i, sort)));
+      .flatMap((_, i) => this.ranges.map((range) => this.buildPage(i, range)));
   }
 
   execute() {
@@ -49,10 +56,10 @@ export class AmazonPlpScraper {
     );
   }
 
-  private buildPage(number: number, sort: string) {
+  private buildPage(number: number, range: AmazonPlpAdPageSort) {
     return {
       number,
-      sort,
+      range,
       pending: false,
       complete: false,
     };
@@ -61,7 +68,7 @@ export class AmazonPlpScraper {
   private handlePage(page: AmazonPlpAdPage, resolve: () => void) {
     const ref = Math.floor(Math.random() * 100000000000);
     const referer = `${this.baseUrl}b?node=${ref}`;
-    const url = `${this.baseUrl}s?i=${this.category}&rh=n%3A${ref}&s=${page.sort}&page=${page.number}&fs=true&ref=lp_${ref}_sar`;
+    const url = `${this.baseUrl}s?i=${this.category}&page=${page.number}&low-price=${page.range.min}&high-price=${page.range.max}`;
 
     if (page.complete || page.pending) return;
     page.pending = true;
@@ -96,8 +103,9 @@ export class AmazonPlpScraper {
     }
 
     page.complete = true;
-    await this.apiService.post("amazon/ads", ads);
     console.log(`Collected ${ads.length} ads from '${this.category}'`);
+    await this.apiService.post("amazon/ads", ads);
+
     resolve();
   }
 

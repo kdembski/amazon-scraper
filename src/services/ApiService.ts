@@ -119,6 +119,6 @@ export class ApiService {
   }
 
   private handleError(e: any) {
-    console.error(e?.response?.data.replaceAll("\n", " "));
+    console.error("Server: " + e?.response?.data.replaceAll("\n", " "));
   }
 }
