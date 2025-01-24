@@ -3,6 +3,7 @@ import { AmazonService } from "@/services/AmazonService";
 import { ApiService } from "@/services/ApiService";
 import { AmazonPlpAdPage, AmazonPlpAd } from "@/types/amazon.types";
 import { parseHTML } from "linkedom";
+import lodash from "lodash";
 
 export class AmazonPlpScraper {
   private baseUrl = "https://www.amazon.pl/";
@@ -18,7 +19,7 @@ export class AmazonPlpScraper {
 
   constructor(
     category: string,
-    pages: number,
+    pages: number | number[],
     apiService = ApiService.getInstance(),
     amazonService = AmazonService.getInstance()
   ) {
@@ -26,14 +27,16 @@ export class AmazonPlpScraper {
     this.apiService = apiService;
     this.amazonService = amazonService;
 
-    this.pages = new Array(pages).fill(null).flatMap((_, i) =>
-      this.sorts.map((sort) => ({
-        number: i + 1,
-        sort,
-        pending: false,
-        complete: false,
-      }))
-    );
+    if (lodash.isArray(pages)) {
+      this.pages = pages.flatMap((number) =>
+        this.sorts.map((sort) => this.buildPage(number, sort))
+      );
+      return;
+    }
+
+    this.pages = new Array(pages)
+      .fill(null)
+      .flatMap((_, i) => this.sorts.map((sort) => this.buildPage(i, sort)));
   }
 
   execute() {
@@ -43,6 +46,15 @@ export class AmazonPlpScraper {
           this.handlePage(page, resolve);
         })
     );
+  }
+
+  private buildPage(number: number, sort: string) {
+    return {
+      number,
+      sort,
+      pending: false,
+      complete: false,
+    };
   }
 
   private handlePage(page: AmazonPlpAdPage, resolve: () => void) {

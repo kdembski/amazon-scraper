@@ -10,13 +10,26 @@ configDotenv();
 process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = "0";
 
 export const scrapPlp = (timeout = 60) => {
-  setInterval(() => {
-    new AmazonPlpScraper("home", 1).execute();
-    new AmazonPlpScraper("sporting", 1).execute();
-    new AmazonPlpScraper("fashion", 1).execute();
-    new AmazonPlpScraper("electronics", 1).execute();
-    new AmazonPlpScraper("computers", 1).execute();
-    new AmazonPlpScraper("videogames", 1).execute();
+  const categories = [
+    "sporting",
+    "fashion",
+    "electronics",
+    "computers",
+    "videogames",
+    "home",
+  ];
+
+  setInterval(async () => {
+    const pages = Array.from(
+      { length: 5 },
+      () => Math.floor(Math.random() * 399) + 2
+    );
+
+    for (const category of categories) {
+      await Promise.all(
+        new AmazonPlpScraper(category, [1, ...pages]).execute()
+      );
+    }
   }, timeout * 1000);
 };
 
