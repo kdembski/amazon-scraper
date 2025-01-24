@@ -40,6 +40,7 @@ export class AmazonPlpScraper {
   }
 
   execute() {
+    console.log(this.category);
     return this.pages.map(
       (page) =>
         new Promise<void>((resolve) => {
@@ -71,7 +72,11 @@ export class AmazonPlpScraper {
     });
   }
 
-  private onSuccess(data: string, page: AmazonPlpAdPage, resolve: () => void) {
+  private async onSuccess(
+    data: string,
+    page: AmazonPlpAdPage,
+    resolve: () => void
+  ) {
     const listItemSelector = "div[role='listitem']";
     const { document } = parseHTML(data);
     const items = [...document.querySelectorAll(listItemSelector)];
@@ -91,7 +96,8 @@ export class AmazonPlpScraper {
     }
 
     page.complete = true;
-    this.apiService.post("amazon/ads", ads);
+    await this.apiService.post("amazon/ads", ads);
+    console.log(`Collected ${ads.length} ads from '${this.category}'`);
     resolve();
   }
 
