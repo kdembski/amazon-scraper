@@ -10,7 +10,7 @@
     "build": "pkgroll"
   },
   "bin": {
-    "scrap":"./dist/index.js"
+    "scrap": "./dist/index.js"
   },
   "license": "ISC",
   "dependencies": {
@@ -19,7 +19,7 @@
     "@types/node": "^22.10.7",
     "@types/user-agents": "^1.0.4",
     "axios": "^1.7.9",
-    "commander": "^13.1.0",
+    "cron": "^3.5.0",
     "dotenv": "^16.4.7",
     "https-proxy-agent": "^7.0.6",
     "linkedom": "^0.18.6",

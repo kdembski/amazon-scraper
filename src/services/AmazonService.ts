@@ -63,7 +63,7 @@ export class AmazonService {
         })
         .catch((e) => {
           callback?.onError?.(e);
-          console.error(`Amazon: ${e.status} ${e.message}`);
+          console.error(`Amazon: ${e.message}`);
         })
         .finally(() => {
           callback?.onFinally?.();

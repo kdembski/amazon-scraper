@@ -43,7 +43,9 @@ export class AmazonPlpScraper {
 
     this.pages = new Array(pages)
       .fill(null)
-      .flatMap((_, i) => this.ranges.map((range) => this.buildPage(i, range)));
+      .flatMap((_, i) =>
+        this.ranges.map((range) => this.buildPage(i + 1, range))
+      );
   }
 
   execute() {
