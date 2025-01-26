@@ -8,7 +8,7 @@ export class AmazonService {
   private static pending = 0;
   private static queue: Function[] = [];
   private proxies;
-  static pendingLimit = 10;
+  static pendingLimit = 20;
 
   private constructor() {
     const data = readFileSync("proxies.txt", "utf-8");
@@ -32,10 +32,14 @@ export class AmazonService {
       onSuccess?: (data: T) => void;
       onError?: (e: any) => void;
       onFinally?: () => void;
-    }
+    },
+    priority?: boolean
   ) {
     if (AmazonService.pending >= AmazonService.pendingLimit) {
-      AmazonService.queue.push(() => this.get(url, referer, callback));
+      this.addToQueue(
+        () => this.get(url, referer, callback, priority),
+        priority
+      );
       return;
     }
 
@@ -75,4 +79,13 @@ export class AmazonService {
         });
     });
   }
+
+  private addToQueue = (callback: () => void, priority?: boolean) => {
+    if (priority) {
+      AmazonService.queue.unshift(callback);
+      return;
+    }
+
+    AmazonService.queue.push(callback);
+  };
 }

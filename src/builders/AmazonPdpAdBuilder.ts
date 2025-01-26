@@ -18,23 +18,28 @@ export class AmazonPdpAdBuilder {
   }
 
   private getPrice(document: Document) {
-    let price: any;
-    const json = document.querySelector(
-      "#twisterPlusWWDesktop > div"
-    )?.innerHTML;
+    return (
+      this.getCorePrice(document, "desktop") ||
+      this.getCorePrice(document, "mobile")
+    );
+  }
 
-    if (json?.startsWith("{") && json.endsWith("}")) {
-      price = JSON.parse(json)?.["desktop_buybox_group_1"]?.[0]?.priceAmount;
-    }
+  private getCorePrice(document: Document, id: string) {
+    const container = document.querySelector(
+      `#corePriceDisplay_${id}_feature_div`
+    );
 
-    const inputValue = document
-      .querySelector("#twister-plus-price-data-price")
-      ?.getAttribute("value");
+    const whole = container
+      ?.querySelector(".a-price-whole")
+      ?.textContent?.replace(/[^\d]/g, "");
 
-    if (inputValue) {
-      price = inputValue;
-    }
+    const fraction = container
+      ?.querySelector(".a-price-fraction")
+      ?.textContent?.replace(/[^\d]/g, "");
 
-    return price ? parseFloat(price) : undefined;
+    if (!whole || !fraction) return;
+
+    const value = `${whole}.${fraction}`;
+    return parseFloat(value);
   }
 }

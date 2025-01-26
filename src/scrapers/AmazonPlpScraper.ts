@@ -49,7 +49,6 @@ export class AmazonPlpScraper {
   }
 
   execute() {
-    console.log(this.category);
     return this.pages.map(
       (page) =>
         new Promise<void>((resolve) => {
@@ -75,10 +74,15 @@ export class AmazonPlpScraper {
     if (page.complete || page.pending) return;
     page.pending = true;
 
-    this.amazonService.get<string>(url, referer, {
-      onSuccess: (data) => this.onSuccess(data, page, resolve),
-      onError: () => this.onError(page, resolve),
-    });
+    this.amazonService.get<string>(
+      url,
+      referer,
+      {
+        onSuccess: (data) => this.onSuccess(data, page, resolve),
+        onError: () => this.onError(page, resolve),
+      },
+      true
+    );
   }
 
   private async onSuccess(

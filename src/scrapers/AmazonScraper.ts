@@ -5,14 +5,11 @@ import { AmazonAd, Country } from "@/types/amazon.types";
 import { CronJob } from "cron";
 
 export class AmazonScraper {
-  private isScrapingPlp = false;
-  private isScrapingPdp = false;
   private categories = [
     "sporting",
     "fashion",
     "electronics",
     "computers",
-    "videogames",
     "home",
   ];
 
@@ -25,22 +22,13 @@ export class AmazonScraper {
   }
 
   async scrapPlp() {
-    this.isScrapingPlp = true;
-
-    const promises = this.categories.flatMap((category) =>
-      new AmazonPlpScraper(category, 400).execute()
-    );
-
+    const category =
+      this.categories[Math.floor(Math.random() * this.categories.length)];
+    const promises = new AmazonPlpScraper(category, 400).execute();
     await Promise.all(promises);
-    this.isScrapingPlp = false;
-
-    if (!this.isScrapingPdp) this.scrapPdp();
   }
 
   async scrapPdp() {
-    if (this.isScrapingPlp) return;
-    this.isScrapingPdp = true;
-
     const apiService = ApiService.getInstance();
     const ads = await apiService.get<AmazonAd[]>("amazon/ads/scrap");
     const countries = await apiService.get<Country[]>("countries");
@@ -50,7 +38,6 @@ export class AmazonScraper {
     });
 
     await Promise.all(promises);
-    this.isScrapingPdp = false;
 
     this.scrapPdp();
   }
