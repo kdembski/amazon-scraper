@@ -16,7 +16,7 @@ export class AmazonScraper {
   constructor() {}
 
   execute() {
-    const scrapPlpJob = new CronJob("0 0 2 * * *", this.scrapPlp);
+    const scrapPlpJob = new CronJob("0 0 2 * * *", () => this.scrapPlp());
     scrapPlpJob.start();
     this.scrapPdp();
   }
