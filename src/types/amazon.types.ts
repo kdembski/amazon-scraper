@@ -45,3 +45,8 @@ export interface Country {
   code: string;
   currencyId: number;
 }
+
+export interface Proxy {
+  ip: string;
+  blocked: boolean;
+}
