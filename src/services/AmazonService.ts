@@ -7,7 +7,7 @@ import { Proxy } from "@/types/amazon.types";
 export class AmazonService {
   private static instance: AmazonService;
   private pending = 0;
-  private pendingLimit = 10;
+  private pendingLimit = 30;
   private queue: Function[] = [];
   private proxies: Proxy[] = [];
 
@@ -55,6 +55,12 @@ export class AmazonService {
             "User-Agent": userAgent,
             Referer: referer,
             "Referrer-Policy": "strict-origin-when-cross-origin",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "gzip, deflate, br",
+            Accept:
+              "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            DNT: "1",
+            Connection: "keep-alive",
           },
         })
         .then((response) => {
@@ -76,7 +82,7 @@ export class AmazonService {
           this.pending--;
 
           const next = this.queue.shift();
-          const delay = Math.floor(Math.random() * 1000);
+          const delay = Math.floor(Math.random() * 5000);
           setTimeout(() => next?.(), delay);
         });
     });
