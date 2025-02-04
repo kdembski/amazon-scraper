@@ -16,12 +16,16 @@ export class AmazonPlpScraper {
   private category: string;
   private pages: AmazonPlpAdPage[];
   private ranges = [
-    { min: 0, max: 20 },
-    { min: 20, max: 50 },
-    { min: 50, max: 100 },
+    { min: 0, max: 10 },
+    { min: 10, max: 20 },
+    { min: 20, max: 30 },
+    { min: 30, max: 50 },
+    { min: 50, max: 75 },
+    { min: 75, max: 100 },
     { min: 100, max: 250 },
     { min: 250, max: 500 },
-    { min: 500 },
+    { min: 500, max: 1000 },
+    { min: 1000 },
   ];
 
   constructor(

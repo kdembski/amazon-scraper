@@ -8,7 +8,7 @@ export class AmazonService {
   private static pending = 0;
   private static queue: Function[] = [];
   private proxies;
-  static pendingLimit = 20;
+  static pendingLimit = 10;
 
   private constructor() {
     const data = readFileSync("proxies.txt", "utf-8");
