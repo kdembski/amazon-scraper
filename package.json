@@ -9,9 +9,6 @@
     "start": "tsx ./src/index.ts",
     "build": "pkgroll"
   },
-  "bin": {
-    "scrap": "./dist/index.js"
-  },
   "license": "ISC",
   "dependencies": {
     "@types/axios": "^0.14.4",

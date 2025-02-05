@@ -128,6 +128,6 @@ export class AmazonService {
 
     setTimeout(() => {
       proxy.blocked = false;
-    }, 5 * 60 * 1000);
+    }, 1 * 60 * 1000);
   }
 }
