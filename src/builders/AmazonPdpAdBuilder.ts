@@ -2,14 +2,18 @@ import { AmazonPdpAd } from "@/types/amazon.types";
 
 export class AmazonPdpAdBuilder {
   private _ad?: AmazonPdpAd;
+  private _isCaptcha?: boolean;
 
   build(document: Document) {
     const form = document.querySelector("form");
     const isCaptcha =
       form?.getAttribute("action") === "/errors/validateCaptcha";
 
+    this._isCaptcha = isCaptcha;
+
     if (isCaptcha) {
       console.warn("Warning: Captcha triggered!");
+      return this;
     }
 
     const price = this.getPrice(document);
@@ -23,6 +27,10 @@ export class AmazonPdpAdBuilder {
 
   get ad() {
     return this._ad;
+  }
+
+  get isCaptcha() {
+    return this._isCaptcha;
   }
 
   private getPrice(document: Document) {

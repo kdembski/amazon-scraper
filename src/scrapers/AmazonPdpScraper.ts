@@ -1,7 +1,7 @@
 import { AmazonPdpAdBuilder } from "@/builders/AmazonPdpAdBuilder";
 import { AmazonService } from "@/services/AmazonService";
 import { ApiService } from "@/services/ApiService";
-import { AmazonAd, Country, AmazonAdPrice } from "@/types/amazon.types";
+import { AmazonAd, Country, AmazonAdPrice, Proxy } from "@/types/amazon.types";
 import { parseHTML } from "linkedom";
 
 export class AmazonPdpScraper {
@@ -53,19 +53,29 @@ export class AmazonPdpScraper {
     price.pending = true;
 
     this.amazonService.get<string>(url, referer, {
-      onSuccess: (data) => this.onSuccess(data, price, resolve),
+      onSuccess: (res) =>
+        this.onSuccess(res.data, res.proxy, country, price, resolve),
       onError: (e) => this.onError(e, country, price, resolve),
     });
   }
 
   private async onSuccess(
     data: string,
+    proxy: Proxy,
+    country: Country,
     price: AmazonAdPrice,
     resolve: () => void
   ) {
     const { document } = parseHTML(data);
+    const builder = new AmazonPdpAdBuilder().build(document);
 
-    price.value = new AmazonPdpAdBuilder().build(document).ad?.price;
+    if (builder.isCaptcha) {
+      this.amazonService.blockProxy(proxy);
+      this.handleCountry(country, resolve);
+      return;
+    }
+
+    price.value = builder.ad?.price;
     price.complete = true;
 
     if (this.isComplete()) {

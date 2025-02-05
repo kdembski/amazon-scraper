@@ -35,7 +35,7 @@ export class AmazonService {
     url: string,
     referer?: string,
     callback?: {
-      onSuccess?: (data: T) => void;
+      onSuccess?: (data: { data: T; proxy: Proxy }) => void;
       onError?: (e: any) => void;
       onFinally?: () => void;
     },
@@ -51,6 +51,8 @@ export class AmazonService {
     const httpAgent = new HttpProxyAgent("http://" + proxy.ip);
     const headers = new HeaderGenerator().getHeaders();
     delete headers["accept"];
+    delete headers["accept-encoding"];
+    delete headers["accept-language"];
 
     this.pending++;
 
@@ -65,12 +67,11 @@ export class AmazonService {
           },
         })
         .then((response) => {
-          callback?.onSuccess?.(response.data);
+          callback?.onSuccess?.({ data: response.data, proxy });
           resolve(response.data);
         })
         .catch((e) => {
           callback?.onError?.(e);
-          this.blockProxy(proxy);
         })
         .finally(() => {
           callback?.onFinally?.();
@@ -123,11 +124,11 @@ export class AmazonService {
     return proxy;
   }
 
-  private blockProxy(proxy: Proxy) {
+  blockProxy(proxy: Proxy) {
     proxy.blocked = true;
 
     setTimeout(() => {
       proxy.blocked = false;
-    }, 1 * 60 * 1000);
+    }, 5 * 60 * 1000);
   }
 }
