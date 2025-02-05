@@ -1,13 +1,13 @@
 import axios from "axios";
-import { HttpProxyAgent } from "http-proxy-agent";
+import { HttpsProxyAgent } from "https-proxy-agent";
 import { readFileSync } from "node:fs";
-import { HeaderGenerator } from "header-generator";
+import UserAgent from "user-agents";
 import { Proxy } from "@/types/amazon.types";
 
 export class AmazonService {
   private static instance: AmazonService;
   private pending = 0;
-  private pendingLimit = 5;
+  private pendingLimit = 20;
   private queue: Function[] = [];
   private proxies: Proxy[] = [];
 
@@ -48,17 +48,17 @@ export class AmazonService {
     }
 
     const proxy = this.getRandomProxy();
-    const httpAgent = new HttpProxyAgent("http://" + proxy.ip);
-    const headers = new HeaderGenerator().getHeaders();
+    const httpsAgent = new HttpsProxyAgent("http://" + proxy.ip);
+    const userAgent = new UserAgent().toString();
 
     this.pending++;
 
     return new Promise<T>(async (resolve) => {
       return axios
         .get<T>(url, {
-          httpAgent,
+          httpsAgent,
           headers: {
-            "User-Agent": headers["user-agent"],
+            "User-Agent": userAgent,
             Referer: referer,
             "Referrer-Policy": "strict-origin-when-cross-origin",
           },
@@ -66,11 +66,11 @@ export class AmazonService {
         .then((response) => {
           callback?.onSuccess?.({ data: response.data, proxy });
           resolve(response.data);
-          console.log(`Amazon: ${response.status}`);
+          //console.log(`Amazon: ${response.status}`);
         })
         .catch((e) => {
           callback?.onError?.(e);
-          console.log(`Amazon: ${e.message}`);
+          //console.log(`Amazon: ${e.message}`);
         })
         .finally(() => {
           callback?.onFinally?.();
