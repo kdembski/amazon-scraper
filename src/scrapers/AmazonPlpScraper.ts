@@ -82,7 +82,7 @@ export class AmazonPlpScraper {
       url,
       referer,
       {
-        onSuccess: (data) => this.onSuccess(data, page, resolve),
+        onSuccess: (res) => this.onSuccess(res.data, page, resolve),
         onError: () => this.onError(page, resolve),
       },
       true

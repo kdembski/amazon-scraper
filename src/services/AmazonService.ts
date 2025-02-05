@@ -50,9 +50,6 @@ export class AmazonService {
     const proxy = this.getRandomProxy();
     const httpAgent = new HttpProxyAgent("http://" + proxy.ip);
     const headers = new HeaderGenerator().getHeaders();
-    delete headers["accept"];
-    delete headers["accept-encoding"];
-    delete headers["accept-language"];
 
     this.pending++;
 
@@ -61,7 +58,7 @@ export class AmazonService {
         .get<T>(url, {
           httpAgent,
           headers: {
-            ...headers,
+            "User-Agent": headers["user-agent"],
             Referer: referer,
             "Referrer-Policy": "strict-origin-when-cross-origin",
           },
@@ -69,9 +66,11 @@ export class AmazonService {
         .then((response) => {
           callback?.onSuccess?.({ data: response.data, proxy });
           resolve(response.data);
+          //console.log(`Amazon: ${response.status}`);
         })
         .catch((e) => {
           callback?.onError?.(e);
+          //console.log(`Amazon: ${e.message}`);
         })
         .finally(() => {
           callback?.onFinally?.();
