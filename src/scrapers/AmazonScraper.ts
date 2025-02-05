@@ -1,5 +1,6 @@
 import { AmazonPdpScraper } from "@/scrapers/AmazonPdpScraper";
 import { AmazonPlpScraper } from "@/scrapers/AmazonPlpScraper";
+import { AmazonService } from "@/services/AmazonService";
 import { ApiService } from "@/services/ApiService";
 import { AmazonAd, Country } from "@/types/amazon.types";
 import { CronJob } from "cron";
@@ -29,16 +30,20 @@ export class AmazonScraper {
   }
 
   async scrapPdp() {
+    const amazonService = AmazonService.getInstance();
+    if (amazonService.queue.length > 0) {
+      setTimeout(() => this.scrapPdp(), 1000);
+      return;
+    }
+
     const apiService = ApiService.getInstance();
     const ads = await apiService.get<AmazonAd[]>("amazon/ads/scrap");
     const countries = await apiService.get<Country[]>("countries");
 
-    const promises = ads.map((ad) => {
+    ads.map((ad) => {
       return new AmazonPdpScraper(ad, countries).execute();
     });
 
-    await Promise.all(promises);
-
-    this.scrapPdp();
+    setTimeout(() => this.scrapPdp(), 1000);
   }
 }

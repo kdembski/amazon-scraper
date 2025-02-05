@@ -8,8 +8,8 @@ export class AmazonService {
   private static instance: AmazonService;
   private pending = 0;
   private pendingLimit = 30;
-  private queue: Function[] = [];
   private proxies: Proxy[] = [];
+  queue: Function[] = [];
 
   private constructor() {
     this.setupProxies();
