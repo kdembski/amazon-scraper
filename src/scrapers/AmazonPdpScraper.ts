@@ -70,6 +70,7 @@ export class AmazonPdpScraper {
     const builder = new AmazonPdpAdBuilder().build(document);
 
     if (builder.isCaptcha) {
+      price.pending = false;
       this.amazonService.blockProxy(proxy);
       this.handleCountry(country, resolve);
       return;
