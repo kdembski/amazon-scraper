@@ -1,13 +1,13 @@
 import axios from "axios";
+import UserAgent from "user-agents";
 import { HttpsProxyAgent } from "https-proxy-agent";
 import { readFileSync } from "node:fs";
-import UserAgent from "user-agents";
 import { Proxy } from "@/types/amazon.types";
 
 export class AmazonService {
   private static instance: AmazonService;
   private pending = 0;
-  private pendingLimit = 20;
+  private pendingLimit = 30;
   private queue: Function[] = [];
   private proxies: Proxy[] = [];
 
