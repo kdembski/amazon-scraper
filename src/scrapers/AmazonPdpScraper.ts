@@ -70,12 +70,7 @@ export class AmazonPdpScraper {
 
     if (this.isComplete()) {
       this.apiService.put("amazon/ads/" + this.ad.id, {
-        prices: this.prices?.map(({ adId, currencyId, country, value }) => ({
-          adId,
-          currencyId,
-          value,
-          country,
-        })),
+        prices: this.prices?.filter((price) => !!price.value),
       });
       resolve();
     }

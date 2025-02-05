@@ -4,6 +4,14 @@ export class AmazonPdpAdBuilder {
   private _ad?: AmazonPdpAd;
 
   build(document: Document) {
+    const form = document.querySelector("form");
+    const isCaptcha =
+      form?.getAttribute("action") === "/errors/validateCaptcha";
+
+    if (isCaptcha) {
+      console.warn("Warning: Captcha triggered!");
+    }
+
     const price = this.getPrice(document);
 
     this._ad = {

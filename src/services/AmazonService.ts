@@ -1,7 +1,7 @@
 import axios from "axios";
-import { HttpsProxyAgent } from "https-proxy-agent";
-import UserAgent from "user-agents";
+import { HttpProxyAgent } from "http-proxy-agent";
 import { readFileSync } from "node:fs";
+import { HeaderGenerator } from "header-generator";
 import { Proxy } from "@/types/amazon.types";
 
 export class AmazonService {
@@ -13,6 +13,14 @@ export class AmazonService {
 
   private constructor() {
     this.setupProxies();
+    this.setupQueue();
+
+    setInterval(() => {
+      const blockedProxies = this.proxies.filter((p) => p.blocked).length;
+      console.log(
+        `pending: ${this.pending} queue: ${this.queue.length} blocked proxies: ${blockedProxies}`
+      );
+    }, 1000);
   }
 
   public static getInstance(): AmazonService {
@@ -39,20 +47,19 @@ export class AmazonService {
       return;
     }
 
-    console.log(
-      "Blocked proxies: " + this.proxies.filter((prox) => prox.blocked).length
-    );
     const proxy = this.getRandomProxy();
-    const httpsAgent = new HttpsProxyAgent("http://" + proxy.ip);
-    const userAgent = new UserAgent().toString();
+    const httpAgent = new HttpProxyAgent("http://" + proxy.ip);
+    const headers = new HeaderGenerator().getHeaders();
+    delete headers["accept"];
 
     this.pending++;
+
     return new Promise<T>(async (resolve) => {
       return axios
         .get<T>(url, {
-          httpsAgent,
+          httpAgent,
           headers: {
-            "User-Agent": userAgent,
+            ...headers,
             Referer: referer,
             "Referrer-Policy": "strict-origin-when-cross-origin",
           },
@@ -60,24 +67,14 @@ export class AmazonService {
         .then((response) => {
           callback?.onSuccess?.(response.data);
           resolve(response.data);
-          console.log(`Amazon: ${response.status}`);
         })
         .catch((e) => {
           callback?.onError?.(e);
-          console.error(`Amazon: ${e.message}`);
-
-          proxy.blocked = true;
-          setTimeout(() => {
-            proxy.blocked = false;
-          }, 5 * 60 * 1000);
+          this.blockProxy(proxy);
         })
         .finally(() => {
           callback?.onFinally?.();
           this.pending--;
-
-          const next = this.queue.shift();
-          const delay = Math.floor(Math.random() * 5000);
-          setTimeout(() => next?.(), delay);
         });
     });
   }
@@ -90,6 +87,24 @@ export class AmazonService {
 
     this.queue.push(callback);
   };
+
+  private shiftQueue() {
+    if (this.pending >= this.pendingLimit) {
+      return;
+    }
+
+    const next = this.queue.shift();
+    next?.();
+  }
+
+  private setupQueue() {
+    const delay = Math.floor(Math.random() * 100);
+
+    setTimeout(() => {
+      this.shiftQueue();
+      this.setupQueue();
+    }, delay);
+  }
 
   private setupProxies() {
     const data = readFileSync("proxies.txt", "utf-8");
@@ -106,5 +121,13 @@ export class AmazonService {
     } while (!proxy || proxy.blocked);
 
     return proxy;
+  }
+
+  private blockProxy(proxy: Proxy) {
+    proxy.blocked = true;
+
+    setTimeout(() => {
+      proxy.blocked = false;
+    }, 5 * 60 * 1000);
   }
 }
