@@ -3,24 +3,17 @@ import UserAgent from "user-agents";
 import { HttpsProxyAgent } from "https-proxy-agent";
 import { readFileSync } from "node:fs";
 import { Proxy } from "@/types/amazon.types";
+import { RequestQueueService } from "@/services/RequestQueueService";
 
 export class AmazonService {
   private static instance: AmazonService;
-  private pending = 0;
-  private pendingLimit = 30;
   private proxies: Proxy[] = [];
-  queue: Function[] = [];
+  queueService;
 
-  private constructor() {
+  private constructor(queueService = new RequestQueueService(30)) {
+    this.queueService = queueService;
+    queueService.start();
     this.setupProxies();
-    this.setupQueue();
-
-    setInterval(() => {
-      const blockedProxies = this.proxies.filter((p) => p.blocked).length;
-      console.log(
-        `pending: ${this.pending} queue: ${this.queue.length} blocked proxies: ${blockedProxies}`
-      );
-    }, 1000);
   }
 
   public static getInstance(): AmazonService {
@@ -35,75 +28,46 @@ export class AmazonService {
     url: string,
     referer?: string,
     callback?: {
-      onSuccess?: (data: { data: T; proxy: Proxy }) => void;
+      onSuccess?: (data: T) => void;
       onError?: (e: any) => void;
       onFinally?: () => void;
     },
     priority?: boolean
   ) {
-    if (this.pending >= this.pendingLimit) {
-      const queueItem = () => this.get(url, referer, callback, priority);
-      this.addToQueue(queueItem, priority);
-      return;
-    }
+    this.queueService.request(() => {
+      const proxy = this.getRandomProxy();
 
-    const proxy = this.getRandomProxy();
-    const httpsAgent = new HttpsProxyAgent("http://" + proxy.ip);
-    const userAgent = new UserAgent().toString();
+      const userAgent = new UserAgent().toString();
+      const httpsAgent = new HttpsProxyAgent("http://" + proxy.ip, {
+        keepAlive: true,
+      });
 
-    this.pending++;
-
-    return new Promise<T>(async (resolve) => {
-      return axios
-        .get<T>(url, {
-          httpsAgent,
-          headers: {
-            "User-Agent": userAgent,
-            Referer: referer,
-            "Referrer-Policy": "strict-origin-when-cross-origin",
-          },
-        })
-        .then((response) => {
-          callback?.onSuccess?.({ data: response.data, proxy });
-          resolve(response.data);
-          //console.log(`Amazon: ${response.status}`);
-        })
-        .catch((e) => {
-          callback?.onError?.(e);
-          //console.log(`Amazon: ${e.message}`);
-        })
-        .finally(() => {
-          callback?.onFinally?.();
-          this.pending--;
-        });
-    });
-  }
-
-  private addToQueue = (callback: () => void, priority?: boolean) => {
-    if (priority) {
-      this.queue.unshift(callback);
-      return;
-    }
-
-    this.queue.push(callback);
-  };
-
-  private shiftQueue() {
-    if (this.pending >= this.pendingLimit) {
-      return;
-    }
-
-    const next = this.queue.shift();
-    next?.();
-  }
-
-  private setupQueue() {
-    const delay = Math.floor(Math.random() * 100);
-
-    setTimeout(() => {
-      this.shiftQueue();
-      this.setupQueue();
-    }, delay);
+      return new Promise<void>(async (resolve) => {
+        return axios
+          .get<T>(url, {
+            httpsAgent,
+            headers: {
+              "User-Agent": userAgent,
+              Referer: referer,
+              "Referrer-Policy": "strict-origin-when-cross-origin",
+            },
+            adapter: "fetch",
+            fetchOptions: { priority: "low" },
+          })
+          .then((response) => {
+            callback?.onSuccess?.(response.data);
+            //console.log(`Amazon: ${response.status}`);
+          })
+          .catch((e) => {
+            callback?.onError?.(e);
+            //console.log(`Amazon: ${e.message}`);
+          })
+          .finally(() => {
+            callback?.onFinally?.();
+            resolve();
+          });
+      });
+    }, priority);
   }
 
   private setupProxies() {
@@ -121,13 +85,5 @@ export class AmazonService {
     } while (!proxy || proxy.blocked);
 
     return proxy;
-  }
-
-  blockProxy(proxy: Proxy) {
-    proxy.blocked = true;
-
-    setTimeout(() => {
-      proxy.blocked = false;
-    }, 5 * 60 * 1000);
   }
 }

@@ -31,8 +31,6 @@ export interface AmazonAd {
 }
 
 export interface AmazonAdPrice {
-  adId: number;
-  currencyId: number;
   country: Country;
   value?: number;
   pending: boolean;
@@ -41,6 +39,7 @@ export interface AmazonAdPrice {
 }
 
 export interface Country {
+  id: number;
   name: string;
   code: string;
   currencyId: number;

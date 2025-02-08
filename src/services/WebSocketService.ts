@@ -1,7 +1,10 @@
+import WebSocket from "ws";
+
 export class WebSocketService<MessageT> {
   private ws?: WebSocket;
   private url: string;
-  onmessage?: (e: MessageEvent<string>) => void;
+  onmessage?: (e: WebSocket.MessageEvent) => void;
+  onerror?: ((event: WebSocket.ErrorEvent) => void) | null;
 
   constructor(path: string) {
     this.url = process.env.API_URL?.replace("http", "ws") + "/" + path;
@@ -24,6 +27,10 @@ export class WebSocketService<MessageT> {
 
     if (!this.ws || !this.onmessage) return;
     this.ws.onmessage = this.onmessage;
+
+    if (this.onerror) {
+      this.ws.onerror = this.onerror;
+    }
   };
 
   send = async (message: MessageT) => {

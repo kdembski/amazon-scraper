@@ -26,8 +26,6 @@ export class AmazonPdpScraper {
 
   execute() {
     this.prices = this.countries.map((country) => ({
-      adId: this.ad.id,
-      currencyId: country.currencyId,
       country,
       pending: false,
       complete: false,
@@ -42,8 +40,7 @@ export class AmazonPdpScraper {
   }
 
   private handleCountry(country: Country, resolve: () => void) {
-    const { currencyId } = country;
-    const price = this.getPrice(this.ad.id, currencyId);
+    const price = this.getPrice(country.id);
 
     if (!price) return;
     if (price.complete || price.pending || price.deleted) return;
@@ -53,15 +50,13 @@ export class AmazonPdpScraper {
     price.pending = true;
 
     this.amazonService.get<string>(url, referer, {
-      onSuccess: (res) =>
-        this.onSuccess(res.data, res.proxy, country, price, resolve),
+      onSuccess: (res) => this.onSuccess(res, country, price, resolve),
       onError: (e) => this.onError(e, country, price, resolve),
     });
   }
 
   private async onSuccess(
     data: string,
-    proxy: Proxy,
     country: Country,
     price: AmazonAdPrice,
     resolve: () => void
@@ -71,7 +66,6 @@ export class AmazonPdpScraper {
 
     if (builder.isCaptcha) {
       price.pending = false;
-      this.amazonService.blockProxy(proxy);
       this.handleCountry(country, resolve);
       return;
     }
@@ -80,9 +74,7 @@ export class AmazonPdpScraper {
     price.complete = true;
 
     if (this.isComplete()) {
-      this.apiService.put("amazon/ads/" + this.ad.id, {
-        prices: this.prices?.filter((price) => !!price.value),
-      });
+      this.sendCompletedPrices();
       resolve();
     }
   }
@@ -96,21 +88,37 @@ export class AmazonPdpScraper {
     price.pending = false;
 
     if (e.status === 404) {
-      this.apiService.delete("amazon/ads/" + this.ad.id);
-      price.deleted = true;
+      if (!price.deleted) {
+        this.apiService.delete("amazon/ads/" + this.ad.id);
+      }
+
+      this.prices?.forEach((price) => (price.deleted = true));
       resolve();
       return;
     }
+
     this.handleCountry(country, resolve);
   }
 
-  private getPrice(adId: number, currencyId: number) {
-    return this.prices?.find(
-      (price) => price.adId === adId && price.currencyId === currencyId
-    );
+  private getPrice(countryId: number) {
+    return this.prices?.find((price) => price.country.id === countryId);
   }
 
   private isComplete() {
     return this.prices?.every((price) => price.complete);
+  }
+
+  private sendCompletedPrices() {
+    const prices = this.prices
+      ?.filter((price) => !!price.value)
+      .map((price) => ({
+        adId: this.ad.id,
+        currencyId: price.country.currencyId,
+        ...price,
+      }));
+
+    if (!prices?.length) return;
+
+    this.apiService.put("amazon/ads/" + this.ad.id, { prices });
   }
 }

@@ -6,6 +6,8 @@ import { AmazonAd, Country } from "@/types/amazon.types";
 import { CronJob } from "cron";
 
 export class AmazonScraper {
+  private apiService;
+  private amazonService;
   private categories = [
     "sporting",
     "fashion",
@@ -13,13 +15,23 @@ export class AmazonScraper {
     "computers",
     "home",
   ];
+  private countries: Country[] = [];
 
-  constructor() {}
+  constructor(
+    apiService = ApiService.getInstance(),
+    amazonService = AmazonService.getInstance()
+  ) {
+    this.apiService = apiService;
+    this.amazonService = amazonService;
+  }
 
-  execute() {
+  async execute() {
+    await this.loadCountries();
+
+    this.scrapPdp();
+
     const scrapPlpJob = new CronJob("0 0 2 * * *", () => this.scrapPlp());
     scrapPlpJob.start();
-    this.scrapPdp();
   }
 
   async scrapPlp() {
@@ -29,21 +41,34 @@ export class AmazonScraper {
     await Promise.all(promises);
   }
 
-  async scrapPdp() {
-    const amazonService = AmazonService.getInstance();
-    if (amazonService.queue.length > 0) {
+  scrapPdp() {
+    if (this.amazonService.queueService.queue.length > 0) {
       setTimeout(() => this.scrapPdp(), 1000);
       return;
     }
 
-    const apiService = ApiService.getInstance();
-    const ads = await apiService.get<AmazonAd[]>("amazon/ads/scrap");
-    const countries = await apiService.get<Country[]>("countries");
+    this.apiService.get<AmazonAd[]>(
+      "amazon/ads/scrap?count=500",
+      {
+        onSuccess: async (ads) => {
+          const promises = ads.map((ad) => {
+            return new AmazonPdpScraper(ad, this.countries).execute();
+          });
+          await Promise.all(promises);
+        },
+        onFinally: () => {
+          setTimeout(() => this.scrapPdp(), 1000);
+        },
+      },
+      true
+    );
+  }
 
-    ads.map((ad) => {
-      return new AmazonPdpScraper(ad, countries).execute();
+  async loadCountries() {
+    return this.apiService.get<Country[]>("countries", {
+      onSuccess: (countries) => {
+        this.countries = countries;
+      },
     });
-
-    setTimeout(() => this.scrapPdp(), 1000);
   }
 }
