@@ -3,13 +3,20 @@ import UserAgent from "user-agents";
 import { HttpsProxyAgent } from "https-proxy-agent";
 import { readFileSync } from "node:fs";
 import { RequestQueueService } from "@/services/RequestQueueService";
+import { ArgsService } from "@/services/ArgsService";
 
 export class AmazonService {
   private static instance: AmazonService;
   private proxies: string[] = [];
   queueService;
 
-  private constructor(queueService = new RequestQueueService(5)) {
+  private constructor(
+    argsService = ArgsService.getInstance(),
+    queueService = new RequestQueueService(
+      argsService.getLimitFlag(),
+      "\x1b[36m%s\x1b[0m"
+    )
+  ) {
     this.queueService = queueService;
     queueService.start();
     this.setupProxies();
@@ -53,11 +60,11 @@ export class AmazonService {
           })
           .then((response) => {
             callback?.onSuccess?.(response.data);
-            console.log(`Amazon: ${response.status}`);
+            //console.log(`Amazon: ${response.status}`);
           })
           .catch((e) => {
             callback?.onError?.(e);
-            console.log(`Amazon: ${e.message}`);
+            //console.log(`Amazon: ${e.message}`);
           })
           .finally(() => {
             callback?.onFinally?.();

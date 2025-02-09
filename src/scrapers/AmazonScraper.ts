@@ -2,12 +2,14 @@ import { AmazonPdpScraper } from "@/scrapers/AmazonPdpScraper";
 import { AmazonPlpScraper } from "@/scrapers/AmazonPlpScraper";
 import { AmazonService } from "@/services/AmazonService";
 import { ApiService } from "@/services/ApiService";
+import { ArgsService } from "@/services/ArgsService";
 import { AmazonAd, Country } from "@/types/amazon.types";
 import { CronJob } from "cron";
 
 export class AmazonScraper {
   private apiService;
   private amazonService;
+  private argsService;
   private categories = [
     "sporting",
     "fashion",
@@ -19,10 +21,12 @@ export class AmazonScraper {
 
   constructor(
     apiService = ApiService.getInstance(),
-    amazonService = AmazonService.getInstance()
+    amazonService = AmazonService.getInstance(),
+    argsService = ArgsService.getInstance()
   ) {
     this.apiService = apiService;
     this.amazonService = amazonService;
+    this.argsService = argsService;
   }
 
   async execute() {
@@ -47,17 +51,22 @@ export class AmazonScraper {
       return;
     }
 
-    this.apiService.get<AmazonAd[]>("amazon/ads/scrap?count=50", {
-      onSuccess: async (ads) => {
-        const promises = ads.map((ad) => {
-          return new AmazonPdpScraper(ad, this.countries).execute();
-        });
-        await Promise.all(promises);
+    const count = this.argsService.getCountFlag();
+    this.apiService.get<AmazonAd[]>(
+      `amazon/ads/scrap?count=${count}`,
+      {
+        onSuccess: async (ads) => {
+          const promises = ads.map((ad) => {
+            return new AmazonPdpScraper(ad, this.countries).execute();
+          });
+          await Promise.all(promises);
+        },
+        onFinally: () => {
+          setTimeout(() => this.scrapPdp(), 1000);
+        },
       },
-      onFinally: () => {
-        setTimeout(() => this.scrapPdp(), 1000);
-      },
-    });
+      true
+    );
   }
 
   async loadCountries() {

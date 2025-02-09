@@ -3,11 +3,14 @@ export class RequestQueueService {
   pendingLimit;
   queue: Function[] = [];
 
-  constructor(pendingLimit: number) {
+  constructor(pendingLimit: number, logWrapper: string) {
     this.pendingLimit = pendingLimit;
 
     setInterval(() => {
-      console.log(`pending: ${this.pending} | queue: ${this.queue.length}`);
+      console.log(
+        logWrapper,
+        `pending: ${this.pending} | queue: ${this.queue.length}`
+      );
     }, 1000);
   }
 
