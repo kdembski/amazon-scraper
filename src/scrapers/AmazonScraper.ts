@@ -48,7 +48,7 @@ export class AmazonScraper {
     }
 
     this.apiService.get<AmazonAd[]>(
-      "amazon/ads/scrap?count=500",
+      "amazon/ads/scrap?count=50",
       {
         onSuccess: async (ads) => {
           const promises = ads.map((ad) => {
