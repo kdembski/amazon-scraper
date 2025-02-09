@@ -4,12 +4,8 @@ import axios from "axios";
 
 export class ApiService {
   private static instance: ApiService;
-  queueService;
 
-  private constructor(queueService = new RequestQueueService(10)) {
-    this.queueService = queueService;
-    queueService.start();
-  }
+  private constructor() {}
 
   public static getInstance(): ApiService {
     if (!ApiService.instance) {
@@ -29,32 +25,29 @@ export class ApiService {
       onSuccess?: (data: T) => void;
       onError?: (e: any) => void;
       onFinally?: () => void;
-    },
-    priority?: boolean
+    }
   ) {
-    return this.queueService.request(() => {
-      const agent = new http.Agent({ keepAlive: true });
+    const agent = new http.Agent({ keepAlive: true });
 
-      return new Promise<void>(async (resolve) => {
-        return axios
-          .get<T>(this.url(path), {
-            httpAgent: agent,
-            adapter: "fetch",
-            fetchOptions: { priority: "high" },
-          })
-          .then((response) => {
-            callback?.onSuccess?.(response.data);
-          })
-          .catch((e) => {
-            callback?.onError?.(e);
-            this.handleError(e);
-          })
-          .finally(() => {
-            callback?.onFinally?.();
-            resolve();
-          });
-      });
-    }, priority);
+    return new Promise<void>(async (resolve) => {
+      return axios
+        .get<T>(this.url(path), {
+          httpAgent: agent,
+          adapter: "fetch",
+          fetchOptions: { priority: "high" },
+        })
+        .then((response) => {
+          callback?.onSuccess?.(response.data);
+        })
+        .catch((e) => {
+          callback?.onError?.(e);
+          this.handleError(e);
+        })
+        .finally(() => {
+          callback?.onFinally?.();
+          resolve();
+        });
+    });
   }
 
   post<T>(
@@ -64,32 +57,29 @@ export class ApiService {
       onSuccess?: (data: T) => void;
       onError?: (e: any) => void;
       onFinally?: () => void;
-    },
-    priority?: boolean
+    }
   ) {
-    return this.queueService.request(() => {
-      const agent = new http.Agent({ keepAlive: true });
+    const agent = new http.Agent({ keepAlive: true });
 
-      return new Promise<void>(async (resolve) => {
-        return axios
-          .post<T>(this.url(path), data, {
-            httpAgent: agent,
-            adapter: "fetch",
-            fetchOptions: { priority: "high" },
-          })
-          .then((response) => {
-            callback?.onSuccess?.(response.data);
-          })
-          .catch((e) => {
-            callback?.onError?.(e);
-            this.handleError(e);
-          })
-          .finally(() => {
-            callback?.onFinally?.();
-            resolve();
-          });
-      });
-    }, priority);
+    return new Promise<void>(async (resolve) => {
+      return axios
+        .post<T>(this.url(path), data, {
+          httpAgent: agent,
+          adapter: "fetch",
+          fetchOptions: { priority: "high" },
+        })
+        .then((response) => {
+          callback?.onSuccess?.(response.data);
+        })
+        .catch((e) => {
+          callback?.onError?.(e);
+          this.handleError(e);
+        })
+        .finally(() => {
+          callback?.onFinally?.();
+          resolve();
+        });
+    });
   }
 
   put<T>(
@@ -99,32 +89,29 @@ export class ApiService {
       onSuccess?: (data: T) => void;
       onError?: (e: any) => void;
       onFinally?: () => void;
-    },
-    priority?: boolean
+    }
   ) {
-    return this.queueService.request(() => {
-      const agent = new http.Agent({ keepAlive: true });
+    const agent = new http.Agent({ keepAlive: true });
 
-      return new Promise<void>(async (resolve) => {
-        return axios
-          .put<T>(this.url(path), data, {
-            httpAgent: agent,
-            adapter: "fetch",
-            fetchOptions: { priority: "high" },
-          })
-          .then((response) => {
-            callback?.onSuccess?.(response.data);
-          })
-          .catch((e) => {
-            callback?.onError?.(e);
-            this.handleError(e);
-          })
-          .finally(() => {
-            callback?.onFinally?.();
-            resolve();
-          });
-      });
-    }, priority);
+    return new Promise<void>(async (resolve) => {
+      return axios
+        .put<T>(this.url(path), data, {
+          httpAgent: agent,
+          adapter: "fetch",
+          fetchOptions: { priority: "high" },
+        })
+        .then((response) => {
+          callback?.onSuccess?.(response.data);
+        })
+        .catch((e) => {
+          callback?.onError?.(e);
+          this.handleError(e);
+        })
+        .finally(() => {
+          callback?.onFinally?.();
+          resolve();
+        });
+    });
   }
 
   delete<T>(
@@ -133,32 +120,29 @@ export class ApiService {
       onSuccess?: (data: T) => void;
       onError?: (e: any) => void;
       onFinally?: () => void;
-    },
-    priority?: boolean
+    }
   ) {
-    return this.queueService.request(() => {
-      const agent = new http.Agent({ keepAlive: true });
+    const agent = new http.Agent({ keepAlive: true });
 
-      return new Promise<void>(async (resolve) => {
-        return axios
-          .delete<T>(this.url(path), {
-            httpAgent: agent,
-            adapter: "fetch",
-            fetchOptions: { priority: "high" },
-          })
-          .then((response) => {
-            callback?.onSuccess?.(response.data);
-          })
-          .catch((e) => {
-            callback?.onError?.(e);
-            this.handleError(e);
-          })
-          .finally(() => {
-            callback?.onFinally?.();
-            resolve();
-          });
-      });
-    }, priority);
+    return new Promise<void>(async (resolve) => {
+      return axios
+        .delete<T>(this.url(path), {
+          httpAgent: agent,
+          adapter: "fetch",
+          fetchOptions: { priority: "high" },
+        })
+        .then((response) => {
+          callback?.onSuccess?.(response.data);
+        })
+        .catch((e) => {
+          callback?.onError?.(e);
+          this.handleError(e);
+        })
+        .finally(() => {
+          callback?.onFinally?.();
+          resolve();
+        });
+    });
   }
 
   private handleError(e: any) {

@@ -47,21 +47,17 @@ export class AmazonScraper {
       return;
     }
 
-    this.apiService.get<AmazonAd[]>(
-      "amazon/ads/scrap?count=50",
-      {
-        onSuccess: async (ads) => {
-          const promises = ads.map((ad) => {
-            return new AmazonPdpScraper(ad, this.countries).execute();
-          });
-          await Promise.all(promises);
-        },
-        onFinally: () => {
-          setTimeout(() => this.scrapPdp(), 1000);
-        },
+    this.apiService.get<AmazonAd[]>("amazon/ads/scrap?count=50", {
+      onSuccess: async (ads) => {
+        const promises = ads.map((ad) => {
+          return new AmazonPdpScraper(ad, this.countries).execute();
+        });
+        await Promise.all(promises);
       },
-      true
-    );
+      onFinally: () => {
+        setTimeout(() => this.scrapPdp(), 1000);
+      },
+    });
   }
 
   async loadCountries() {
