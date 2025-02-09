@@ -56,11 +56,11 @@ export class AmazonService {
           })
           .then((response) => {
             callback?.onSuccess?.(response.data);
-            //console.log(`Amazon: ${response.status}`);
+            console.log(`Amazon: ${response.status}`);
           })
           .catch((e) => {
             callback?.onError?.(e);
-            //console.log(`Amazon: ${e.message}`);
+            console.log(`Amazon: ${e.message}`);
           })
           .finally(() => {
             callback?.onFinally?.();
