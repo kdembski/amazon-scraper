@@ -10,7 +10,7 @@ export class AmazonService {
   private proxies: Proxy[] = [];
   queueService;
 
-  private constructor(queueService = new RequestQueueService(20)) {
+  private constructor(queueService = new RequestQueueService(5)) {
     this.queueService = queueService;
     queueService.start();
     this.setupProxies();
