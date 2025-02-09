@@ -2,12 +2,11 @@ import axios from "axios";
 import UserAgent from "user-agents";
 import { HttpsProxyAgent } from "https-proxy-agent";
 import { readFileSync } from "node:fs";
-import { Proxy } from "@/types/amazon.types";
 import { RequestQueueService } from "@/services/RequestQueueService";
 
 export class AmazonService {
   private static instance: AmazonService;
-  private proxies: Proxy[] = [];
+  private proxies: string[] = [];
   queueService;
 
   private constructor(queueService = new RequestQueueService(5)) {
@@ -38,7 +37,7 @@ export class AmazonService {
       const proxy = this.getRandomProxy();
 
       const userAgent = new UserAgent().toString();
-      const httpsAgent = new HttpsProxyAgent("http://" + proxy.ip, {
+      const httpsAgent = new HttpsProxyAgent("http://" + proxy, {
         keepAlive: true,
       });
 
@@ -51,8 +50,6 @@ export class AmazonService {
               Referer: referer,
               "Referrer-Policy": "strict-origin-when-cross-origin",
             },
-            adapter: "fetch",
-            fetchOptions: { priority: "low" },
           })
           .then((response) => {
             callback?.onSuccess?.(response.data);
@@ -72,18 +69,12 @@ export class AmazonService {
 
   private setupProxies() {
     const data = readFileSync("proxies.txt", "utf-8");
-    this.proxies = (
-      data.includes("\r\n") ? data.split("\r\n") : data.split("\n")
-    ).map((proxy) => ({ ip: proxy, blocked: false }));
+    this.proxies = data.includes("\r\n")
+      ? data.split("\r\n")
+      : data.split("\n");
   }
 
   private getRandomProxy() {
-    let proxy: Proxy;
-
-    do {
-      proxy = this.proxies[Math.floor(Math.random() * this.proxies.length)];
-    } while (!proxy || proxy.blocked);
-
-    return proxy;
+    return this.proxies[Math.floor(Math.random() * this.proxies.length)];
   }
 }
