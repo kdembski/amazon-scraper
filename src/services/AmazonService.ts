@@ -8,6 +8,7 @@ import { ArgsService } from "@/services/ArgsService";
 export class AmazonService {
   private static instance: AmazonService;
   private proxies: string[] = [];
+  private argsService;
   queueService;
 
   private constructor(
@@ -17,6 +18,7 @@ export class AmazonService {
       "\x1b[36m%s\x1b[0m"
     )
   ) {
+    this.argsService = argsService;
     this.queueService = queueService;
     queueService.start();
     this.setupProxies();
@@ -57,6 +59,11 @@ export class AmazonService {
               Referer: referer,
               "Referrer-Policy": "strict-origin-when-cross-origin",
             },
+            maxRedirects: 0,
+            ...(this.argsService.getTurboFlag() && {
+              adapter: "fetch",
+              fetchOptions: { priority: "low" },
+            }),
           })
           .then((response) => {
             callback?.onSuccess?.(response.data);

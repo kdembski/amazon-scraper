@@ -1,10 +1,18 @@
+import { ArgsService } from "@/services/ArgsService";
+
 export class RequestQueueService {
+  private argsService;
   pending = 0;
   pendingLimit;
   queue: Function[] = [];
 
-  constructor(pendingLimit: number, logWrapper: string) {
+  constructor(
+    pendingLimit: number,
+    logWrapper: string,
+    argsService = ArgsService.getInstance()
+  ) {
     this.pendingLimit = pendingLimit;
+    this.argsService = argsService;
 
     setInterval(() => {
       console.log(
@@ -37,7 +45,7 @@ export class RequestQueueService {
   }
 
   start() {
-    const delay = Math.floor(Math.random() * 100);
+    const delay = Math.floor(Math.random() * this.argsService.getDelayFlag());
 
     setTimeout(() => {
       this.next();

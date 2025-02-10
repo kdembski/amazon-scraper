@@ -32,4 +32,18 @@ export class ArgsService {
     if (!value) return 50;
     return parseInt(value);
   }
+
+  getTurboFlag() {
+    const value = this.getFlagValue("-t") || this.getFlagValue("--turbo");
+
+    if (!value) return false;
+    return value === "1";
+  }
+
+  getDelayFlag() {
+    const value = this.getFlagValue("-d") || this.getFlagValue("--delay");
+
+    if (!value) return 100;
+    return parseInt(value);
+  }
 }

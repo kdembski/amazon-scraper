@@ -23,6 +23,7 @@ export interface AmazonPlpAdPageSort {
 
 export interface AmazonPdpAd {
   price?: number;
+  asin?: string;
 }
 
 export interface AmazonAd {

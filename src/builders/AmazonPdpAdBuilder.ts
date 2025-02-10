@@ -17,9 +17,11 @@ export class AmazonPdpAdBuilder {
     }
 
     const price = this.getPrice(document);
+    const asin = this.getAsin(document);
 
     this._ad = {
       price,
+      asin,
     };
 
     return this;
@@ -57,5 +59,14 @@ export class AmazonPdpAdBuilder {
 
     const value = `${whole}.${fraction}`;
     return parseFloat(value);
+  }
+
+  private getAsin(document: Document) {
+    const els = document.querySelectorAll(`[data-csa-c-asin]`);
+    const asins = [...els]
+      .map((el) => el.getAttribute("data-csa-c-asin"))
+      .filter((asin): asin is string => !!asin);
+
+    return asins[0];
   }
 }
