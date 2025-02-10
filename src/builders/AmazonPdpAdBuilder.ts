@@ -38,7 +38,10 @@ export class AmazonPdpAdBuilder {
   private getPrice(document: Document) {
     return (
       this.getCorePrice(document, "desktop") ||
-      this.getCorePrice(document, "mobile")
+      this.getCorePrice(document, "mobile") ||
+      this.getWholeCorePrice(document, "desktop") ||
+      this.getWholeCorePrice(document, "mobile") ||
+      this.getCorePriceDesktopPrice(document)
     );
   }
 
@@ -59,6 +62,34 @@ export class AmazonPdpAdBuilder {
 
     const value = `${whole}.${fraction}`;
     return parseFloat(value);
+  }
+
+  private getWholeCorePrice(document: Document, id: string) {
+    const container = document.querySelector(
+      `#corePriceDisplay_${id}_feature_div`
+    );
+
+    const price = container
+      ?.querySelector(".a-text-price > span")
+      ?.textContent?.replace(/[^\d,]/g, "")
+      .replace(",", ".");
+
+    if (!price) return;
+
+    return parseFloat(price);
+  }
+
+  private getCorePriceDesktopPrice(document: Document) {
+    const container = document.querySelector(`#corePrice_desktop`);
+
+    const price = container
+      ?.querySelector(".a-text-price > span")
+      ?.textContent?.replace(/[^\d,]/g, "")
+      .replace(",", ".");
+
+    if (!price) return;
+
+    return parseFloat(price);
   }
 
   private getAsin(document: Document) {
