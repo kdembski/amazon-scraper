@@ -113,8 +113,9 @@ export class AmazonPdpScraper {
       ?.filter((price) => !!price.value)
       .map((price) => ({
         adId: this.ad.id,
-        currencyId: price.country.currencyId,
-        ...price,
+        countryId: price.country.id,
+        country: price.country,
+        value: price.value,
       }));
 
     if (!prices?.length) return;
