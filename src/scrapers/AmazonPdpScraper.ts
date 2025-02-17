@@ -30,6 +30,7 @@ export class AmazonPdpScraper {
       pending: false,
       complete: false,
       deleted: false,
+      failed: 0,
     }));
 
     return new Promise<void>((resolve) => {
@@ -97,6 +98,13 @@ export class AmazonPdpScraper {
       return;
     }
 
+    if (price.failed > 10) {
+      price.complete = true;
+      console.log(`${this.ad.asin}_${country.code}: Failed over 10 times`);
+      return;
+    }
+
+    price.failed++;
     this.handleCountry(country, resolve);
   }
 
