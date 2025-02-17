@@ -125,6 +125,7 @@ export class AmazonPlpScraper {
 
     if (page.failed > 100) {
       page.complete = true;
+      resolve();
       return;
     }
 
