@@ -98,7 +98,7 @@ export class AmazonPdpScraper {
       return;
     }
 
-    if (price.failed > 10) {
+    if (price.failed > 50) {
       price.complete = true;
       console.log(`${this.ad.asin}_${country.code}: Failed over 10 times`);
       return;
