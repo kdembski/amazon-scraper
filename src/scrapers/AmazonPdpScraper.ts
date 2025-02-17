@@ -98,7 +98,7 @@ export class AmazonPdpScraper {
       return;
     }
 
-    if (price.failed > 100) {
+    if (price.failed > 500) {
       price.complete = true;
       this.amazonService.queueService.failed++;
 
