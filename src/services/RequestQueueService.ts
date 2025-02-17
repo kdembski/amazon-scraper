@@ -2,6 +2,7 @@ import { ArgsService } from "@/services/ArgsService";
 
 export class RequestQueueService {
   private argsService;
+  failed = 0;
   pending = 0;
   pendingLimit;
   queue: Function[] = [];
@@ -17,7 +18,7 @@ export class RequestQueueService {
     setInterval(() => {
       console.log(
         logWrapper,
-        `pending: ${this.pending} | queue: ${this.queue.length}`
+        `pending: ${this.pending} | queue: ${this.queue.length} | failed: ${this.failed}`
       );
     }, 1000);
   }
