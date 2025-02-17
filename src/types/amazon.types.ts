@@ -15,6 +15,7 @@ export interface AmazonPlpAdPage {
   range: AmazonPlpAdPageSort;
   pending: boolean;
   complete: boolean;
+  failed: number;
 }
 export interface AmazonPlpAdPageSort {
   min: number;

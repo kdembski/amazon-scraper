@@ -67,6 +67,7 @@ export class AmazonPlpScraper {
       range,
       pending: false,
       complete: false,
+      failed: 0,
     };
   }
 
@@ -121,6 +122,13 @@ export class AmazonPlpScraper {
 
   private onError(page: AmazonPlpAdPage, resolve: () => void) {
     page.pending = false;
+
+    if (page.failed > 100) {
+      page.complete = true;
+      return;
+    }
+
+    page.failed++;
     this.handlePage(page, resolve);
   }
 }

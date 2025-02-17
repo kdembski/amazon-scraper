@@ -18,6 +18,7 @@ export class AmazonScraper {
     "home",
   ];
   private countries: Country[] = [];
+  private paused = false;
 
   constructor(
     apiService = ApiService.getInstance(),
@@ -36,6 +37,17 @@ export class AmazonScraper {
 
     const scrapPlpJob = new CronJob("0 0 2 * * *", () => this.scrapPlp());
     scrapPlpJob.start();
+
+    const pauseJob = new CronJob("0 0 4 * * *", () => {
+      this.paused = true;
+
+      setTimeout(() => {
+        this.paused = false;
+        this.scrapPdp();
+      }, 60 * 60 * 1000);
+    });
+
+    pauseJob.start();
   }
 
   async scrapPlp() {
@@ -46,6 +58,8 @@ export class AmazonScraper {
   }
 
   scrapPdp() {
+    if (this.paused) return;
+
     if (this.amazonService.queueService.queue.length > 0) {
       setTimeout(() => this.scrapPdp(), 1000);
       return;
