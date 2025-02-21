@@ -73,8 +73,8 @@ export class RequestQueueService {
   private updateSpeedHistory() {
     if (!this.lastRequestCount || !this.requestCount) return;
 
-    const speed = this.lastRequestCount - this.requestCount;
-    if (speed < 0) return;
+    let speed = this.lastRequestCount - this.requestCount;
+    speed = speed < 0 ? 0 : speed;
 
     const length = this.speedHistory.unshift(speed);
     this.speedHistory.length = Math.min(length, 100);

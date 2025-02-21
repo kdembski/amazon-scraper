@@ -7,8 +7,7 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "start": "tsx ./src/index.ts",
-    "test": "tsx ./src/test.ts",
-    "build": "pkgroll"
+    "test": "tsx ./src/test.ts"
   },
   "license": "ISC",
   "dependencies": {
@@ -28,7 +27,6 @@
     "@types/node": "^22.10.7",
     "@types/user-agents": "^1.0.4",
     "@types/ws": "^8.5.14",
-    "pkgroll": "^2.6.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3"
   }
