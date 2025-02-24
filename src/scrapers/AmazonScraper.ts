@@ -3,20 +3,14 @@ import { AmazonPlpScraper } from "@/scrapers/AmazonPlpScraper";
 import { AmazonService } from "@/services/AmazonService";
 import { ApiService } from "@/services/ApiService";
 import { ArgsService } from "@/services/ArgsService";
-import { AmazonAd, Country } from "@/types/amazon.types";
+import { AmazonAd, AmazonAdCategory, Country } from "@/types/amazon.types";
 import { CronJob } from "cron";
 
 export class AmazonScraper {
   private apiService;
   private amazonService;
   private argsService;
-  private categories = [
-    "sporting",
-    "fashion",
-    "electronics",
-    "computers",
-    "home",
-  ];
+  private categories: AmazonAdCategory[] = [];
   private countries: Country[] = [];
   private paused = false;
 
@@ -32,6 +26,7 @@ export class AmazonScraper {
 
   async execute() {
     await this.loadCountries();
+    await this.loadCategories();
 
     this.scrapPdp();
 
@@ -50,10 +45,10 @@ export class AmazonScraper {
     pauseJob.start();
   }
 
-  async scrapPlp() {
-    const category =
-      this.categories[Math.floor(Math.random() * this.categories.length)];
-    const promises = new AmazonPlpScraper(category, 400).execute();
+  async scrapPlp(name?: string) {
+    const random =
+      this.categories[Math.floor(Math.random() * this.categories.length)]?.name;
+    const promises = new AmazonPlpScraper(name || random, 400).execute();
     await Promise.all(promises);
   }
 
@@ -89,6 +84,14 @@ export class AmazonScraper {
     return this.apiService.get<Country[]>("countries", {
       onSuccess: (countries) => {
         this.countries = countries;
+      },
+    });
+  }
+
+  async loadCategories() {
+    return this.apiService.get<AmazonAdCategory[]>("amazon/ads/categories", {
+      onSuccess: (categories) => {
+        this.categories = categories;
       },
     });
   }

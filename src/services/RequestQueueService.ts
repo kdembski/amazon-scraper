@@ -1,4 +1,5 @@
 import { ArgsService } from "@/services/ArgsService";
+import _ from "lodash";
 
 export class RequestQueueService {
   private argsService;
@@ -71,7 +72,7 @@ export class RequestQueueService {
   }
 
   private updateSpeedHistory() {
-    if (!this.lastRequestCount || !this.requestCount) return;
+    if (_.isNil(this.lastRequestCount) || _.isNil(this.requestCount)) return;
 
     let speed = this.lastRequestCount - this.requestCount;
     speed = speed < 0 ? 0 : speed;
