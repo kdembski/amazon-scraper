@@ -1,9 +1,9 @@
 import axios from "axios";
 import UserAgent from "user-agents";
 import { HttpsProxyAgent } from "https-proxy-agent";
-import { readFileSync } from "node:fs";
 import { RequestQueueService } from "@/services/RequestQueueService";
 import { ArgsService } from "@/services/ArgsService";
+import { CronJob } from "cron";
 
 export class AmazonService {
   private static instance: AmazonService;
@@ -21,7 +21,13 @@ export class AmazonService {
     this.argsService = argsService;
     this.queueService = queueService;
     queueService.start();
-    this.setupProxies();
+
+    this.loadProxies();
+
+    const updateJob = new CronJob("0 0 */1 * * *", async () => {
+      await this.loadProxies();
+    });
+    updateJob.start();
   }
 
   public static getInstance(): AmazonService {
@@ -81,11 +87,26 @@ export class AmazonService {
     }, priority);
   }
 
-  private setupProxies() {
-    const data = readFileSync("proxies.txt", "utf-8");
-    this.proxies = data.includes("\r\n")
-      ? data.split("\r\n")
-      : data.split("\n");
+  private loadProxies() {
+    return new Promise((resolve) => {
+      const url = `https://api.proxyscrape.com/v2/account/datacenter_shared/proxy-list?auth=${process.env.PROXY_API_KEY}&type=getproxies&protocol=http`;
+      axios
+        .get<string>(url)
+        .then((response) => {
+          const data = response.data;
+          let array = data.includes("\r\n")
+            ? data.split("\r\n")
+            : data.split("\n");
+
+          array = array.filter((v) => !!v);
+          this.proxies = array;
+
+          resolve(data);
+        })
+        .catch((e) => {
+          console.log(e);
+        });
+    });
   }
 
   private getRandomProxy() {
