@@ -76,6 +76,7 @@ export class AmazonPdpScraper {
 
     price.value = builder.ad?.price;
     price.complete = true;
+    this.amazonService.queueService.completed++;
 
     if (this.isComplete()) {
       this.sendCompletedPrices();

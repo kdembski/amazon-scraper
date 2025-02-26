@@ -7,6 +7,7 @@ export class RequestQueueService {
   private requestCount = 0;
   private speedHistory: number[] = [];
   private speed = 0;
+  completed = 0;
   failed = 0;
   pending = 0;
   pendingLimit;
@@ -27,7 +28,7 @@ export class RequestQueueService {
 
       console.log(
         logWrapper,
-        `speed: ${this.speed}/s | pending: ${this.pending} | queue: ${this.queue.length} | failed: ${this.failed}`
+        `speed: ${this.speed}/s | pending: ${this.pending} | queue: ${this.queue.length} | failed: ${this.failed} | completed: ${this.completed}`
       );
 
       this.lastRequestCount = this.requestCount;

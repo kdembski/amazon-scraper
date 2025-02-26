@@ -61,6 +61,7 @@ export class AmazonScraper {
     }
 
     this.amazonService.queueService.failed = 0;
+    this.amazonService.queueService.completed = 0;
     const count = this.argsService.getCountFlag();
 
     this.apiService.get<AmazonAd[]>(
