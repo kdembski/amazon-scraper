@@ -12,6 +12,7 @@ export class AmazonScraper {
   private argsService;
   private categories: AmazonAdCategory[] = [];
   private countries: Country[] = [];
+  private failed: Record<string, number> = {};
 
   constructor(
     apiService = ApiService.getInstance(),
@@ -21,12 +22,19 @@ export class AmazonScraper {
     this.apiService = apiService;
     this.amazonService = amazonService;
     this.argsService = argsService;
+
+    setInterval(() => {
+      console.log(
+        Object.entries(this.failed)
+          .map(([code, failed]) => `${code}: ${failed}`)
+          .join(" | ")
+      );
+    }, 1000);
   }
 
   async execute() {
     await this.loadCountries();
     await this.loadCategories();
-
     this.scrapPdp();
 
     const scrapPlpJob = new CronJob("0 0 2 * * *", () => this.scrapPlp());
@@ -60,7 +68,11 @@ export class AmazonScraper {
       {
         onSuccess: async (ads) => {
           const promises = ads.map((ad) => {
-            return new AmazonPdpScraper(ad, this.countries).execute();
+            return new AmazonPdpScraper(
+              ad,
+              this.countries,
+              this.failed
+            ).execute();
           });
           await Promise.all(promises);
         },
@@ -76,6 +88,10 @@ export class AmazonScraper {
     return this.apiService.get<Country[]>("countries", {
       onSuccess: (countries) => {
         this.countries = countries;
+
+        this.failed = Object.fromEntries(
+          countries.map((country) => [country.code, 0])
+        );
       },
     });
   }

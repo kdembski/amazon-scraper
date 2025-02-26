@@ -11,15 +11,18 @@ export class AmazonPdpScraper {
   private ad: AmazonAd;
   private countries: Country[];
   private prices?: AmazonAdPrice[];
+  private failed: Record<string, number>;
 
   constructor(
     ad: AmazonAd,
     countries: Country[],
+    failed: Record<string, number>,
     apiService = ApiService.getInstance(),
     amazonService = AmazonService.getInstance()
   ) {
     this.ad = ad;
     this.countries = countries;
+    this.failed = failed;
     this.apiService = apiService;
     this.amazonService = amazonService;
   }
@@ -97,6 +100,8 @@ export class AmazonPdpScraper {
       resolve();
       return;
     }
+
+    this.failed[country.code]++;
 
     if (price.failed > 100) {
       price.complete = true;
