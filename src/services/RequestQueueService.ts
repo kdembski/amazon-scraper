@@ -25,7 +25,6 @@ export class RequestQueueService {
     this.pendingLimit = pendingLimit;
     this.argsService = argsService;
     this.apiService = apiService;
-    console.log(process.env);
 
     setInterval(() => {
       this.requestCount = this.pending + this.queue.length;
@@ -33,9 +32,8 @@ export class RequestQueueService {
       this.calculateSpeed();
 
       if (logs) {
-        console.log(
-          `speed: ${this.speed}/s | pending: ${this.pending} | queue: ${this.queue.length} | failed: ${this.failed} | completed: ${this.completed}`
-        );
+        const text = `speed: ${this.speed}/s | pending: ${this.pending} | queue: ${this.queue.length} | failed: ${this.failed} | completed: ${this.completed}`;
+        console.log(text);
       }
 
       this.lastRequestCount = this.requestCount;
@@ -43,9 +41,6 @@ export class RequestQueueService {
 
     if (logs) {
       new CronJob("0 50 */1 * * *", () => this.sendScraperSpeed()).start();
-      setTimeout(() => {
-        this.sendScraperSpeed();
-      }, 1000);
     }
   }
 
