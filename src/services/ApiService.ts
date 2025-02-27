@@ -6,7 +6,7 @@ export class ApiService {
   private static instance: ApiService;
   queueService;
 
-  private constructor(queueService = new RequestQueueService(5)) {
+  private constructor(queueService = new RequestQueueService(5, false, this)) {
     this.queueService = queueService;
     queueService.start();
   }

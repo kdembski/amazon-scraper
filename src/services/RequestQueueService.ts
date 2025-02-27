@@ -19,8 +19,8 @@ export class RequestQueueService {
   constructor(
     pendingLimit: number,
     logs = false,
-    argsService = ArgsService.getInstance(),
-    apiService = ApiService.getInstance()
+    apiService = ApiService.getInstance(),
+    argsService = ArgsService.getInstance()
   ) {
     this.pendingLimit = pendingLimit;
     this.argsService = argsService;
