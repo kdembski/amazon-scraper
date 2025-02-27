@@ -6,9 +6,7 @@ export class ApiService {
   private static instance: ApiService;
   queueService;
 
-  private constructor(
-    queueService = new RequestQueueService(5, "\x1b[35m%s\x1b[0m")
-  ) {
+  private constructor(queueService = new RequestQueueService(5)) {
     this.queueService = queueService;
     queueService.start();
   }

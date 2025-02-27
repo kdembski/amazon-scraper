@@ -1,8 +1,11 @@
+import { ApiService } from "@/services/ApiService";
 import { ArgsService } from "@/services/ArgsService";
+import { CronJob } from "cron";
 import _ from "lodash";
 
 export class RequestQueueService {
   private argsService;
+  private apiService;
   private lastRequestCount = 0;
   private requestCount = 0;
   private speedHistory: number[] = [];
@@ -15,24 +18,31 @@ export class RequestQueueService {
 
   constructor(
     pendingLimit: number,
-    logWrapper: string,
-    argsService = ArgsService.getInstance()
+    logs = false,
+    argsService = ArgsService.getInstance(),
+    apiService = ApiService.getInstance()
   ) {
     this.pendingLimit = pendingLimit;
     this.argsService = argsService;
+    this.apiService = apiService;
 
     setInterval(() => {
       this.requestCount = this.pending + this.queue.length;
       this.updateSpeedHistory();
       this.calculateSpeed();
 
-      console.log(
-        logWrapper,
-        `speed: ${this.speed}/s | pending: ${this.pending} | queue: ${this.queue.length} | failed: ${this.failed} | completed: ${this.completed}`
-      );
+      if (logs) {
+        console.log(
+          `speed: ${this.speed}/s | pending: ${this.pending} | queue: ${this.queue.length} | failed: ${this.failed} | completed: ${this.completed}`
+        );
+      }
 
       this.lastRequestCount = this.requestCount;
     }, 1000);
+
+    if (logs) {
+      new CronJob("0 59 */1 * * *", () => this.sendScraperSpeed()).start();
+    }
   }
 
   async request(callback: () => Promise<any>, top?: boolean) {
@@ -91,5 +101,12 @@ export class RequestQueueService {
       this.speedHistory.reduce((sum, v) => sum + v, 0) /
         this.speedHistory.length
     );
+  }
+
+  private sendScraperSpeed() {
+    return this.apiService.post("/scrapers/speed", {
+      name: process.env.name,
+      speed: this.speed,
+    });
   }
 }

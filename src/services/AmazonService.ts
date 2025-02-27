@@ -13,10 +13,7 @@ export class AmazonService {
 
   private constructor(
     argsService = ArgsService.getInstance(),
-    queueService = new RequestQueueService(
-      argsService.getLimitFlag(),
-      "\x1b[36m%s\x1b[0m"
-    )
+    queueService = new RequestQueueService(argsService.getLimitFlag(), true)
   ) {
     this.argsService = argsService;
     this.queueService = queueService;
@@ -65,11 +62,6 @@ export class AmazonService {
               Referer: referer,
               "Referrer-Policy": "strict-origin-when-cross-origin",
             },
-            maxRedirects: 0,
-            ...(this.argsService.getTurboFlag() && {
-              adapter: "fetch",
-              fetchOptions: { priority: "low" },
-            }),
           })
           .then((response) => {
             callback?.onSuccess?.(response.data);

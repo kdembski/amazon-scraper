@@ -22,14 +22,6 @@ export class AmazonScraper {
     this.apiService = apiService;
     this.amazonService = amazonService;
     this.argsService = argsService;
-
-    setInterval(() => {
-      console.log(
-        Object.entries(this.failed)
-          .map(([code, failed]) => `${code}: ${failed}`)
-          .join(" | ")
-      );
-    }, 1000);
   }
 
   async execute() {
