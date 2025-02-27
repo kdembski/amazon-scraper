@@ -25,6 +25,7 @@ export class RequestQueueService {
     this.pendingLimit = pendingLimit;
     this.argsService = argsService;
     this.apiService = apiService;
+    console.log(process.env);
 
     setInterval(() => {
       this.requestCount = this.pending + this.queue.length;
@@ -41,7 +42,10 @@ export class RequestQueueService {
     }, 1000);
 
     if (logs) {
-      new CronJob("0 59 */1 * * *", () => this.sendScraperSpeed()).start();
+      new CronJob("0 50 */1 * * *", () => this.sendScraperSpeed()).start();
+      setTimeout(() => {
+        this.sendScraperSpeed();
+      }, 1000);
     }
   }
 
@@ -104,7 +108,7 @@ export class RequestQueueService {
   }
 
   private sendScraperSpeed() {
-    return this.apiService.post("/scrapers/speed", {
+    return this.apiService.post("scrapers/speed", {
       name: process.env.name,
       speed: this.speed,
     });
