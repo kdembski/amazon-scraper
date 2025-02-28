@@ -27,7 +27,7 @@ export class AmazonService {
       await this.loadProxies();
     }).start();
 
-    new CronJob("0 58 */1 * * *", () => this.sendScraperSpeed()).start();
+    new CronJob("0 50 */1 * * *", () => this.sendScraperSpeed()).start();
   }
 
   public static getInstance(): AmazonService {
