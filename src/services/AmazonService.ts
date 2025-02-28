@@ -4,27 +4,30 @@ import { HttpsProxyAgent } from "https-proxy-agent";
 import { RequestQueueService } from "@/services/RequestQueueService";
 import { ArgsService } from "@/services/ArgsService";
 import { CronJob } from "cron";
+import { ApiService } from "@/services/ApiService";
 
 export class AmazonService {
   private static instance: AmazonService;
   private proxies: string[] = [];
-  private argsService;
+  private apiService;
   queueService;
 
   private constructor(
     argsService = ArgsService.getInstance(),
+    apiService = ApiService.getInstance(),
     queueService = new RequestQueueService(argsService.getLimitFlag(), true)
   ) {
-    this.argsService = argsService;
     this.queueService = queueService;
+    this.apiService = apiService;
     queueService.start();
 
     this.loadProxies();
 
-    const updateJob = new CronJob("0 0 */1 * * *", async () => {
+    new CronJob("0 0 */1 * * *", async () => {
       await this.loadProxies();
-    });
-    updateJob.start();
+    }).start();
+
+    new CronJob("0 58 */1 * * *", () => this.sendScraperSpeed()).start();
   }
 
   public static getInstance(): AmazonService {
@@ -103,5 +106,12 @@ export class AmazonService {
 
   private getRandomProxy() {
     return this.proxies[Math.floor(Math.random() * this.proxies.length)];
+  }
+
+  private sendScraperSpeed() {
+    return this.apiService.post("scrapers/speed", {
+      name: process.env.name,
+      speed: this.queueService.speed,
+    });
   }
 }

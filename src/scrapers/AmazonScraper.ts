@@ -29,14 +29,12 @@ export class AmazonScraper {
     await this.loadCategories();
     this.scrapPdp();
 
-    const scrapPlpJob = new CronJob("0 0 2 * * *", () => this.scrapPlp());
-    scrapPlpJob.start();
+    new CronJob("0 0 2 * * *", () => this.scrapPlp()).start();
 
-    const updateJob = new CronJob("0 0 0 * * *", async () => {
+    new CronJob("0 0 0 * * *", async () => {
       await this.loadCountries();
       await this.loadCategories();
-    });
-    updateJob.start();
+    }).start();
   }
 
   async scrapPlp(name?: string) {

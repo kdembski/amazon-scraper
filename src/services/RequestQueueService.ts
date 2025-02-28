@@ -1,15 +1,13 @@
-import { ApiService } from "@/services/ApiService";
 import { ArgsService } from "@/services/ArgsService";
-import { CronJob } from "cron";
 import _ from "lodash";
 
 export class RequestQueueService {
   private argsService;
-  private apiService;
+
   private lastRequestCount = 0;
   private requestCount = 0;
   private speedHistory: number[] = [];
-  private speed = 0;
+  speed = 0;
   completed = 0;
   failed = 0;
   pending = 0;
@@ -19,12 +17,11 @@ export class RequestQueueService {
   constructor(
     pendingLimit: number,
     logs = false,
-    apiService = ApiService.getInstance(),
+
     argsService = ArgsService.getInstance()
   ) {
     this.pendingLimit = pendingLimit;
     this.argsService = argsService;
-    this.apiService = apiService;
 
     setInterval(() => {
       this.requestCount = this.pending + this.queue.length;
@@ -38,10 +35,6 @@ export class RequestQueueService {
 
       this.lastRequestCount = this.requestCount;
     }, 1000);
-
-    if (logs) {
-      new CronJob("0 50 */1 * * *", () => this.sendScraperSpeed()).start();
-    }
   }
 
   async request(callback: () => Promise<any>, top?: boolean) {
@@ -100,12 +93,5 @@ export class RequestQueueService {
       this.speedHistory.reduce((sum, v) => sum + v, 0) /
         this.speedHistory.length
     );
-  }
-
-  private sendScraperSpeed() {
-    return this.apiService.post("scrapers/speed", {
-      name: process.env.name,
-      speed: this.speed,
-    });
   }
 }
