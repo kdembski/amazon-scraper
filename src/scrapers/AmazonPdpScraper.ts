@@ -74,12 +74,6 @@ export class AmazonPdpScraper {
       return;
     }
 
-    if (builder.ad?.asin !== this.ad.asin) {
-      console.log(
-        `Asins not matching -> asked:${this.ad.asin} given:${builder.ad?.asin}`
-      );
-    }
-
     if (builder.ad?.asin === this.ad.asin) {
       price.value = builder.ad?.price;
     }
