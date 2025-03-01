@@ -74,7 +74,16 @@ export class AmazonPdpScraper {
       return;
     }
 
-    price.value = builder.ad?.price;
+    if (builder.ad?.asin !== this.ad.asin) {
+      console.log(
+        `Asins not matching -> asked:${this.ad.asin} given:${builder.ad?.asin}`
+      );
+    }
+
+    if (builder.ad?.asin === this.ad.asin) {
+      price.value = builder.ad?.price;
+    }
+
     price.complete = true;
     this.amazonService.queueService.completed++;
 
@@ -97,7 +106,11 @@ export class AmazonPdpScraper {
         this.apiService.delete("amazon/ads/" + this.ad.id);
       }
 
-      this.prices?.forEach((price) => (price.deleted = true));
+      this.prices?.forEach((price) => {
+        if (price.deleted) return;
+        price.deleted = true;
+        this.amazonService.queueService.completed++;
+      });
       resolve();
       return;
     }

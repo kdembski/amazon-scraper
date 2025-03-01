@@ -3,7 +3,6 @@ import _ from "lodash";
 
 export class RequestQueueService {
   private argsService;
-
   private lastRequestCount = 0;
   private requestCount = 0;
   private speedHistory: number[] = [];
@@ -17,7 +16,6 @@ export class RequestQueueService {
   constructor(
     pendingLimit: number,
     logs = false,
-
     argsService = ArgsService.getInstance()
   ) {
     this.pendingLimit = pendingLimit;
@@ -68,10 +66,13 @@ export class RequestQueueService {
     }, delay);
   }
 
-  private next() {
+  private async next() {
     if (this.pending >= this.pendingLimit) return;
     const next = this.queue.shift();
-    next?.();
+
+    this.pending++;
+    await next?.();
+    this.pending--;
   }
 
   private updateSpeedHistory() {
