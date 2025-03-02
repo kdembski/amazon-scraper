@@ -74,10 +74,6 @@ export class AmazonPdpScraper {
       return;
     }
 
-    if (builder.ad?.asin === this.ad.asin) {
-      price.value = builder.ad?.price;
-    }
-
     price.complete = true;
     this.amazonService.queueService.completed++;
 
