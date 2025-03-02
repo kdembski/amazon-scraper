@@ -1,27 +1,32 @@
 import { AmazonPdpAdBuilder } from "@/builders/AmazonPdpAdBuilder";
-import axios from "axios";
+import { AmazonService } from "@/services/AmazonService";
 import { parseHTML } from "linkedom";
 import { writeFileSync } from "node:fs";
+import { configDotenv } from "dotenv";
+
+configDotenv();
 
 const testAsin = () => {
   const asin = process.argv[2];
-  const countries = ["fr"];
+  const service = AmazonService.getInstance();
+  const countries = ["de"];
 
   countries.forEach(async (country) => {
     const url = `https://www.amazon.${country}/dp/${asin}`;
-    axios
-      .get<string>(url, { maxRedirects: 0 })
-      .then((response) => {
+    service.get<string>(url, undefined, {
+      onSuccess: (data) => {
         //console.log(response.status);
-        writeFileSync(`test-html/${asin}-${country}.html`, response.data);
-        const { document } = parseHTML(response.data);
+        writeFileSync(`test-html/${asin}-${country}.html`, data);
+        const { document } = parseHTML(data);
         const ad = new AmazonPdpAdBuilder().build(document);
-      })
-      .catch((e) => {
+      },
+      onError: (e) => {
         console.log(e.message);
-      });
+      },
+    });
   });
 };
+
 setInterval(() => {
   testAsin();
 }, 1000);

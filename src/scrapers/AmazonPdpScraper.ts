@@ -68,6 +68,12 @@ export class AmazonPdpScraper {
     price: AmazonAdPrice,
     resolve: () => void
   ) {
+    if (!data.length) {
+      price.pending = false;
+      this.handleCountry(country, resolve);
+      return;
+    }
+
     const { document } = parseHTML(data);
     const ad = this.builder.build(document);
 
@@ -77,7 +83,11 @@ export class AmazonPdpScraper {
       return;
     }
 
-    price.value = ad?.price;
+    if (ad?.price) {
+      const multiplier = this.getPriceMultiplier(country.code, ad?.deliverCode);
+      price.value = ad.price * multiplier;
+    }
+
     price.complete = true;
     this.amazonService.queueService.completed++;
 
@@ -148,5 +158,22 @@ export class AmazonPdpScraper {
     if (!prices?.length) return;
 
     this.apiService.put("amazon/ads/" + this.ad.id, { prices });
+  }
+
+  private getPriceMultiplier(countryCode: string, deliveryCode?: string) {
+    if (!deliveryCode) return 1;
+    const multipliers: Record<string, any> = {
+      fr: {
+        ca: 1.2,
+      },
+      it: {
+        ca: 1.22,
+      },
+      de: {
+        ca: 1.23,
+      },
+    };
+
+    return (multipliers[countryCode][deliveryCode] as number) || 1;
   }
 }
