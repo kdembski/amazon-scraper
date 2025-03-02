@@ -13,6 +13,7 @@ export class AmazonPlpScraper {
   private baseUrl = "https://www.amazon.pl/";
   private apiService;
   private amazonService;
+  private builder;
   private category: string;
   private pages: AmazonPlpAdPage[];
   private ranges = [
@@ -35,11 +36,13 @@ export class AmazonPlpScraper {
     category: string,
     pages: number | number[],
     apiService = ApiService.getInstance(),
-    amazonService = AmazonService.getInstance()
+    amazonService = AmazonService.getInstance(),
+    builder = new AmazonPlpAdBuilder()
   ) {
     this.category = category;
     this.apiService = apiService;
     this.amazonService = amazonService;
+    this.builder = builder;
 
     if (lodash.isArray(pages)) {
       this.pages = pages.flatMap((number) =>
@@ -103,7 +106,7 @@ export class AmazonPlpScraper {
     const items = [...document.querySelectorAll(listItemSelector)];
 
     const ads = items.reduce((accum: AmazonPlpAd[], item) => {
-      const ad = new AmazonPlpAdBuilder().build(item, this.category).ad;
+      const ad = this.builder.build(item, this.category);
       if (!ad) return accum;
 
       accum.push(ad);

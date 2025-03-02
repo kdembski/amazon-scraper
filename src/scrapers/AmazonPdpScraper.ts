@@ -8,6 +8,7 @@ export class AmazonPdpScraper {
   private baseUrl = "https://www.amazon";
   private apiService;
   private amazonService;
+  private builder;
   private ad: AmazonAd;
   private countries: Country[];
   private prices?: AmazonAdPrice[];
@@ -18,13 +19,15 @@ export class AmazonPdpScraper {
     countries: Country[],
     failed: Record<string, number>,
     apiService = ApiService.getInstance(),
-    amazonService = AmazonService.getInstance()
+    amazonService = AmazonService.getInstance(),
+    builder = new AmazonPdpAdBuilder()
   ) {
     this.ad = ad;
     this.countries = countries;
     this.failed = failed;
     this.apiService = apiService;
     this.amazonService = amazonService;
+    this.builder = builder;
   }
 
   execute() {
@@ -66,14 +69,15 @@ export class AmazonPdpScraper {
     resolve: () => void
   ) {
     const { document } = parseHTML(data);
-    const builder = new AmazonPdpAdBuilder().build(document);
+    const ad = this.builder.build(document);
 
-    if (builder.isCaptcha) {
+    if (ad?.isCaptcha) {
       price.pending = false;
       this.handleCountry(country, resolve);
       return;
     }
 
+    price.value = ad?.price;
     price.complete = true;
     this.amazonService.queueService.completed++;
 

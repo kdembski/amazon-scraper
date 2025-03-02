@@ -33,13 +33,6 @@ export class ArgsService {
     return parseInt(value);
   }
 
-  getTurboFlag() {
-    const value = this.getFlagValue("-t") || this.getFlagValue("--turbo");
-
-    if (!value) return false;
-    return value === "1";
-  }
-
   getDelayFlag() {
     const value = this.getFlagValue("-d") || this.getFlagValue("--delay");
 
