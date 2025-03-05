@@ -14,8 +14,6 @@ export class AmazonPlpScraper {
   private apiService;
   private amazonService;
   private builder;
-  private category: string;
-  private pages: AmazonPlpAdPage[];
   private ranges = [
     { min: 0, max: 5 },
     { min: 5, max: 10 },
@@ -33,38 +31,37 @@ export class AmazonPlpScraper {
   ];
 
   constructor(
-    category: string,
-    pages: number | number[],
     apiService = ApiService.getInstance(),
     amazonService = AmazonService.getInstance(),
     builder = new AmazonPlpAdBuilder()
   ) {
-    this.category = category;
     this.apiService = apiService;
     this.amazonService = amazonService;
     this.builder = builder;
+  }
 
-    if (lodash.isArray(pages)) {
-      this.pages = pages.flatMap((number) =>
+  execute(category: string, length: number | number[]) {
+    const pages = this.buildPages(length);
+    return pages.map(
+      (page) =>
+        new Promise<void>((resolve) => {
+          this.handlePage(page, category, resolve);
+        })
+    );
+  }
+
+  private buildPages(length: number | number[]) {
+    if (lodash.isArray(length)) {
+      return length.flatMap((number) =>
         this.ranges.map((range) => this.buildPage(number, range))
       );
-      return;
     }
 
-    this.pages = new Array(pages)
+    return new Array(length)
       .fill(null)
       .flatMap((_, i) =>
         this.ranges.map((range) => this.buildPage(i + 1, range))
       );
-  }
-
-  execute() {
-    return this.pages.map(
-      (page) =>
-        new Promise<void>((resolve) => {
-          this.handlePage(page, resolve);
-        })
-    );
   }
 
   private buildPage(number: number, range: AmazonPlpAdPageSort) {
@@ -77,10 +74,14 @@ export class AmazonPlpScraper {
     };
   }
 
-  private handlePage(page: AmazonPlpAdPage, resolve: () => void) {
+  private handlePage(
+    page: AmazonPlpAdPage,
+    category: string,
+    resolve: () => void
+  ) {
     const ref = Math.floor(Math.random() * 100000000000);
     const referer = `${this.baseUrl}b?node=${ref}`;
-    const url = `${this.baseUrl}s?i=${this.category}&page=${page.number}&low-price=${page.range.min}&high-price=${page.range.max}`;
+    const url = `${this.baseUrl}s?i=${category}&page=${page.number}&low-price=${page.range.min}&high-price=${page.range.max}`;
 
     if (page.complete || page.pending) return;
     page.pending = true;
@@ -89,8 +90,8 @@ export class AmazonPlpScraper {
       url,
       referer,
       {
-        onSuccess: (res) => this.onSuccess(res, page, resolve),
-        onError: () => this.onError(page, resolve),
+        onSuccess: (res) => this.onSuccess(res, page, category, resolve),
+        onError: () => this.onError(page, category, resolve),
       },
       true
     );
@@ -99,34 +100,40 @@ export class AmazonPlpScraper {
   private async onSuccess(
     data: string,
     page: AmazonPlpAdPage,
+    category: string,
     resolve: () => void
   ) {
-    const listItemSelector = "div[role='listitem']";
+    page.pending = false;
+
     const { document } = parseHTML(data);
+    const ads = this.buildAds(document, category);
+
+    if (ads.length === 0) {
+      this.retry(page, category, resolve);
+      return;
+    }
+
+    this.complete(page, ads, resolve);
+  }
+
+  private buildAds(document: Document, category: string) {
+    const listItemSelector = "div[role='listitem']";
     const items = [...document.querySelectorAll(listItemSelector)];
 
-    const ads = items.reduce((accum: AmazonPlpAd[], item) => {
-      const ad = this.builder.build(item, this.category);
+    return items.reduce((accum: AmazonPlpAd[], item) => {
+      const ad = this.builder.build(item, category);
       if (!ad) return accum;
 
       accum.push(ad);
       return accum;
     }, []);
-
-    if (ads.length === 0) {
-      page.pending = false;
-      this.handlePage(page, resolve);
-      return;
-    }
-
-    page.complete = true;
-    console.log(`Collected ${ads.length} ads from '${this.category}'`);
-    await this.apiService.post("amazon/ads", ads);
-
-    resolve();
   }
 
-  private onError(page: AmazonPlpAdPage, resolve: () => void) {
+  private onError(
+    page: AmazonPlpAdPage,
+    category: string,
+    resolve: () => void
+  ) {
     page.pending = false;
 
     if (page.failed > 100) {
@@ -136,6 +143,20 @@ export class AmazonPlpScraper {
     }
 
     page.failed++;
-    this.handlePage(page, resolve);
+    this.retry(page, category, resolve);
+  }
+
+  private retry(page: AmazonPlpAdPage, category: string, resolve: () => void) {
+    this.handlePage(page, category, resolve);
+  }
+
+  private complete(
+    page: AmazonPlpAdPage,
+    ads: AmazonPlpAd[],
+    resolve: () => void
+  ) {
+    page.complete = true;
+    this.apiService.post("amazon/ads", ads);
+    resolve();
   }
 }

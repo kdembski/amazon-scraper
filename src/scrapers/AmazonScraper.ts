@@ -10,6 +10,8 @@ export class AmazonScraper {
   private apiService;
   private amazonService;
   private argsService;
+  private pdpScraper;
+  private plpScraper;
   private categories: AmazonAdCategory[] = [];
   private countries: Country[] = [];
   private failed: Record<string, number> = {};
@@ -17,11 +19,15 @@ export class AmazonScraper {
   constructor(
     apiService = ApiService.getInstance(),
     amazonService = AmazonService.getInstance(),
-    argsService = ArgsService.getInstance()
+    argsService = ArgsService.getInstance(),
+    pdpScraper = new AmazonPdpScraper(this.failed),
+    plpScraper = new AmazonPlpScraper()
   ) {
     this.apiService = apiService;
     this.amazonService = amazonService;
     this.argsService = argsService;
+    this.pdpScraper = pdpScraper;
+    this.plpScraper = plpScraper;
   }
 
   async execute() {
@@ -40,13 +46,13 @@ export class AmazonScraper {
   async scrapPlp(name?: string) {
     const random =
       this.categories[Math.floor(Math.random() * this.categories.length)]?.name;
-    const promises = new AmazonPlpScraper(name || random, 400).execute();
+    const promises = this.plpScraper.execute(name || random, 400);
     await Promise.all(promises);
   }
 
   scrapPdp() {
     if (this.amazonService.queueService.queue.length > 0) {
-      setTimeout(() => this.scrapPdp(), 1000);
+      setTimeout(() => this.scrapPdp(), 5000);
       return;
     }
 
@@ -58,17 +64,13 @@ export class AmazonScraper {
       `amazon/ads/scrap?count=${count}`,
       {
         onSuccess: async (ads) => {
-          const promises = ads.map((ad) => {
-            return new AmazonPdpScraper(
-              ad,
-              this.countries,
-              this.failed
-            ).execute();
-          });
+          const promises = ads.map((ad) =>
+            this.pdpScraper.execute(ad, this.countries)
+          );
           await Promise.all(promises);
         },
         onFinally: () => {
-          setTimeout(() => this.scrapPdp(), 1000);
+          setTimeout(() => this.scrapPdp(), 10000);
         },
       },
       true
