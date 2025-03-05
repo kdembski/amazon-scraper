@@ -14,7 +14,7 @@ export class AmazonPdpAdPriceBuilder {
     const price = _.maxBy(Object.keys(freq), (o) => freq[o]);
 
     if (!price) return;
-    return parseFloat(price);
+    return this.parse(price);
   }
 
   private getCorePriceDisplayFeatureDiv(document: Document, id: string) {
@@ -54,31 +54,34 @@ export class AmazonPdpAdPriceBuilder {
   }
 
   private buildWholePrice(el: Element | null) {
-    const price = this.getPriceContent(el, ".a-text-price > span");
+    const price = this.getPriceContent(
+      el,
+      `.a-text-price:not([data-a-size="mini"]) > span[aria-hidden="true"]`
+    );
     if (!price) return;
 
-    return parseFloat(price);
+    return this.parse(price);
   }
 
   private buildColorPrice(el: Element | null) {
     const price = this.getPriceContent(el, ".a-color-price");
     if (!price) return;
 
-    return parseFloat(price);
+    return this.parse(price);
   }
 
   private buildAokOffscreenPrice(el: Element | null) {
-    const price = this.getPriceContent(el, ".aok-offscreen");
+    const price = this.getPriceContent(el, ".aok-offscreen:not(.a-size-mini)");
     if (!price) return;
 
-    return parseFloat(price);
+    return this.parse(price);
   }
 
   private buildAOffscreenPrice(el: Element | null) {
     const price = this.getPriceContent(el, ".a-offscreen");
     if (!price) return;
 
-    return parseFloat(price);
+    return this.parse(price);
   }
 
   private buildFractionPrice(el: Element | null) {
@@ -88,7 +91,7 @@ export class AmazonPdpAdPriceBuilder {
     if (!whole || !fraction) return;
 
     const value = `${whole}${fraction}`;
-    return parseFloat(value);
+    return this.parse(value);
   }
 
   private getPriceContent(el: Element | null, selector: string) {
@@ -97,5 +100,9 @@ export class AmazonPdpAdPriceBuilder {
 
   private cleanUpPrice(price: string | null | undefined) {
     return price?.replace(/[^\d,]/g, "").replace(",", ".");
+  }
+
+  private parse(value: string) {
+    return Math.round(parseFloat(value) * 100) / 100;
   }
 }

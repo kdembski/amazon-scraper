@@ -9,7 +9,7 @@ configDotenv();
 const testAsin = () => {
   const asin = process.argv[2];
   const service = AmazonService.getInstance();
-  const countries = ["de"];
+  const countries = ["de", "fr", "it", "pl", "se"];
 
   countries.forEach(async (country) => {
     const url = `https://www.amazon.${country}/dp/${asin}`;
