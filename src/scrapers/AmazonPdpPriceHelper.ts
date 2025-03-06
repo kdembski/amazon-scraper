@@ -1,8 +1,5 @@
-import { AmazonPdpAdBuilder } from "@/builders/AmazonPdpAdBuilder";
-import { AmazonService } from "@/services/AmazonService";
 import { ApiService } from "@/services/ApiService";
-import { AmazonAd, Country, AmazonAdPrice } from "@/types/amazon.types";
-import { parseHTML } from "linkedom";
+import { AmazonAd, AmazonAdPrice } from "@/types/amazon.types";
 
 export class AmazonPdpPriceHelper {
   private apiService;

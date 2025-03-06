@@ -29,4 +29,4 @@ const testAsin = () => {
 
 setInterval(() => {
   testAsin();
-}, 1000);
+}, 10000);

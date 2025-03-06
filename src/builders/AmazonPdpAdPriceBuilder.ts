@@ -56,7 +56,7 @@ export class AmazonPdpAdPriceBuilder {
   private buildWholePrice(el: Element | null) {
     const price = this.getPriceContent(
       el,
-      `.a-text-price:not([data-a-size="mini"]) > span[aria-hidden="true"]`
+      `.a-text-price:not([data-a-size="mini"]):not([data-a-size="s"]) > span[aria-hidden="true"]`
     );
     if (!price) return;
 
@@ -103,6 +103,6 @@ export class AmazonPdpAdPriceBuilder {
   }
 
   private parse(value: string) {
-    return Math.round(parseFloat(value) * 100) / 100;
+    return parseFloat(parseFloat(value).toFixed(2));
   }
 }

@@ -99,7 +99,8 @@ export class AmazonService {
           resolve(data);
         })
         .catch((e) => {
-          console.log(e);
+          console.log(e.message);
+          setTimeout(this.loadProxies, 2 * 60 * 1000);
         });
     });
   }

@@ -46,8 +46,7 @@ export class AmazonScraper {
   async scrapPlp(name?: string) {
     const random =
       this.categories[Math.floor(Math.random() * this.categories.length)]?.name;
-    const promises = this.plpScraper.execute(name || random, 400);
-    await Promise.all(promises);
+    await this.plpScraper.execute(name || random);
   }
 
   scrapPdp() {

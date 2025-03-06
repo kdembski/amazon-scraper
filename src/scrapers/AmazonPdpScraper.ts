@@ -1,9 +1,5 @@
-import { AmazonPdpAdBuilder } from "@/builders/AmazonPdpAdBuilder";
 import { AmazonPdpCountryScraper } from "@/scrapers/AmazonPdpCountryScraper";
-import { AmazonService } from "@/services/AmazonService";
-import { ApiService } from "@/services/ApiService";
-import { AmazonAd, Country, AmazonAdPrice } from "@/types/amazon.types";
-import { parseHTML } from "linkedom";
+import { AmazonAd, Country } from "@/types/amazon.types";
 
 export class AmazonPdpScraper {
   private countryScraper;
