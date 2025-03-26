@@ -87,7 +87,6 @@ export class HeadlessAmazonPdpCountryScraper extends AmazonPdpCountryScraper {
     const pdpAd = this.builder.build(document);
 
     price.value = pdpAd?.price;
-    console.log(price.value);
     item.close();
     price.resolve?.();
   }
