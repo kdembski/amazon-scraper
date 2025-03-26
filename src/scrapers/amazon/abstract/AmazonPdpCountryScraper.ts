@@ -55,7 +55,7 @@ export abstract class AmazonPdpCountryScraper {
     price.deleted = true;
 
     if (!this.priceHelper.isDeleted(prices)) {
-      price.resolve();
+      price.resolve?.();
       return 0;
     }
 
