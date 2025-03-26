@@ -60,8 +60,7 @@ export class HeadlessAmazonPdpCountryScraper extends AmazonPdpCountryScraper {
         this.playwrightService.completed++;
         this.tryComplete(ad, prices, resolveAd);
       })
-      .catch((e) => {
-        console.log(e.message || e);
+      .catch(() => {
         price.pending = false;
         price.failed++;
         this.playwrightService.failed++;
