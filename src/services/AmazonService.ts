@@ -5,27 +5,25 @@ import { RequestQueueService } from "@/services/RequestQueueService";
 import { ArgsService } from "@/services/ArgsService";
 import { CronJob } from "cron";
 import { ApiService } from "@/services/ApiService";
+import { ProxyService } from "@/services/ProxyService";
 
 export class AmazonService {
   private static instance: AmazonService;
-  private proxies: string[] = [];
+  private baseUrl = "https://www.amazon.";
   private apiService;
+  private proxyService;
   queueService;
 
   private constructor(
     argsService = ArgsService.getInstance(),
     apiService = ApiService.getInstance(),
+    proxyService = ProxyService.getInstance(),
     queueService = new RequestQueueService(argsService.getLimitFlag(), true)
   ) {
     this.queueService = queueService;
     this.apiService = apiService;
+    this.proxyService = proxyService;
     queueService.start();
-
-    this.loadProxies();
-
-    new CronJob("0 0 */1 * * *", async () => {
-      await this.loadProxies();
-    }).start();
 
     new CronJob("0 50 */1 * * *", () => this.sendScraperSpeed()).start();
   }
@@ -48,8 +46,8 @@ export class AmazonService {
     },
     priority?: boolean
   ) {
-    this.queueService.request(() => {
-      const proxy = this.getRandomProxy();
+    this.queueService.request(async () => {
+      const proxy = this.proxyService.getRandomProxy();
 
       const userAgent = new UserAgent().toString();
       const httpsAgent = new HttpsProxyAgent("http://" + proxy, {
@@ -58,11 +56,11 @@ export class AmazonService {
 
       return new Promise<void>(async (resolve) => {
         return axios
-          .get<T>(url, {
+          .get<T>(`${this.baseUrl}${url}`, {
             httpsAgent,
             headers: {
               "User-Agent": userAgent,
-              Referer: referer,
+              Referer: `${this.baseUrl}${referer}`,
               "Referrer-Policy": "strict-origin-when-cross-origin",
             },
           })
@@ -80,33 +78,6 @@ export class AmazonService {
           });
       });
     }, priority);
-  }
-
-  private loadProxies() {
-    return new Promise((resolve) => {
-      const url = `https://api.proxyscrape.com/v2/account/datacenter_shared/proxy-list?auth=${process.env.PROXY_API_KEY}&type=getproxies&protocol=http`;
-      axios
-        .get<string>(url)
-        .then((response) => {
-          const data = response.data;
-          let array = data.includes("\r\n")
-            ? data.split("\r\n")
-            : data.split("\n");
-
-          array = array.filter((v) => !!v);
-          this.proxies = array;
-
-          resolve(data);
-        })
-        .catch((e) => {
-          console.log(e.message);
-          setTimeout(this.loadProxies, 2 * 60 * 1000);
-        });
-    });
-  }
-
-  private getRandomProxy() {
-    return this.proxies[Math.floor(Math.random() * this.proxies.length)];
   }
 
   private sendScraperSpeed() {

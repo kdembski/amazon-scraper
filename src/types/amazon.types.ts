@@ -1,3 +1,5 @@
+import { PlaywrightItem } from "@/types/playwright.types";
+
 export interface AmazonAdCategory {
   id: number;
   name: string;
@@ -40,6 +42,8 @@ export interface AmazonAdPrice {
   complete: boolean;
   deleted: boolean;
   failed: number;
+  resolve?: () => void;
+  reject?: (e: any) => void;
 }
 
 export interface Country {

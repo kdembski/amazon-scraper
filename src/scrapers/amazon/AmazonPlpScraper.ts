@@ -1,5 +1,5 @@
 import { AmazonPlpBuilder } from "@/builders/AmazonPlpBuilder";
-import { AmazonPlpPageScraper } from "@/scrapers/AmazonPlpPageScraper";
+import { AmazonPlpPageScraper } from "@/scrapers/amazon/AmazonPlpPageScraper";
 import { AmazonService } from "@/services/AmazonService";
 import { AmazonPlpAdPageSort } from "@/types/amazon.types";
 import { parseHTML } from "linkedom";
@@ -72,11 +72,11 @@ export class AmazonPlpScraper {
   }
 
   loadSubcategories(category: string, resolve: (value: string[]) => void) {
-    const url = `https://www.amazon.pl/s?i=${category}&s=popularity-rank`;
+    const url = `pl/s?i=${category}&s=popularity-rank`;
 
     this.amazonService.get<string>(
       url,
-      "https://www.amazon.pl/",
+      "pl/",
       {
         onSuccess: (data) => {
           if (!data.length) {

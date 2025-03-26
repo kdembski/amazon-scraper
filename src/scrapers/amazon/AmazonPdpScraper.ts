@@ -1,13 +1,10 @@
-import { AmazonPdpCountryScraper } from "@/scrapers/AmazonPdpCountryScraper";
+import { AmazonPdpCountryScraper } from "@/scrapers/amazon/abstract/AmazonPdpCountryScraper";
 import { AmazonAd, Country } from "@/types/amazon.types";
 
 export class AmazonPdpScraper {
   private countryScraper;
 
-  constructor(
-    failed: Record<string, number>,
-    countryScraper = new AmazonPdpCountryScraper(failed)
-  ) {
+  constructor(countryScraper: AmazonPdpCountryScraper) {
     this.countryScraper = countryScraper;
   }
 

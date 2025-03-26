@@ -12,8 +12,16 @@ export class AmazonPdpPriceHelper {
     return prices?.find((price) => price.country.id === countryId);
   }
 
+  isScrapable(price: AmazonAdPrice) {
+    return !price.complete && !price.pending && !price.deleted;
+  }
+
   isComplete(prices: AmazonAdPrice[]) {
     return prices?.every((price) => price.complete);
+  }
+
+  isDeleted(prices: AmazonAdPrice[]) {
+    return prices?.filter((price) => !price.deleted).length <= 2;
   }
 
   sendCompletedPrices(prices: AmazonAdPrice[], ad: AmazonAd) {
@@ -29,22 +37,5 @@ export class AmazonPdpPriceHelper {
     if (!prices?.length) return;
 
     this.apiService.put("amazon/ads/" + ad.id, { prices: prepared });
-  }
-
-  getPriceMultiplier(countryCode: string, deliveryCode?: string) {
-    if (!deliveryCode) return 1;
-    const multipliers: Record<string, any> = {
-      fr: {
-        ca: 1.2,
-      },
-      it: {
-        ca: 1.22,
-      },
-      de: {
-        ca: 1.23,
-      },
-    };
-
-    return (multipliers[countryCode][deliveryCode] as number) || 1;
   }
 }

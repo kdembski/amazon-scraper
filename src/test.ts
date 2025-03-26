@@ -3,6 +3,7 @@ import { AmazonService } from "@/services/AmazonService";
 import { parseHTML } from "linkedom";
 import { writeFileSync } from "node:fs";
 import { configDotenv } from "dotenv";
+import { PlaywrightService } from "@/services/PlaywrightService";
 
 configDotenv();
 
@@ -12,7 +13,7 @@ const testAsin = () => {
   const countries = ["de", "fr", "it", "pl", "se"];
 
   countries.forEach(async (country) => {
-    const url = `https://www.amazon.${country}/dp/${asin}`;
+    const url = `${country}/dp/${asin}`;
     service.get<string>(url, undefined, {
       onSuccess: (data) => {
         //console.log(response.status);
@@ -27,6 +28,22 @@ const testAsin = () => {
   });
 };
 
-setInterval(() => {
-  testAsin();
-}, 10000);
+const headlessTestAsin = () => {
+  const asin = process.argv[2];
+  const service = PlaywrightService.getInstance();
+  const countries = ["fr", "it"];
+
+  countries.forEach(async (country) => {
+    const url = `${country}/dp/${asin}`;
+  });
+
+  setTimeout(() => {
+    service.create("", "");
+  }, 5000);
+};
+
+// setInterval(() => {
+//   testAsin();
+// }, 10000);
+
+headlessTestAsin();

@@ -1,9 +1,10 @@
-import { AmazonPdpScraper } from "@/scrapers/AmazonPdpScraper";
-import { AmazonPlpScraper } from "@/scrapers/AmazonPlpScraper";
+import { AmazonPdpScraper } from "@/scrapers/amazon/AmazonPdpScraper";
+import { AmazonPlpScraper } from "@/scrapers/amazon/AmazonPlpScraper";
+import { RequestAmazonPdpCountryScraper } from "@/scrapers/amazon/RequestAmazonPdpCountryScraper";
 import { AmazonService } from "@/services/AmazonService";
 import { ApiService } from "@/services/ApiService";
 import { ArgsService } from "@/services/ArgsService";
-import { AmazonAd, AmazonAdCategory, Country } from "@/types/amazon.types";
+import { AmazonAd } from "@/types/amazon.types";
 import { CronJob } from "cron";
 
 export class AmazonScraper {
@@ -12,15 +13,12 @@ export class AmazonScraper {
   private argsService;
   private pdpScraper;
   private plpScraper;
-  private categories: AmazonAdCategory[] = [];
-  private countries: Country[] = [];
-  private failed: Record<string, number> = {};
 
   constructor(
     apiService = ApiService.getInstance(),
     amazonService = AmazonService.getInstance(),
     argsService = ArgsService.getInstance(),
-    pdpScraper = new AmazonPdpScraper(this.failed),
+    pdpScraper = new AmazonPdpScraper(new RequestAmazonPdpCountryScraper()),
     plpScraper = new AmazonPlpScraper()
   ) {
     this.apiService = apiService;
@@ -31,25 +29,18 @@ export class AmazonScraper {
   }
 
   async execute() {
-    await this.loadCountries();
-    await this.loadCategories();
     this.scrapPdp();
-
     new CronJob("0 0 2 * * *", () => this.scrapPlp()).start();
-
-    new CronJob("0 0 0 * * *", async () => {
-      await this.loadCountries();
-      await this.loadCategories();
-    }).start();
   }
 
   async scrapPlp(name?: string) {
-    const random =
-      this.categories[Math.floor(Math.random() * this.categories.length)]?.name;
+    const categories = await this.apiService.getCategories();
+    const randomIndex = Math.floor(Math.random() * categories.length);
+    const random = categories[randomIndex]?.name;
     await this.plpScraper.execute(name || random);
   }
 
-  scrapPdp() {
+  async scrapPdp() {
     if (this.amazonService.queueService.queue.length > 0) {
       setTimeout(() => this.scrapPdp(), 5000);
       return;
@@ -58,13 +49,14 @@ export class AmazonScraper {
     this.amazonService.queueService.failed = 0;
     this.amazonService.queueService.completed = 0;
     const count = this.argsService.getCountFlag();
+    const countries = await this.apiService.getCountries();
 
     this.apiService.get<AmazonAd[]>(
       `amazon/ads/scrap?count=${count}`,
       {
         onSuccess: async (ads) => {
           const promises = ads.map((ad) =>
-            this.pdpScraper.execute(ad, this.countries)
+            this.pdpScraper.execute(ad, countries)
           );
           await Promise.all(promises);
         },
@@ -74,25 +66,5 @@ export class AmazonScraper {
       },
       true
     );
-  }
-
-  async loadCountries() {
-    return this.apiService.get<Country[]>("countries", {
-      onSuccess: (countries) => {
-        this.countries = countries;
-
-        this.failed = Object.fromEntries(
-          countries.map((country) => [country.code, 0])
-        );
-      },
-    });
-  }
-
-  async loadCategories() {
-    return this.apiService.get<AmazonAdCategory[]>("amazon/ads/categories", {
-      onSuccess: (categories) => {
-        this.categories = categories;
-      },
-    });
   }
 }

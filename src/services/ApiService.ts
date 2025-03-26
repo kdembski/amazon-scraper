@@ -1,14 +1,23 @@
 import { RequestQueueService } from "@/services/RequestQueueService";
 import http from "http";
 import axios from "axios";
+import { AmazonAdCategory, Country } from "@/types/amazon.types";
+import { CronJob } from "cron";
 
 export class ApiService {
   private static instance: ApiService;
   queueService;
+  categories: AmazonAdCategory[] = [];
+  countries: Country[] = [];
 
   private constructor(queueService = new RequestQueueService(5, false)) {
     this.queueService = queueService;
     queueService.start();
+
+    new CronJob("0 0 0 * * *", async () => {
+      await this.loadCountries();
+      await this.loadCategories();
+    }).start();
   }
 
   public static getInstance(): ApiService {
@@ -17,6 +26,38 @@ export class ApiService {
     }
 
     return ApiService.instance;
+  }
+
+  async getCountries() {
+    if (!this.countries.length) {
+      await this.loadCountries();
+    }
+
+    return this.countries;
+  }
+
+  async getCategories() {
+    if (!this.categories.length) {
+      await this.loadCategories();
+    }
+
+    return this.categories;
+  }
+
+  loadCountries() {
+    return this.get<Country[]>("countries", {
+      onSuccess: (countries) => {
+        this.countries = countries;
+      },
+    });
+  }
+
+  loadCategories() {
+    return this.get<AmazonAdCategory[]>("amazon/ads/categories", {
+      onSuccess: (categories) => {
+        this.categories = categories;
+      },
+    });
   }
 
   private url(path: string) {
@@ -37,11 +78,7 @@ export class ApiService {
 
       return new Promise<void>(async (resolve) => {
         return axios
-          .get<T>(this.url(path), {
-            httpAgent: agent,
-            adapter: "fetch",
-            fetchOptions: { priority: "high" },
-          })
+          .get<T>(this.url(path), { httpAgent: agent })
           .then((response) => {
             callback?.onSuccess?.(response.data);
           })
@@ -72,11 +109,7 @@ export class ApiService {
 
       return new Promise<void>(async (resolve) => {
         return axios
-          .post<T>(this.url(path), data, {
-            httpAgent: agent,
-            adapter: "fetch",
-            fetchOptions: { priority: "high" },
-          })
+          .post<T>(this.url(path), data, { httpAgent: agent })
           .then((response) => {
             callback?.onSuccess?.(response.data);
           })
@@ -107,11 +140,7 @@ export class ApiService {
 
       return new Promise<void>(async (resolve) => {
         return axios
-          .put<T>(this.url(path), data, {
-            httpAgent: agent,
-            adapter: "fetch",
-            fetchOptions: { priority: "high" },
-          })
+          .put<T>(this.url(path), data, { httpAgent: agent })
           .then((response) => {
             callback?.onSuccess?.(response.data);
           })
@@ -141,11 +170,7 @@ export class ApiService {
 
       return new Promise<void>(async (resolve) => {
         return axios
-          .delete<T>(this.url(path), {
-            httpAgent: agent,
-            adapter: "fetch",
-            fetchOptions: { priority: "high" },
-          })
+          .delete<T>(this.url(path), { httpAgent: agent })
           .then((response) => {
             callback?.onSuccess?.(response.data);
           })

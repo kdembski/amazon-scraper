@@ -1,4 +1,5 @@
 import { AmazonPdpAdPriceBuilder } from "@/builders/AmazonPdpAdPriceBuilder";
+import { Country, AmazonAd } from "@/types/amazon.types";
 
 export class AmazonPdpAdBuilder {
   private priceBuilder;
@@ -55,5 +56,15 @@ export class AmazonPdpAdBuilder {
     if (!name) return;
     if (["Canada", "Kanada"].includes(name)) return "ca";
     if (["Germania", "Allemagne"].includes(name)) return "de";
+  }
+
+  buildUrl(country: Country, ad: AmazonAd) {
+    const url = `${country.code}/dp/${ad.asin}`;
+    const referer = `${country.code}/s?k=${ad.asin}`;
+
+    return {
+      url,
+      referer,
+    };
   }
 }
