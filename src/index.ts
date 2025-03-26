@@ -7,8 +7,8 @@ configDotenv();
 // Ignore the certificate
 process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = "0";
 
-//new AmazonScraper().execute();
-new HeadlessAmazonScraper().execute();
+new AmazonScraper().execute();
+//new HeadlessAmazonScraper().execute();
 
 process.on("uncaughtException", (e, o) => {
   console.log("uncaught exception");
