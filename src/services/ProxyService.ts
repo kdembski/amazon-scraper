@@ -20,10 +20,7 @@ export class ProxyService {
     return ProxyService.instance;
   }
 
-  async getRandomProxy() {
-    if (!this.proxies.length) {
-      await this.loadProxies();
-    }
+  getRandomProxy() {
     return this.proxies[Math.floor(Math.random() * this.proxies.length)];
   }
 

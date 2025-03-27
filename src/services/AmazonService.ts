@@ -47,7 +47,7 @@ export class AmazonService {
     priority?: boolean
   ) {
     this.queueService.request(async () => {
-      const proxy = await this.proxyService.getRandomProxy();
+      const proxy = this.proxyService.getRandomProxy();
 
       const userAgent = new UserAgent().toString();
       const httpsAgent = new HttpsProxyAgent("http://" + proxy, {

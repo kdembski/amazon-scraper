@@ -87,7 +87,7 @@ export class PlaywrightService {
     const userAgent = new UserAgent().toString();
     const config = {
       proxy: {
-        server: await this.proxyService.getRandomProxy(),
+        server: this.proxyService.getRandomProxy(),
       },
       extraHTTPHeaders: {
         referer: `${this.baseUrl}${referer}`,

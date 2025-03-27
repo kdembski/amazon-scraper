@@ -4,6 +4,7 @@ import { RequestAmazonPdpCountryScraper } from "@/scrapers/amazon/RequestAmazonP
 import { AmazonService } from "@/services/AmazonService";
 import { ApiService } from "@/services/ApiService";
 import { ArgsService } from "@/services/ArgsService";
+import { ProxyService } from "@/services/ProxyService";
 import { AmazonAd } from "@/types/amazon.types";
 import { CronJob } from "cron";
 
@@ -13,23 +14,27 @@ export class AmazonScraper {
   private argsService;
   private pdpScraper;
   private plpScraper;
+  private proxyService;
 
   constructor(
     apiService = ApiService.getInstance(),
     amazonService = AmazonService.getInstance(),
     argsService = ArgsService.getInstance(),
     pdpScraper = new AmazonPdpScraper(new RequestAmazonPdpCountryScraper()),
-    plpScraper = new AmazonPlpScraper()
+    plpScraper = new AmazonPlpScraper(),
+    proxyService = ProxyService.getInstance()
   ) {
     this.apiService = apiService;
     this.amazonService = amazonService;
     this.argsService = argsService;
     this.pdpScraper = pdpScraper;
     this.plpScraper = plpScraper;
+    this.proxyService = proxyService;
   }
 
   async execute() {
-    this.scrapPdp();
+    await this.proxyService.loadProxies();
+    await this.scrapPdp();
     new CronJob("0 0 2 * * *", () => this.scrapPlp()).start();
   }
 
