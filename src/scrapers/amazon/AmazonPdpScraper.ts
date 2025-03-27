@@ -14,6 +14,7 @@ export class AmazonPdpScraper {
       pending: false,
       complete: false,
       deleted: false,
+      adDeleted: false,
       failed: 0,
     }));
 

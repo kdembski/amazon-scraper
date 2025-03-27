@@ -41,6 +41,7 @@ export interface AmazonAdPrice {
   pending: boolean;
   complete: boolean;
   deleted: boolean;
+  adDeleted: boolean;
   failed: number;
   resolve?: () => void;
   reject?: (e: any) => void;

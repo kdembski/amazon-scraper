@@ -62,7 +62,6 @@ export class RequestAmazonPdpCountryScraper extends AmazonPdpCountryScraper {
       return;
     }
 
-    console.log(pdpAd?.price);
     price.value = pdpAd?.price;
     price.resolve?.();
   }

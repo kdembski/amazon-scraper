@@ -52,6 +52,7 @@ export abstract class AmazonPdpCountryScraper {
     prices: AmazonAdPrice[],
     resolveAd: () => void
   ) {
+    if (price.adDeleted) return 0;
     price.deleted = true;
 
     if (!this.priceHelper.isDeleted(prices)) {
@@ -62,6 +63,7 @@ export abstract class AmazonPdpCountryScraper {
     const toDelete = prices.filter((price) => !price.deleted);
     toDelete.forEach((price) => {
       price.deleted = true;
+      price.adDeleted = true;
       price.resolve?.();
     });
 
