@@ -60,7 +60,10 @@ export abstract class AmazonPdpCountryScraper {
     }
 
     const toDelete = prices.filter((price) => !price.deleted);
-    toDelete.forEach((price) => (price.deleted = true));
+    toDelete.forEach((price) => {
+      price.deleted = true;
+      price.resolve?.();
+    });
 
     this.apiService.delete("amazon/ads/" + ad.id);
     resolveAd();

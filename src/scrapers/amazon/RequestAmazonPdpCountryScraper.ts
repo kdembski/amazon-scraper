@@ -15,34 +15,42 @@ export class RequestAmazonPdpCountryScraper extends AmazonPdpCountryScraper {
     country: Country,
     ad: AmazonAd,
     prices: AmazonAdPrice[],
-    resolve: () => void
+    resolveAd: () => void
   ) {
     const price = this.priceHelper.getPrice(prices, country.id);
+    if (!price) return;
 
-    if (!(price && this.priceHelper.isScrapable(price))) return;
+    new Promise<void>((resolvePrice, rejectPrice) => {
+      if (price.complete || price.deleted || price.pending) return;
 
-    const { url, referer } = this.builder.buildUrl(country, ad);
-    price.pending = true;
+      price.resolve = resolvePrice;
+      price.reject = rejectPrice;
 
-    this.amazonService.get<string>(url, referer, {
-      onSuccess: (res) =>
-        this.onSuccess(res, country, price, ad, prices, resolve),
-      onError: (e) => this.onError(e, country, price, ad, prices, resolve),
-    });
+      const { url, referer } = this.builder.buildUrl(country, ad);
+      price.pending = true;
+
+      this.amazonService.get<string>(url, referer, {
+        onSuccess: (res) => this.onSuccess(res, price),
+        onError: (e) => this.onError(e, price, ad, prices, resolveAd),
+      });
+    })
+      .then(() => {
+        price.pending = false;
+        price.complete = true;
+        this.amazonService.queueService.completed++;
+        this.tryComplete(ad, prices, resolveAd);
+      })
+      .catch(() => {
+        price.pending = false;
+        price.failed++;
+        this.amazonService.queueService.failed++;
+        this.retry(country, ad, prices, resolveAd);
+      });
   }
 
-  private async onSuccess(
-    data: string,
-    country: Country,
-    price: AmazonAdPrice,
-    ad: AmazonAd,
-    prices: AmazonAdPrice[],
-    resolve: () => void
-  ) {
-    price.pending = false;
-
+  private async onSuccess(data: string, price: AmazonAdPrice) {
     if (!data.length) {
-      this.retry(country, ad, prices, resolve);
+      price.reject?.("Recived empty data");
       return;
     }
 
@@ -50,38 +58,33 @@ export class RequestAmazonPdpCountryScraper extends AmazonPdpCountryScraper {
     const pdpAd = this.builder.build(document);
 
     if (pdpAd?.isCaptcha) {
-      this.retry(country, ad, prices, resolve);
+      price.reject?.("Captcha occured");
       return;
     }
 
+    console.log(pdpAd?.price);
     price.value = pdpAd?.price;
-    this.amazonService.queueService.completed++;
-    this.tryComplete(ad, prices, resolve);
+    price.resolve?.();
   }
 
   private onError(
     e: any,
-    country: Country,
     price: AmazonAdPrice,
     ad: AmazonAd,
     prices: AmazonAdPrice[],
-    resolve: () => void
+    resolveAd: () => void
   ) {
-    price.pending = false;
-
     if (e.status === 404) {
-      this.amazonService.queueService.completed++;
-      this.tryDelete(ad, price, prices, resolve);
+      const count = this.tryDelete(ad, price, prices, resolveAd);
+      this.amazonService.queueService.completed += count;
       return;
     }
 
     if (price.failed > 100) {
-      this.amazonService.queueService.failed++;
-      this.tryComplete(ad, prices, resolve);
+      price.resolve?.();
       return;
     }
 
-    price.failed++;
-    this.retry(country, ad, prices, resolve);
+    price.reject?.("Failed");
   }
 }

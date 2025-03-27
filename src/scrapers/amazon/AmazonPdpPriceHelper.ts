@@ -12,10 +12,6 @@ export class AmazonPdpPriceHelper {
     return prices?.find((price) => price.country.id === countryId);
   }
 
-  isScrapable(price: AmazonAdPrice) {
-    return !price.complete && !price.pending && !price.deleted;
-  }
-
   isComplete(prices: AmazonAdPrice[]) {
     return prices?.every((price) => price.complete);
   }

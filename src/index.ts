@@ -15,5 +15,5 @@ process.on("uncaughtException", (e, o) => {
 });
 
 process.on("unhandledRejection", (e: any, o) => {
-  //console.log("uncaught rejection");
+  console.log("uncaught rejection");
 });
