@@ -76,8 +76,7 @@ export class RequestAmazonPdpCountryScraper extends AmazonPdpCountryScraper {
     resolveAd: () => void
   ) {
     if (e.status === 404) {
-      const count = this.tryDelete(ad, price, prices, resolveAd);
-      this.amazonService.queueService.completed += count;
+      this.tryDelete(ad, price, prices, resolveAd);
       return;
     }
 

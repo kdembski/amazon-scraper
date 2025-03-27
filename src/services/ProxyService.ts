@@ -28,7 +28,6 @@ export class ProxyService {
   }
 
   loadProxies() {
-    console.log(this.isLoading);
     return new Promise<void>((resolve) => {
       if (this.isLoading) {
         setTimeout(() => {
@@ -39,6 +38,7 @@ export class ProxyService {
 
           this.intervalLoad(resolve);
         }, 2 * 60 * 1000);
+        return;
       }
 
       this.isLoading = true;

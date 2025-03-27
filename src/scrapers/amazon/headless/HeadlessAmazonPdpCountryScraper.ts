@@ -106,8 +106,7 @@ export class HeadlessAmazonPdpCountryScraper extends AmazonPdpCountryScraper {
     resolveAd: () => void
   ) {
     if (item.is404()) {
-      const count = this.tryDelete(ad, price, prices, resolveAd);
-      this.playwrightService.completed += count;
+      this.tryDelete(ad, price, prices, resolveAd);
       item.close();
       return;
     }
