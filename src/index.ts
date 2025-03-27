@@ -11,9 +11,9 @@ new AmazonScraper().execute();
 //new HeadlessAmazonScraper().execute();
 
 process.on("uncaughtException", (e, o) => {
-  console.log("uncaught exception");
+  console.log("uncaught exception", e, o);
 });
 
-process.on("unhandledRejection", (e: any, o) => {
-  console.log("uncaught rejection");
+process.on("unhandledRejection", (e, o) => {
+  console.log("uncaught rejection", e, o);
 });

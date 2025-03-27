@@ -4,10 +4,9 @@ import { CronJob } from "cron";
 export class ProxyService {
   private static instance: ProxyService;
   private proxies: string[] = [];
+  private isLoading = false;
 
   private constructor() {
-    this.loadProxies();
-
     new CronJob("0 0 */1 * * *", async () => {
       await this.loadProxies();
     }).start();
@@ -21,30 +20,50 @@ export class ProxyService {
     return ProxyService.instance;
   }
 
-  private loadProxies() {
-    return new Promise((resolve) => {
-      const url = `https://api.proxyscrape.com/v2/account/datacenter_shared/proxy-list?auth=${process.env.PROXY_API_KEY}&type=getproxies&protocol=http`;
-      axios
-        .get<string>(url)
-        .then((response) => {
-          const data = response.data;
-          let array = data.includes("\r\n")
-            ? data.split("\r\n")
-            : data.split("\n");
+  async getRandomProxy() {
+    if (!this.proxies.length) {
+      await this.loadProxies();
+    }
+    return this.proxies[Math.floor(Math.random() * this.proxies.length)];
+  }
 
-          array = array.filter((v) => !!v);
-          this.proxies = array;
+  loadProxies() {
+    console.log(this.isLoading);
+    return new Promise<void>((resolve) => {
+      if (this.isLoading) {
+        setTimeout(() => {
+          if (this.proxies.length) {
+            resolve();
+            return;
+          }
 
-          resolve(data);
-        })
-        .catch((e) => {
-          console.log(e.message);
-          setTimeout(this.loadProxies, 2 * 60 * 1000);
-        });
+          this.intervalLoad(resolve);
+        }, 2 * 60 * 1000);
+      }
+
+      this.isLoading = true;
+      this.intervalLoad(resolve);
     });
   }
 
-  getRandomProxy() {
-    return this.proxies[Math.floor(Math.random() * this.proxies.length)];
+  private intervalLoad(resolve: () => void) {
+    const url = `https://api.proxyscrape.com/v2/account/datacenter_shared/proxy-list?auth=${process.env.PROXY_API_KEY}&type=getproxies&protocol=http`;
+    axios
+      .get<string>(url)
+      .then((response) => {
+        const data = response.data;
+        this.proxies = this.formatProxies(data);
+        this.isLoading = false;
+        resolve();
+      })
+      .catch(() => {
+        setTimeout(() => this.intervalLoad(resolve), 2 * 60 * 1000);
+      });
+  }
+
+  private formatProxies(data: string) {
+    let array = data.includes("\r\n") ? data.split("\r\n") : data.split("\n");
+    array = array.filter((v) => !!v);
+    return array;
   }
 }

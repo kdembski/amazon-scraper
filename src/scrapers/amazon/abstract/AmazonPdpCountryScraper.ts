@@ -60,6 +60,9 @@ export abstract class AmazonPdpCountryScraper {
       return 0;
     }
 
+    price.adDeleted = true;
+    price.resolve?.();
+
     const toDelete = prices.filter((price) => !price.deleted);
     toDelete.forEach((price) => {
       price.deleted = true;

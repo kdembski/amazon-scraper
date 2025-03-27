@@ -21,7 +21,9 @@ export class RequestAmazonPdpCountryScraper extends AmazonPdpCountryScraper {
     if (!price) return;
 
     new Promise<void>((resolvePrice, rejectPrice) => {
-      if (price.complete || price.deleted || price.pending) return;
+      if (price.complete || price.deleted || price.pending || price.adDeleted) {
+        return;
+      }
 
       price.resolve = resolvePrice;
       price.reject = rejectPrice;
