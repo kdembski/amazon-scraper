@@ -1,5 +1,6 @@
-import { ArgsService } from "@/services/ArgsService";
 import _ from "lodash";
+import { styleText } from "node:util";
+import { ArgsService } from "@/services/ArgsService";
 
 export class RequestQueueService {
   private argsService;
@@ -27,7 +28,16 @@ export class RequestQueueService {
       this.calculateSpeed();
 
       if (logs) {
-        const text = `speed: ${this.speed}/s | pending: ${this.pending} | queue: ${this.queue.length} | failed: ${this.failed} | completed: ${this.completed}`;
+        const sum = this.pending + this.queue.length + this.completed;
+        const stats = [
+          `${styleText("dim", "speed:")} ${this.speed}/s`,
+          `${styleText("dim", "pending:")} ${this.pending}`,
+          `${styleText("dim", "queue:")} ${this.queue.length}`,
+          `${styleText("dim", "failed:")} ${this.failed}`,
+          `${styleText("dim", "completed:")} ${this.completed}`,
+          `${styleText("dim", "sum:")} ${sum}`,
+        ];
+        const text = stats.join(` ${styleText("dim", "|")} `);
         console.log(text);
       }
 
@@ -35,7 +45,7 @@ export class RequestQueueService {
     }, 1000);
   }
 
-  async request(callback: () => Promise<any>, top?: boolean) {
+  async request(callback: () => Promise<void>, top?: boolean) {
     if (this.pending >= this.pendingLimit) {
       this.add(callback, top);
       return;

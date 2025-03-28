@@ -1,9 +1,7 @@
 import { AmazonPdpAdBuilder } from "@/builders/AmazonPdpAdBuilder";
 import { AmazonPdpPriceHelper } from "@/scrapers/amazon/AmazonPdpPriceHelper";
-import { AmazonService } from "@/services/AmazonService";
 import { ApiService } from "@/services/ApiService";
 import { AmazonAd, Country, AmazonAdPrice } from "@/types/amazon.types";
-import { parseHTML } from "linkedom";
 
 export abstract class AmazonPdpCountryScraper {
   protected apiService;
@@ -68,7 +66,5 @@ export abstract class AmazonPdpCountryScraper {
 
     this.apiService.delete("amazon/ads/" + ad.id);
     resolveAd();
-
-    return;
   }
 }

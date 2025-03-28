@@ -5,7 +5,7 @@ import { AmazonService } from "@/services/AmazonService";
 import { ApiService } from "@/services/ApiService";
 import { ArgsService } from "@/services/ArgsService";
 import { ProxyService } from "@/services/ProxyService";
-import { AmazonAd } from "@/types/amazon.types";
+import { AmazonAd, AmazonAdCategory } from "@/types/amazon.types";
 import { CronJob } from "cron";
 
 export class AmazonScraper {
@@ -39,10 +39,12 @@ export class AmazonScraper {
   }
 
   async scrapPlp(name?: string) {
-    const categories = await this.apiService.getCategories();
-    const randomIndex = Math.floor(Math.random() * categories.length);
-    const random = categories[randomIndex]?.name;
-    await this.plpScraper.execute(name || random);
+    return this.apiService.get<AmazonAdCategory>(
+      "amazon/ads/categories/scrap",
+      {
+        onSuccess: (category) => this.plpScraper.execute(name || category.name),
+      }
+    );
   }
 
   async scrapPdp() {
