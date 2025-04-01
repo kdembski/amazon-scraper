@@ -1,5 +1,4 @@
 import _ from "lodash";
-import { styleText } from "node:util";
 import { ArgsService } from "@/services/ArgsService";
 
 export class RequestQueueService {
@@ -30,14 +29,14 @@ export class RequestQueueService {
       if (logs) {
         const sum = this.pending + this.queue.length + this.completed;
         const stats = [
-          `${styleText("dim", "speed:")} ${this.speed}/s`,
-          `${styleText("dim", "pending:")} ${this.pending}`,
-          `${styleText("dim", "queue:")} ${this.queue.length}`,
-          `${styleText("dim", "failed:")} ${this.failed}`,
-          `${styleText("dim", "completed:")} ${this.completed}`,
-          `${styleText("dim", "sum:")} ${sum}`,
+          `speed: ${this.speed}/s`,
+          `pending: ${this.pending}`,
+          `queue: ${this.queue.length}`,
+          `failed: ${this.failed}`,
+          `completed: ${this.completed}`,
+          `sum: ${sum}`,
         ];
-        const text = stats.join(` ${styleText("dim", "|")} `);
+        const text = stats.join(` | `);
         console.log(text);
       }
 

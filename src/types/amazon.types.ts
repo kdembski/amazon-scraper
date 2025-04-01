@@ -1,5 +1,3 @@
-import { PlaywrightItem } from "@/types/playwright.types";
-
 export interface AmazonAdCategory {
   id: number;
   name: string;
