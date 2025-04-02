@@ -4,10 +4,12 @@ import { parseHTML } from "linkedom";
 import { writeFileSync } from "node:fs";
 import { configDotenv } from "dotenv";
 import { PlaywrightService } from "@/services/PlaywrightService";
+import { ProxyService } from "@/services/ProxyService";
 
 configDotenv();
 
-const testAsin = () => {
+const testAsin = async () => {
+  await ProxyService.getInstance().loadProxies();
   const asin = process.argv[2];
   const service = AmazonService.getInstance();
   const countries = ["de", "fr", "it", "pl", "se"];
@@ -46,4 +48,4 @@ const headlessTestAsin = () => {
 //   testAsin();
 // }, 10000);
 
-headlessTestAsin();
+testAsin();

@@ -1,10 +1,9 @@
 import axios from "axios";
 import { CronJob } from "cron";
-import { Proxy, WebshareProxy } from "@/types/proxy.types";
 import { HttpsProxyAgent } from "https-proxy-agent";
 export class ProxyService {
   private static instance: ProxyService;
-  private proxies: Proxy[] = [];
+  private proxies: string[] = [];
   private isLoading = false;
 
   private constructor() {
@@ -26,9 +25,10 @@ export class ProxyService {
   }
 
   getRandomProxyAgent() {
-    const { address, port, username, password } = this.getRandomProxy();
+    const proxy = this.getRandomProxy();
+    const parts = proxy.split(":");
     return new HttpsProxyAgent(
-      `http://${username}:${password}@${address}:${port}`,
+      `http://${parts[2]}:${parts[3]}@${parts[0]}:${parts[1]}`,
       { keepAlive: true }
     );
   }
@@ -53,15 +53,12 @@ export class ProxyService {
   }
 
   private intervalLoad(resolve: () => void) {
-    const url =
-      "https://proxy.webshare.io/api/v2/proxy/list/?mode=direct&page=1&page_size=500";
+    const url = `https://proxy.webshare.io/api/v2/proxy/list/download/${process.env.PROXY_LIST_TOKEN}/-/any/username/direct/-/`;
 
     axios
-      .get<{ results: WebshareProxy[] }>(url, {
-        headers: { Authorization: `Token ${process.env.PROXY_API_KEY}` },
-      })
+      .get<string>(url)
       .then((response) => {
-        const data = response.data.results;
+        const data = response.data;
         this.proxies = this.formatProxies(data);
         this.isLoading = false;
         resolve();
@@ -72,12 +69,9 @@ export class ProxyService {
       });
   }
 
-  private formatProxies(data: WebshareProxy[]) {
-    return data.map((proxy) => ({
-      username: proxy.username,
-      password: proxy.password,
-      address: proxy.proxy_address,
-      port: proxy.port,
-    }));
+  private formatProxies(data: string) {
+    let array = data.includes("\r\n") ? data.split("\r\n") : data.split("\n");
+    array = array.filter((v) => !!v);
+    return array;
   }
 }

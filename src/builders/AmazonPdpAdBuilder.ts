@@ -56,6 +56,7 @@ export class AmazonPdpAdBuilder {
     if (!name) return;
     if (["Canada", "Kanada"].includes(name)) return "ca";
     if (["Germania", "Allemagne"].includes(name)) return "de";
+    if (["Polen", "Pologne", "Polonia"].includes(name)) return "pl";
   }
 
   buildUrl(country: Country, ad: AmazonAd) {
