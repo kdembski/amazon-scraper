@@ -65,7 +65,7 @@ export class AmazonService {
           })
           .catch((e) => {
             callback?.onError?.(e);
-            console.log(`Amazon: ${e}`);
+            //console.log(`Amazon: ${e}`);
           })
           .finally(() => {
             callback?.onFinally?.();
