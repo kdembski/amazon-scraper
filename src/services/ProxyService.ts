@@ -1,6 +1,5 @@
 import axios from "axios";
 import { CronJob } from "cron";
-import { HttpsProxyAgent } from "https-proxy-agent";
 export class ProxyService {
   private static instance: ProxyService;
   private proxies: string[] = [];
@@ -21,16 +20,9 @@ export class ProxyService {
   }
 
   getRandomProxy() {
-    return this.proxies[Math.floor(Math.random() * this.proxies.length)];
-  }
-
-  getRandomProxyAgent() {
-    const proxy = this.getRandomProxy();
+    const proxy = this.proxies[Math.floor(Math.random() * this.proxies.length)];
     const parts = proxy.split(":");
-    return new HttpsProxyAgent(
-      `http://${parts[2]}:${parts[3]}@${parts[0]}:${parts[1]}`,
-      { keepAlive: true }
-    );
+    return `http://${parts[2]}:${parts[3]}@${parts[0]}:${parts[1]}`;
   }
 
   loadProxies() {

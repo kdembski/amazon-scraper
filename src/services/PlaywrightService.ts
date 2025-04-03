@@ -85,15 +85,11 @@ export class PlaywrightService {
     reject,
   }: PlaywrightQueueItem) {
     const userAgent = new UserAgent().toString();
-    const { address, port, username, password } =
-      this.proxyService.getRandomProxy();
+    const proxy = this.proxyService.getRandomProxy();
 
     const config = {
       proxy: {
-        server: address,
-        port,
-        username,
-        password,
+        server: proxy,
       },
       extraHTTPHeaders: {
         referer: `${this.baseUrl}${referer}`,

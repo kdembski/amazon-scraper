@@ -3,49 +3,41 @@ import { ArgsService } from "@/services/ArgsService";
 
 export class RequestQueueService {
   private argsService;
-  private lastRequestCount = 0;
-  private requestCount = 0;
   private speedHistory: number[] = [];
+  private adjustInterval = 5 * 60;
   speed = 0;
   completed = 0;
+  previousCompleted = 0;
   failed = 0;
   pending = 0;
-  pendingLimit;
+  limit;
   queue: Function[] = [];
 
   constructor(
-    pendingLimit: number,
-    logs = false,
+    limit: number,
+    enableLogs = false,
     argsService = ArgsService.getInstance()
   ) {
-    this.pendingLimit = pendingLimit;
+    this.limit = limit;
     this.argsService = argsService;
 
-    setInterval(() => {
-      this.requestCount = this.pending + this.queue.length;
-      this.updateSpeedHistory();
-      this.calculateSpeed();
+    if (enableLogs) {
+      setInterval(() => {
+        this.updateSpeedHistory();
+        this.calculateSpeed();
+        this.logState();
 
-      if (logs) {
-        const sum = this.pending + this.queue.length + this.completed;
-        const stats = [
-          `speed: ${this.speed}/s`,
-          `pending: ${this.pending}`,
-          `queue: ${this.queue.length}`,
-          `failed: ${this.failed}`,
-          `completed: ${this.completed}`,
-          `sum: ${sum}`,
-        ];
-        const text = stats.join(` | `);
-        console.log(text);
-      }
+        this.previousCompleted = this.completed;
+      }, 1000);
 
-      this.lastRequestCount = this.requestCount;
-    }, 1000);
+      setInterval(() => {
+        this.adjustLimit();
+      }, this.adjustInterval * 1000);
+    }
   }
 
   async request(callback: () => Promise<void>, top?: boolean) {
-    if (this.pending >= this.pendingLimit) {
+    if (this.pending >= this.limit) {
       this.add(callback, top);
       return;
     }
@@ -76,7 +68,7 @@ export class RequestQueueService {
   }
 
   private async next() {
-    if (this.pending >= this.pendingLimit) return;
+    if (this.pending >= this.limit) return;
     const next = this.queue.shift();
 
     this.pending++;
@@ -85,13 +77,11 @@ export class RequestQueueService {
   }
 
   private updateSpeedHistory() {
-    if (_.isNil(this.lastRequestCount) || _.isNil(this.requestCount)) return;
-
-    let speed = this.lastRequestCount - this.requestCount;
+    let speed = this.completed - this.previousCompleted;
     speed = speed < 0 ? 0 : speed;
 
     const length = this.speedHistory.unshift(speed);
-    this.speedHistory.length = Math.min(length, 100);
+    this.speedHistory.length = Math.min(length, 60 * 60);
   }
 
   private calculateSpeed() {
@@ -99,9 +89,54 @@ export class RequestQueueService {
       return;
     }
 
-    this.speed = Math.round(
-      this.speedHistory.reduce((sum, v) => sum + v, 0) /
-        this.speedHistory.length
+    this.speed = Math.round(this.calculateAvg(this.speedHistory));
+  }
+
+  private calculateAvg(values: number[]) {
+    return values.reduce((sum, v) => sum + v, 0) / values.length;
+  }
+
+  private logState() {
+    const sum = this.pending + this.queue.length + this.completed;
+    const stats = [
+      `speed: ${this.speed}/s`,
+      `pending: ${this.pending}`,
+      `queue: ${this.queue.length}`,
+      `failed: ${this.failed}`,
+      `completed: ${this.completed}`,
+      `sum: ${sum}`,
+    ];
+    const text = stats.join(` | `);
+    console.log(text);
+  }
+
+  private adjustLimit() {
+    if (this.speedHistory.length < this.adjustInterval * 4) return;
+
+    if (this.speedHistory.length < this.adjustInterval * 5) {
+      this.limit += 1000;
+      return;
+    }
+
+    const current = this.calculateAvg(
+      this.speedHistory.slice(0, this.adjustInterval)
     );
+    const previous = this.calculateAvg(
+      this.speedHistory.slice(this.adjustInterval, this.adjustInterval * 2)
+    );
+    const diff = current - previous;
+
+    if (diff > -current * 0.1 && diff < current * 0.1) {
+      return;
+    }
+
+    if (diff >= 0) {
+      this.limit += 500;
+      return;
+    }
+
+    if (diff < 0) {
+      this.limit -= 100;
+    }
   }
 }
