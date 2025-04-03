@@ -5,7 +5,6 @@ import { AmazonPlpAdPage, AmazonPlpAd } from "@/types/amazon.types";
 import { parseHTML } from "linkedom";
 
 export class AmazonPlpPageScraper {
-  private baseUrl = "https://www.amazon.pl/";
   private apiService;
   private amazonService;
   private builder;
@@ -20,72 +19,65 @@ export class AmazonPlpPageScraper {
     this.builder = builder;
   }
 
-  execute(page: AmazonPlpAdPage, category: string, resolve: () => void) {
-    const ref = Math.floor(Math.random() * 100000000000);
-    const referer = `${this.baseUrl}b?node=${ref}`;
-    const url = `${this.baseUrl}s?i=${category}&rh=${page.subcategory}&page=${page.number}&low-price=${page.range.min}&high-price=${page.range.max}`;
+  async execute(page: AmazonPlpAdPage, category: string) {
+    return new Promise<AmazonPlpAd[] | undefined>((resolve, reject) => {
+      page.resolve = resolve;
+      page.reject = reject;
 
-    if (page.complete || page.pending) return;
-    page.pending = true;
+      const url = this.getUrl(page, category);
+      const ref = Math.floor(Math.random() * 100000000000);
+      const referer = `pl/b?node=${ref}`;
 
-    this.amazonService.get<string>(
-      url,
-      referer,
-      {
-        onSuccess: (res) => this.onSuccess(res, page, category, resolve),
-        onError: () => this.onError(page, category, resolve),
-      },
-      true
-    );
+      if (page.complete || page.pending) return;
+      page.pending = true;
+
+      const callback = {
+        onSuccess: (res: string) => this.onSuccess(res, page, category),
+        onError: () => this.onError(page),
+      };
+      this.amazonService.get<string>(url, referer, callback, true);
+    })
+      .then((ads) => {
+        page.pending = false;
+        page.complete = true;
+        this.amazonService.queueService.completed++;
+        if (ads) this.apiService.post("amazon/ads", ads);
+      })
+      .catch(() => {
+        page.pending = false;
+        page.failed++;
+        this.amazonService.queueService.failed++;
+        this.execute(page, category);
+      });
   }
 
   private async onSuccess(
     data: string,
     page: AmazonPlpAdPage,
-    category: string,
-    resolve: () => void
+    category: string
   ) {
-    page.pending = false;
-
     const { document } = parseHTML(data);
     const ads = this.builder.build(document, category);
 
     if (ads.length === 0) {
-      this.retry(page, category, resolve);
+      page.reject?.("No ads found");
       return;
     }
 
-    this.complete(page, ads, resolve);
+    page.resolve?.(ads);
   }
 
-  private onError(
-    page: AmazonPlpAdPage,
-    category: string,
-    resolve: () => void
-  ) {
-    page.pending = false;
-
+  private onError(page: AmazonPlpAdPage) {
     if (page.failed > 100) {
-      page.complete = true;
-      resolve();
+      page.resolve?.();
       return;
     }
 
     page.failed++;
-    this.retry(page, category, resolve);
+    page.reject?.("Failed");
   }
 
-  private retry(page: AmazonPlpAdPage, category: string, resolve: () => void) {
-    this.execute(page, category, resolve);
-  }
-
-  private complete(
-    page: AmazonPlpAdPage,
-    ads: AmazonPlpAd[],
-    resolve: () => void
-  ) {
-    page.complete = true;
-    this.apiService.post("amazon/ads", ads);
-    resolve();
+  private getUrl(page: AmazonPlpAdPage, category: string) {
+    return `pl/s?i=${category}&rh=${page.subcategory}&page=${page.number}&low-price=${page.range.min}&high-price=${page.range.max}`;
   }
 }

@@ -17,6 +17,8 @@ export interface AmazonPlpAdPage {
   pending: boolean;
   complete: boolean;
   failed: number;
+  resolve?: (value?: AmazonPlpAd[] | PromiseLike<AmazonPlpAd[]>) => void;
+  reject?: (e: any) => void;
 }
 export interface AmazonPlpAdPageSort {
   min: number;

@@ -131,7 +131,7 @@ export class RequestQueueService {
     }
 
     if (diff >= 0) {
-      this.limit += 500;
+      this.limit += diff * 1000;
       return;
     }
 

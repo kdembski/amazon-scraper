@@ -30,12 +30,10 @@ export class AmazonPlpScraper {
       this.loadSubcategories(category, resolve)
     );
     const pages = this.buildPages(subcategories);
+    pages.length = Math.min(pages.length, 60 * 60);
 
-    const promises = pages.map(
-      (page) =>
-        new Promise<void>((resolve) => {
-          this.pageScraper.execute(page, category, resolve);
-        })
+    const promises = pages.map((page) =>
+      this.pageScraper.execute(page, category)
     );
     await Promise.all(promises);
   }
