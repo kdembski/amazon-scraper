@@ -4,7 +4,7 @@ import { ArgsService } from "@/services/ArgsService";
 export class RequestQueueService {
   private argsService;
   private speedHistory: number[] = [];
-  private adjustInterval = 1 * 60;
+  private adjustInterval = 30 * 60;
   speed = 0;
   completed = 0;
   previousCompleted = 0;
@@ -111,9 +111,11 @@ export class RequestQueueService {
   }
 
   private adjustLimit() {
-    if (this.speedHistory.length < this.adjustInterval * 4) return;
+    const skip = 2;
 
-    if (this.speedHistory.length < this.adjustInterval * 5) {
+    if (this.speedHistory.length < this.adjustInterval * skip) return;
+
+    if (this.speedHistory.length < this.adjustInterval * (skip + 1)) {
       this.limit += 1000;
       return;
     }
@@ -124,19 +126,20 @@ export class RequestQueueService {
     );
 
     const diff = current - previous;
+    const errorThreshold = 0.01;
     console.log({ current, previous, diff });
 
-    if (diff > -current * 0.01 && diff < current * 0.01) {
+    if (diff > -current * errorThreshold && diff < current * errorThreshold) {
       return;
     }
 
     if (diff >= 0) {
-      this.limit += diff * 10000;
+      this.limit += diff * 2000;
       return;
     }
 
     if (diff < 0) {
-      this.limit -= 100;
+      this.limit -= diff * 1000;
       return;
     }
   }
