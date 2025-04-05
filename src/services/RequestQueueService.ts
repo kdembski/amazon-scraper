@@ -129,6 +129,7 @@ export class RequestQueueService {
 
     if (diff < 0.25) {
       this.targetedSpeed += 1;
+      this.limit += 1000;
       return;
     }
 
@@ -137,8 +138,13 @@ export class RequestQueueService {
       return;
     }
 
-    if (diff > 1.5) {
+    if (diff > 1.5 && diff <= 2) {
       this.limit -= (diff - 1) * 1000;
+      return;
+    }
+
+    if (diff > 2) {
+      this.targetedSpeed -= 1;
     }
   }
 }
