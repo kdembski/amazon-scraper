@@ -78,6 +78,6 @@ export class AmazonPlpPageScraper {
   }
 
   private getUrl(page: AmazonPlpAdPage, category: string) {
-    return `pl/s?i=${category}&rh=${page.subcategory}&page=${page.number}&low-price=${page.range.min}&high-price=${page.range.max}`;
+    return `pl/s?i=${category}&rh=${page.subcategory}&page=${page.number}&low-price=${page.range.min}&high-price=${page.range.max}&s=date-desc-rank`;
   }
 }

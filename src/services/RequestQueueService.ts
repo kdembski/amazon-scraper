@@ -125,7 +125,6 @@ export class RequestQueueService {
     }
 
     const diff = this.targetedSpeed - current;
-    console.log({ diff, current, target: this.targetedSpeed });
 
     if (diff < 0.25) {
       this.targetedSpeed += 1;

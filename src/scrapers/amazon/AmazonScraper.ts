@@ -42,7 +42,8 @@ export class AmazonScraper {
     return this.apiService.get<AmazonAdCategory>(
       "amazon/ads/categories/scrap",
       {
-        onSuccess: (category) => this.plpScraper.execute(name || category.name),
+        onSuccess: (category) =>
+          this.plpScraper.execute(name || category.name, 10),
       }
     );
   }
