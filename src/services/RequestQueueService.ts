@@ -4,14 +4,15 @@ import { ArgsService } from "@/services/ArgsService";
 export class RequestQueueService {
   private argsService;
   private speedHistory: number[] = [];
-  private adjustInterval = 30 * 60;
+  private adjustInterval = 5 * 60;
+  queue: Function[] = [];
   speed = 0;
   completed = 0;
   previousCompleted = 0;
   failed = 0;
   pending = 0;
   limit;
-  queue: Function[] = [];
+  targetedSpeed?: number;
 
   constructor(
     limit: number,
@@ -111,36 +112,33 @@ export class RequestQueueService {
   }
 
   private adjustLimit() {
-    const skip = 2;
+    const skip = 5;
 
-    if (this.speedHistory.length < this.adjustInterval * skip) return;
-
-    if (this.speedHistory.length < this.adjustInterval * (skip + 1)) {
-      this.limit += 1000;
+    if (this.speedHistory.length < this.adjustInterval * skip) {
       return;
     }
 
     const current = this.calculateAvg(this.speedHistory);
-    const previous = this.calculateAvg(
-      this.speedHistory.slice(this.adjustInterval, this.speedHistory.length)
-    );
 
-    const diff = current - previous;
-    const errorThreshold = 0.01;
-    console.log({ current, previous, diff });
+    if (!this.targetedSpeed) {
+      this.targetedSpeed = current + 1;
+    }
 
-    if (diff > -current * errorThreshold && diff < current * errorThreshold) {
+    const diff = this.targetedSpeed - current;
+    console.log({ diff, current, target: this.targetedSpeed });
+
+    if (diff < 0.25) {
+      this.targetedSpeed += 1;
       return;
     }
 
-    if (diff >= 0) {
-      this.limit += diff * 2000;
+    if (diff >= 0.25 && diff <= 1.25) {
+      this.limit += diff * 1000;
       return;
     }
 
-    if (diff < 0) {
-      this.limit -= diff * 1000;
-      return;
+    if (diff > 1.25) {
+      this.limit -= (diff - 1) * 1000;
     }
   }
 }
