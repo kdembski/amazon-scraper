@@ -118,39 +118,40 @@ export class RequestQueueService {
   }
 
   private adjustLimit() {
-    const skip = 6;
-    const step = 0.5;
+    const skipIntervals = 6;
+    const speedStep = 0.5;
+    const limitStep = 1000;
 
-    if (this.speedHistory.length < this.adjustInterval * skip) {
+    if (this.speedHistory.length < this.adjustInterval * skipIntervals) {
       return;
     }
 
     const current = this.calculateAvg(this.speedHistory);
 
     if (!this.targetedSpeed) {
-      this.targetedSpeed = current + step;
+      this.targetedSpeed = current + speedStep;
     }
 
     const diff = this.targetedSpeed - current;
 
-    if (diff < step * 0.5) {
-      this.targetedSpeed += step;
-      this.limit += 1000;
+    if (diff < speedStep * 0.5) {
+      this.targetedSpeed += speedStep;
+      this.limit += limitStep * 2;
       return;
     }
 
-    if (diff >= step * 0.5 && diff <= step * 2) {
-      this.limit += diff * 1000;
+    if (diff >= speedStep * 0.5 && diff <= speedStep * 2) {
+      this.limit += diff * limitStep * 3;
       return;
     }
 
-    if (diff > step * 2 && diff <= step * 3) {
-      this.limit -= (diff - step) * 1000;
+    if (diff > speedStep * 2 && diff <= speedStep * 3) {
+      this.limit -= (diff - speedStep) * limitStep;
       return;
     }
 
-    if (diff > step * 3) {
-      this.targetedSpeed -= step;
+    if (diff > speedStep * 3) {
+      this.targetedSpeed -= speedStep;
     }
   }
 }
