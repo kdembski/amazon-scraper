@@ -1,4 +1,5 @@
 import _ from "lodash";
+import osu from "node-os-utils";
 import { ArgsService } from "@/services/ArgsService";
 
 export class RequestQueueService {
@@ -117,7 +118,7 @@ export class RequestQueueService {
     return !_.isNil(value) ? (Math.round(value * 100) / 100).toFixed(2) : "-";
   }
 
-  private adjustLimit() {
+  private async adjustLimit() {
     const skipIntervals = 6;
     const speedStep = 0.5;
     const limitStep = 1000;
@@ -126,31 +127,46 @@ export class RequestQueueService {
       return;
     }
 
-    const current = this.calculateAvg(this.speedHistory);
+    const currentCpu = await osu.cpu.usage();
+    const { totalMemMb, usedMemMb } = await osu.mem.used();
+    const currentMem = (usedMemMb * 100) / totalMemMb;
+    const currentSpeed = this.calculateAvg(this.speedHistory);
 
     if (!this.targetedSpeed) {
-      this.targetedSpeed = current + speedStep;
+      this.targetedSpeed = currentSpeed + speedStep;
     }
 
-    const diff = this.targetedSpeed - current;
+    if (currentMem > 80) return;
+    if (currentMem > 90) {
+      this.limit -= limitStep;
+      return;
+    }
 
-    if (diff < speedStep * 0.5) {
+    if (currentCpu > 80) return;
+    if (currentCpu > 90) {
+      this.limit -= limitStep;
+      return;
+    }
+
+    const speedDiff = this.targetedSpeed - currentSpeed;
+
+    if (speedDiff < speedStep * 0.5) {
       this.targetedSpeed += speedStep;
       this.limit += limitStep * 2;
       return;
     }
 
-    if (diff >= speedStep * 0.5 && diff <= speedStep * 2) {
-      this.limit += diff * limitStep * 3;
+    if (speedDiff >= speedStep * 0.5 && speedDiff <= speedStep * 2) {
+      this.limit += speedDiff * limitStep * 3;
       return;
     }
 
-    if (diff > speedStep * 2 && diff <= speedStep * 3) {
-      this.limit -= (diff - speedStep) * limitStep;
+    if (speedDiff > speedStep * 2 && speedDiff <= speedStep * 3) {
+      this.limit -= (speedDiff - speedStep) * limitStep;
       return;
     }
 
-    if (diff > speedStep * 3) {
+    if (speedDiff > speedStep * 3) {
       this.targetedSpeed -= speedStep;
     }
   }
