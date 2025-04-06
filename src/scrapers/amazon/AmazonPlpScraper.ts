@@ -30,9 +30,7 @@ export class AmazonPlpScraper {
   }
 
   async execute(category: string, length: number) {
-    const subcategories = await new Promise<string[]>((resolve) =>
-      this.loadSubcategories(category, resolve)
-    );
+    const subcategories = await this.loadSubcategories(category);
     const pages = this.buildPages(subcategories, length);
 
     const promises = pages.map((page) =>
@@ -66,8 +64,31 @@ export class AmazonPlpScraper {
     };
   }
 
-  loadSubcategories(category: string, resolve: (value: string[]) => void) {
-    const url = `pl/s?i=${category}&s=popularity-rank`;
+  private async loadSubcategories(category: string) {
+    const subcategories = await new Promise<string[]>((resolve) =>
+      this.intervalLoadSubcategories(category, resolve)
+    );
+
+    const promises = subcategories.map(async (subcategory) => {
+      const subsubcategories = await new Promise<string[]>((resolve) =>
+        this.intervalLoadSubcategories(category, resolve, subcategory)
+      );
+      subcategories.push(...subsubcategories);
+    });
+
+    await Promise.all(promises);
+
+    return [...new Set(subcategories)];
+  }
+
+  private intervalLoadSubcategories(
+    category: string,
+    resolve: (value: string[]) => void,
+    subcategory?: string
+  ) {
+    const url = subcategory
+      ? `pl/s?i=${category}&rh=${subcategory}&s=popularity-rank`
+      : `pl/s?i=${category}&s=popularity-rank`;
 
     this.amazonService.get<string>(
       url,
@@ -75,7 +96,7 @@ export class AmazonPlpScraper {
       {
         onSuccess: (data) => {
           if (!data.length) {
-            this.loadSubcategories(category, resolve);
+            this.intervalLoadSubcategories(category, resolve, subcategory);
             return;
           }
 
@@ -83,14 +104,14 @@ export class AmazonPlpScraper {
           const subcategories = this.builder.buildSubcategories(document);
 
           if (!subcategories.length) {
-            this.loadSubcategories(category, resolve);
+            this.intervalLoadSubcategories(category, resolve, subcategory);
             return;
           }
 
           resolve(subcategories);
         },
         onError: () => {
-          this.loadSubcategories(category, resolve);
+          this.intervalLoadSubcategories(category, resolve, subcategory);
         },
       },
       true

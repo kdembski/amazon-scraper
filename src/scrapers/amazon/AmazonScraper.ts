@@ -43,7 +43,7 @@ export class AmazonScraper {
       "amazon/ads/categories/scrap",
       {
         onSuccess: (category) =>
-          this.plpScraper.execute(name || category.name, 10),
+          this.plpScraper.execute(name || category.name, 5),
       }
     );
   }

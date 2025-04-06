@@ -4,7 +4,7 @@ import { ArgsService } from "@/services/ArgsService";
 export class RequestQueueService {
   private argsService;
   private speedHistory: number[] = [];
-  private adjustInterval = 20 * 60;
+  private adjustInterval = 10 * 60;
   queue: Function[] = [];
   speed = 0;
   completed = 0;
@@ -90,7 +90,7 @@ export class RequestQueueService {
       return;
     }
 
-    this.speed = Math.round(this.calculateAvg(this.speedHistory));
+    this.speed = this.calculateAvg(this.speedHistory);
   }
 
   private calculateAvg(values: number[]) {
@@ -99,8 +99,10 @@ export class RequestQueueService {
 
   private logState() {
     const sum = this.pending + this.queue.length + this.completed;
+
     const stats = [
-      `speed: ${this.speed}/s`,
+      `speed: ${this.roundToTwoDecimals(this.speed)}/s`,
+      `target: ${this.roundToTwoDecimals(this.targetedSpeed)}/s`,
       `pending: ${this.pending}`,
       `queue: ${this.queue.length}`,
       `failed: ${this.failed}`,
@@ -111,8 +113,13 @@ export class RequestQueueService {
     console.log(text);
   }
 
+  private roundToTwoDecimals(value?: number) {
+    return !_.isNil(value) ? (Math.round(value * 100) / 100).toFixed(2) : "-";
+  }
+
   private adjustLimit() {
-    const skip = 3;
+    const skip = 6;
+    const step = 0.5;
 
     if (this.speedHistory.length < this.adjustInterval * skip) {
       return;
@@ -121,29 +128,29 @@ export class RequestQueueService {
     const current = this.calculateAvg(this.speedHistory);
 
     if (!this.targetedSpeed) {
-      this.targetedSpeed = current + 1;
+      this.targetedSpeed = current + step;
     }
 
     const diff = this.targetedSpeed - current;
 
-    if (diff < 0.25) {
-      this.targetedSpeed += 1;
+    if (diff < step * 0.5) {
+      this.targetedSpeed += step;
       this.limit += 1000;
       return;
     }
 
-    if (diff >= 0.25 && diff <= 1.5) {
+    if (diff >= step * 0.5 && diff <= step * 2) {
       this.limit += diff * 1000;
       return;
     }
 
-    if (diff > 1.5 && diff <= 2) {
-      this.limit -= (diff - 1) * 1000;
+    if (diff > step * 2 && diff <= step * 3) {
+      this.limit -= (diff - step) * 1000;
       return;
     }
 
-    if (diff > 2) {
-      this.targetedSpeed -= 1;
+    if (diff > step * 3) {
+      this.targetedSpeed -= step;
     }
   }
 }
