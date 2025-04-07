@@ -10,7 +10,7 @@ export class RequestQueueService {
   speed = 0;
   completed = 0;
   scraped = 0;
-  previousScraped = 0;
+  previousCompleted = 0;
   failed = 0;
   pending = 0;
   limit;
@@ -30,7 +30,7 @@ export class RequestQueueService {
         this.calculateSpeed();
         this.logState();
 
-        this.previousScraped = this.scraped;
+        this.previousCompleted = this.completed;
       }, 1000);
 
       setInterval(() => {
@@ -80,7 +80,7 @@ export class RequestQueueService {
   }
 
   private updateSpeedHistory() {
-    let speed = this.scraped - this.previousScraped;
+    let speed = this.completed - this.previousCompleted;
     speed = speed < 0 ? 0 : speed;
 
     const length = this.speedHistory.unshift(speed);
