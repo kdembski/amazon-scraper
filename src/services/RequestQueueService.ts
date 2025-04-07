@@ -5,7 +5,7 @@ import { ArgsService } from "@/services/ArgsService";
 export class RequestQueueService {
   private argsService;
   private speedHistory: number[] = [];
-  private adjustInterval = 10 * 60;
+  private adjustInterval = 5 * 60;
   queue: Function[] = [];
   speed = 0;
   completed = 0;
@@ -119,8 +119,8 @@ export class RequestQueueService {
 
   private async adjustLimit() {
     const skipIntervals = 6;
-    const speedStep = 0.1;
-    const limitStep = 1000;
+    const speedStep = 0.2;
+    const limitStep = 2000;
 
     if (this.speedHistory.length < this.adjustInterval * skipIntervals) {
       return;
@@ -155,12 +155,12 @@ export class RequestQueueService {
       return;
     }
 
-    if (speedDiff >= speedStep * 0.5 && speedDiff <= speedStep * 2) {
+    if (speedDiff >= speedStep * 0.5 && speedDiff <= speedStep * 2.5) {
       this.limit += speedDiff * limitStep * 3;
       return;
     }
 
-    if (speedDiff > speedStep * 2 && speedDiff <= speedStep * 3) {
+    if (speedDiff > speedStep * 2.5 && speedDiff <= speedStep * 3) {
       this.limit -= (speedDiff - speedStep) * limitStep;
       return;
     }
