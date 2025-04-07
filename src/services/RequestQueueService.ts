@@ -99,8 +99,6 @@ export class RequestQueueService {
   }
 
   private logState() {
-    const sum = this.pending + this.queue.length + this.completed;
-
     const stats = [
       `speed: ${this.roundToTwoDecimals(this.speed)}/s`,
       `target: ${this.roundToTwoDecimals(this.targetedSpeed)}/s`,
@@ -108,7 +106,6 @@ export class RequestQueueService {
       `queue: ${this.queue.length}`,
       `failed: ${this.failed}`,
       `completed: ${this.completed}`,
-      `sum: ${sum}`,
     ];
     const text = stats.join(` | `);
     console.log(text);
