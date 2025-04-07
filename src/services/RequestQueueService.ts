@@ -9,7 +9,8 @@ export class RequestQueueService {
   queue: Function[] = [];
   speed = 0;
   completed = 0;
-  previousCompleted = 0;
+  scraped = 0;
+  previousScraped = 0;
   failed = 0;
   pending = 0;
   limit;
@@ -29,7 +30,7 @@ export class RequestQueueService {
         this.calculateSpeed();
         this.logState();
 
-        this.previousCompleted = this.completed;
+        this.previousScraped = this.scraped;
       }, 1000);
 
       setInterval(() => {
@@ -79,7 +80,7 @@ export class RequestQueueService {
   }
 
   private updateSpeedHistory() {
-    let speed = this.completed - this.previousCompleted;
+    let speed = this.scraped - this.previousScraped;
     speed = speed < 0 ? 0 : speed;
 
     const length = this.speedHistory.unshift(speed);
@@ -106,6 +107,7 @@ export class RequestQueueService {
       `queue: ${this.queue.length}`,
       `failed: ${this.failed}`,
       `completed: ${this.completed}`,
+      `scraped: ${this.scraped}`,
     ];
     const text = stats.join(` | `);
     console.log(text);
@@ -117,7 +119,7 @@ export class RequestQueueService {
 
   private async adjustLimit() {
     const skipIntervals = 6;
-    const speedStep = 0.5;
+    const speedStep = 0.1;
     const limitStep = 1000;
 
     if (this.speedHistory.length < this.adjustInterval * skipIntervals) {

@@ -80,7 +80,7 @@ export class RequestAmazonPdpCountryScraper extends AmazonPdpCountryScraper {
       return;
     }
 
-    if (price.failed > 1000) {
+    if (price.failed > 200) {
       price.resolve?.(true);
       return;
     }

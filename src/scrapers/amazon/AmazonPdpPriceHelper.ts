@@ -1,11 +1,17 @@
+import { AmazonService } from "@/services/AmazonService";
 import { ApiService } from "@/services/ApiService";
 import { AmazonAd, AmazonAdPrice } from "@/types/amazon.types";
 
 export class AmazonPdpPriceHelper {
   private apiService;
+  private amazonService;
 
-  constructor(apiService = ApiService.getInstance()) {
+  constructor(
+    apiService = ApiService.getInstance(),
+    amazonService = AmazonService.getInstance()
+  ) {
     this.apiService = apiService;
+    this.amazonService = amazonService;
   }
 
   getPrice(prices: AmazonAdPrice[], countryId: number) {
@@ -32,6 +38,7 @@ export class AmazonPdpPriceHelper {
 
     if (!prices?.length) return;
 
+    this.amazonService.queueService.scraped++;
     this.apiService.put("amazon/ads/" + ad.id, { prices: prepared });
   }
 }
