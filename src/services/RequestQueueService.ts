@@ -4,7 +4,7 @@ import { ArgsService } from "@/services/ArgsService";
 
 export class RequestQueueService {
   private argsService;
-  private speedHistory: number[] = [];
+  private completedHistory: number[] = [];
   private adjustInterval = 5 * 60;
   queue: Function[] = [];
   speed = 0;
@@ -26,7 +26,7 @@ export class RequestQueueService {
 
     if (enableLogs) {
       setInterval(() => {
-        this.updateSpeedHistory();
+        this.updateCompletedHistory();
         this.calculateSpeed();
         this.logState();
 
@@ -79,20 +79,20 @@ export class RequestQueueService {
     this.pending--;
   }
 
-  private updateSpeedHistory() {
-    let speed = this.completed - this.previousCompleted;
-    speed = speed < 0 ? 0 : speed;
+  private updateCompletedHistory() {
+    let diff = this.completed - this.previousCompleted;
+    diff = diff < 0 ? 0 : diff;
 
-    const length = this.speedHistory.unshift(speed);
-    this.speedHistory.length = Math.min(length, 24 * 60 * 60);
+    const length = this.completedHistory.unshift(diff);
+    this.completedHistory.length = Math.min(length, 24 * 60 * 60);
   }
 
   private calculateSpeed() {
-    if (!this.speedHistory.length) {
+    if (!this.completedHistory.length) {
       return;
     }
 
-    this.speed = this.calculateAvg(this.speedHistory);
+    this.speed = this.calculateAvg(this.completedHistory);
   }
 
   private calculateAvg(values: number[]) {
@@ -122,14 +122,14 @@ export class RequestQueueService {
     const speedStep = 0.2;
     const limitStep = 2000;
 
-    if (this.speedHistory.length < this.adjustInterval * skipIntervals) {
+    if (this.completedHistory.length < this.adjustInterval * skipIntervals) {
       return;
     }
 
     const currentCpu = await osu.cpu.usage();
     const { totalMemMb, usedMemMb } = await osu.mem.used();
     const currentMem = (usedMemMb * 100) / totalMemMb;
-    const currentSpeed = this.calculateAvg(this.speedHistory);
+    const currentSpeed = this.calculateAvg(this.completedHistory);
 
     if (!this.targetedSpeed) {
       this.targetedSpeed = currentSpeed + speedStep;
@@ -164,17 +164,18 @@ export class RequestQueueService {
     }
 
     if (speedDiff >= -speedStep * 0.5 && speedDiff <= speedStep) {
-      this.limit += speedDiff * limitStep * 3;
+      this.limit += (2 * speedStep - speedDiff) * limitStep * 3;
       return;
     }
 
     if (speedDiff > speedStep && speedDiff <= speedStep * 1.5) {
-      this.limit -= (speedDiff - speedStep) * limitStep;
+      this.limit -= speedDiff * limitStep;
       return;
     }
 
     if (speedDiff > speedStep * 1.5) {
       this.targetedSpeed -= speedStep;
+      this.limit += limitStep;
     }
   }
 }

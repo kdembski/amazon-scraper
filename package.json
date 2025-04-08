@@ -12,6 +12,7 @@
   },
   "license": "ISC",
   "dependencies": {
+    "asciichart": "^1.5.25",
     "axios": "^1.7.9",
     "cron": "^3.5.0",
     "dotenv": "^16.4.7",
@@ -27,6 +28,7 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "@types/asciichart": "^1.5.8",
     "@types/axios": "^0.14.4",
     "@types/lodash": "^4.17.14",
     "@types/node": "^22.10.7",

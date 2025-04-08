@@ -68,7 +68,7 @@ export class AmazonPlpPageScraper {
   }
 
   private onError(page: AmazonPlpAdPage) {
-    if (page.failed > 100) {
+    if (page.failed > 200) {
       page.resolve?.();
       return;
     }
