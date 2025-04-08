@@ -135,37 +135,45 @@ export class RequestQueueService {
       this.targetedSpeed = currentSpeed + speedStep;
     }
 
-    if (currentMem > 80) return;
     if (currentMem > 90) {
+      this.limit -= 2 * limitStep;
+      return;
+    }
+
+    if (currentCpu > 90) {
+      this.limit -= 2 * limitStep;
+      return;
+    }
+
+    if (currentMem > 80) {
       this.limit -= limitStep;
       return;
     }
 
-    if (currentCpu > 80) return;
-    if (currentCpu > 90) {
+    if (currentCpu > 80) {
       this.limit -= limitStep;
       return;
     }
 
     const speedDiff = this.targetedSpeed - currentSpeed;
 
-    if (speedDiff < speedStep * 0.5) {
+    if (speedDiff < -speedStep * 0.5) {
       this.targetedSpeed += speedStep;
       this.limit += limitStep * 2;
       return;
     }
 
-    if (speedDiff >= speedStep * 0.5 && speedDiff <= speedStep * 2.5) {
+    if (speedDiff >= -speedStep * 0.5 && speedDiff <= speedStep) {
       this.limit += speedDiff * limitStep * 3;
       return;
     }
 
-    if (speedDiff > speedStep * 2.5 && speedDiff <= speedStep * 3) {
+    if (speedDiff > speedStep && speedDiff <= speedStep * 1.5) {
       this.limit -= (speedDiff - speedStep) * limitStep;
       return;
     }
 
-    if (speedDiff > speedStep * 3) {
+    if (speedDiff > speedStep * 1.5) {
       this.targetedSpeed -= speedStep;
     }
   }
