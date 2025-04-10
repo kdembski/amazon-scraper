@@ -132,7 +132,7 @@ export class RequestQueueService {
     const currentSpeed = this.calculateAvg(this.completedHistory);
 
     if (!this.targetedSpeed) {
-      this.targetedSpeed = currentSpeed + speedStep;
+      this.targetedSpeed = currentSpeed + speedStep * 0.5;
     }
 
     if (currentMem > 90) {
@@ -164,7 +164,7 @@ export class RequestQueueService {
     }
 
     if (speedDiff >= -speedStep * 0.5 && speedDiff <= speedStep) {
-      this.limit += (2 * speedStep - speedDiff) * limitStep * 3;
+      this.limit += (speedStep + speedDiff) * limitStep * 3;
       return;
     }
 

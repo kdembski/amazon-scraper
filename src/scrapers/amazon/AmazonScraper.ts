@@ -35,7 +35,7 @@ export class AmazonScraper {
   async execute() {
     await this.proxyService.loadProxies();
     await this.scrapPdp();
-    new CronJob("0 0 2 * * *", () => this.scrapPlp()).start();
+    new CronJob("0 0 */1 * * *", () => this.scrapPlp()).start();
   }
 
   async scrapPlp(name?: string) {
@@ -43,7 +43,7 @@ export class AmazonScraper {
       "amazon/ads/categories/scrap",
       {
         onSuccess: (category) =>
-          this.plpScraper.execute(name || category.name, 5),
+          this.plpScraper.execute(name || category.name, 1),
       }
     );
   }
