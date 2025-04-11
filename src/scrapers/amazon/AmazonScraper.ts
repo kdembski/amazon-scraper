@@ -44,6 +44,9 @@ export class AmazonScraper {
       {
         onSuccess: (category) =>
           this.plpScraper.execute(name || category.name, 1),
+        onError: () => {
+          this.scrapPlp(name);
+        },
       }
     );
   }
