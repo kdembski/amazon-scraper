@@ -5,7 +5,8 @@ import { ArgsService } from "@/services/ArgsService";
 export class RequestQueueService {
   private argsService;
   private completedHistory: number[] = [];
-  private adjustInterval = 5 * 60;
+  private cpuHistory: number[] = [];
+  private adjustInterval = 10 * 60;
   queue: Function[] = [];
   speed = 0;
   completed = 0;
@@ -27,6 +28,7 @@ export class RequestQueueService {
     if (enableLogs) {
       setInterval(() => {
         this.updateCompletedHistory();
+        this.updateCpuHistory();
         this.calculateSpeed();
         this.logState();
 
@@ -87,6 +89,13 @@ export class RequestQueueService {
     this.completedHistory.length = Math.min(length, 24 * 60 * 60);
   }
 
+  private async updateCpuHistory() {
+    const usage = await osu.cpu.usage();
+
+    const length = this.cpuHistory.unshift(usage);
+    this.cpuHistory.length = Math.min(length, 10 * 60);
+  }
+
   private calculateSpeed() {
     if (!this.completedHistory.length) {
       return;
@@ -118,15 +127,15 @@ export class RequestQueueService {
   }
 
   private async adjustLimit() {
-    const skipIntervals = 6;
+    const skipIntervals = 3;
     const speedStep = 0.2;
-    const limitStep = 2000;
+    const limitStep = 1000;
 
     if (this.completedHistory.length < this.adjustInterval * skipIntervals) {
       return;
     }
 
-    const currentCpu = await osu.cpu.usage();
+    const currentCpu = this.calculateAvg(this.cpuHistory);
     const { totalMemMb, usedMemMb } = await osu.mem.used();
     const currentMem = (usedMemMb * 100) / totalMemMb;
     const currentSpeed = this.calculateAvg(this.completedHistory);
@@ -140,7 +149,7 @@ export class RequestQueueService {
       return;
     }
 
-    if (currentCpu > 90) {
+    if (currentCpu > 80) {
       this.limit -= 2 * limitStep;
       return;
     }
@@ -150,7 +159,7 @@ export class RequestQueueService {
       return;
     }
 
-    if (currentCpu > 80) {
+    if (currentCpu > 70) {
       this.limit -= limitStep;
       return;
     }
