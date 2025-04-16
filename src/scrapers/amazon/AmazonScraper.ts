@@ -54,6 +54,7 @@ export class AmazonScraper {
         onSuccess: (category) => {
           this.plpScraper.execute(category.name);
         },
+        onError: () => this.scrapPlp(),
         onFinally: () => {
           setTimeout(() => this.scrapPlp(), 10000);
         },
