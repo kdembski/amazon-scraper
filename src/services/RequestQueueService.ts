@@ -7,7 +7,7 @@ export class RequestQueueService {
   private completedHistory: number[] = [];
   private cpuHistory: number[] = [];
   private adjustInterval = 10 * 60;
-  private limitStep = 3000;
+  private limitStep = 4000;
   queue: Function[] = [];
   speed = 0;
   completed = 0;
@@ -41,15 +41,15 @@ export class RequestQueueService {
 
       setInterval(() => {
         this.limit += this.limitStep;
-      }, 5 * this.adjustInterval * 1000);
-
-      setTimeout(() => {
-        this.limitStep = this.limitStep / 2;
       }, 10 * this.adjustInterval * 1000);
 
       setTimeout(() => {
         this.limitStep = this.limitStep / 2;
       }, 20 * this.adjustInterval * 1000);
+
+      setTimeout(() => {
+        this.limitStep = this.limitStep / 2;
+      }, 30 * this.adjustInterval * 1000);
     }
   }
 
