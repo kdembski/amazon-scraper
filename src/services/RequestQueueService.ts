@@ -7,6 +7,7 @@ export class RequestQueueService {
   private completedHistory: number[] = [];
   private cpuHistory: number[] = [];
   private adjustInterval = 10 * 60;
+  private limitStep = 3000;
   queue: Function[] = [];
   speed = 0;
   completed = 0;
@@ -38,6 +39,18 @@ export class RequestQueueService {
       setInterval(() => {
         this.adjustLimit();
       }, this.adjustInterval * 1000);
+
+      setInterval(() => {
+        this.limit += this.limitStep;
+      }, 5 * this.adjustInterval * 1000);
+
+      setTimeout(() => {
+        this.limitStep = this.limitStep / 2;
+      }, 10 * this.adjustInterval * 1000);
+
+      setTimeout(() => {
+        this.limitStep = this.limitStep / 2;
+      }, 20 * this.adjustInterval * 1000);
     }
   }
 
@@ -129,7 +142,6 @@ export class RequestQueueService {
   private async adjustLimit() {
     const skipIntervals = 3;
     const speedStep = 0.2;
-    const limitStep = 1000;
 
     if (this.completedHistory.length < this.adjustInterval * skipIntervals) {
       return;
@@ -145,22 +157,22 @@ export class RequestQueueService {
     }
 
     if (currentMem > 90) {
-      this.limit -= 2 * limitStep;
+      this.limit -= 2 * this.limitStep;
       return;
     }
 
-    if (currentCpu > 80) {
-      this.limit -= 2 * limitStep;
+    if (currentCpu > 85) {
+      this.limit -= 2 * this.limitStep;
       return;
     }
 
     if (currentMem > 80) {
-      this.limit -= limitStep;
+      this.limit -= this.limitStep;
       return;
     }
 
-    if (currentCpu > 70) {
-      this.limit -= limitStep;
+    if (currentCpu > 75) {
+      this.limit -= this.limitStep;
       return;
     }
 
@@ -168,23 +180,23 @@ export class RequestQueueService {
 
     if (speedDiff < -speedStep * 0.5) {
       this.targetedSpeed += speedStep;
-      this.limit += limitStep * 2;
+      this.limit += this.limitStep * 2;
       return;
     }
 
     if (speedDiff >= -speedStep * 0.5 && speedDiff <= speedStep) {
-      this.limit += (speedStep + speedDiff) * limitStep * 3;
+      this.limit += (speedStep + speedDiff) * this.limitStep * 3;
       return;
     }
 
     if (speedDiff > speedStep && speedDiff <= speedStep * 1.5) {
-      this.limit -= speedDiff * limitStep;
+      this.limit -= speedDiff * this.limitStep;
       return;
     }
 
     if (speedDiff > speedStep * 1.5) {
       this.targetedSpeed -= speedStep;
-      this.limit += limitStep;
+      this.limit += this.limitStep;
     }
   }
 }

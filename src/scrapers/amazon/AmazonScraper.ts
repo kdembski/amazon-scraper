@@ -38,15 +38,12 @@ export class AmazonScraper {
     new CronJob("0 0 */1 * * *", () => this.scrapPlp()).start();
   }
 
-  async scrapPlp(name?: string) {
+  async scrapPlp() {
     return this.apiService.get<AmazonAdCategory>(
       "amazon/ads/categories/scrap",
       {
-        onSuccess: (category) =>
-          this.plpScraper.execute(name || category.name, 1),
-        onError: () => {
-          this.scrapPlp(name);
-        },
+        onSuccess: (category) => this.plpScraper.execute(category.name),
+        onError: () => this.scrapPlp(),
       }
     );
   }

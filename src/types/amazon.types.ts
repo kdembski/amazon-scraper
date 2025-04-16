@@ -11,9 +11,8 @@ export interface AmazonPlpAd {
 }
 
 export interface AmazonPlpAdPage {
-  number: number;
-  range: AmazonPlpAdPageSort;
-  subcategory: string;
+  category: string;
+  subcategory?: string;
   pending: boolean;
   complete: boolean;
   failed: number;

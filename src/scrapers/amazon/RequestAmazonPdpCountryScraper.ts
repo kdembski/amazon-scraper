@@ -52,7 +52,7 @@ export class RequestAmazonPdpCountryScraper extends AmazonPdpCountryScraper {
 
   private async onSuccess(data: string, price: AmazonAdPrice) {
     if (!data.length) {
-      price.reject?.("Recived empty data");
+      price.reject?.("Received empty data");
       return;
     }
 
