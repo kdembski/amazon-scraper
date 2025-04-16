@@ -11,7 +11,6 @@ export class RequestQueueService {
   queue: Function[] = [];
   speed = 0;
   completed = 0;
-  scraped = 0;
   previousCompleted = 0;
   failed = 0;
   pending = 0;
@@ -129,7 +128,6 @@ export class RequestQueueService {
       `queue: ${this.queue.length}`,
       `failed: ${this.failed}`,
       `completed: ${this.completed}`,
-      `scraped: ${this.scraped}`,
     ];
     const text = stats.join(` | `);
     console.log(text);

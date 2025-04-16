@@ -39,4 +39,12 @@ export class ArgsService {
     if (!value) return 100;
     return parseInt(value);
   }
+
+  getTargetFlag() {
+    const value = this.getFlagValue("-t") || this.getFlagValue("--target");
+
+    const isPlp = value === "plp";
+    const isPdp = !value || value === "pdp";
+    return { isPdp, isPlp };
+  }
 }

@@ -6,7 +6,6 @@ import { ApiService } from "@/services/ApiService";
 import { ArgsService } from "@/services/ArgsService";
 import { ProxyService } from "@/services/ProxyService";
 import { AmazonAd, AmazonAdCategory } from "@/types/amazon.types";
-import { CronJob } from "cron";
 
 export class AmazonScraper {
   private apiService;
@@ -33,17 +32,31 @@ export class AmazonScraper {
   }
 
   async execute() {
+    const { isPdp, isPlp } = this.argsService.getTargetFlag();
     await this.proxyService.loadProxies();
-    await this.scrapPdp();
-    new CronJob("0 0 */1 * * *", () => this.scrapPlp()).start();
+
+    if (isPdp) await this.scrapPdp();
+    if (isPlp) await this.scrapPlp();
   }
 
   async scrapPlp() {
+    if (this.amazonService.queueService.queue.length > 0) {
+      setTimeout(() => this.scrapPlp(), 5000);
+      return;
+    }
+
+    this.amazonService.queueService.failed = 0;
+    this.amazonService.queueService.completed = 0;
+
     return this.apiService.get<AmazonAdCategory>(
       "amazon/ads/categories/scrap",
       {
-        onSuccess: (category) => this.plpScraper.execute(category.name),
-        onError: () => this.scrapPlp(),
+        onSuccess: (category) => {
+          this.plpScraper.execute(category.name);
+        },
+        onFinally: () => {
+          setTimeout(() => this.scrapPlp(), 10000);
+        },
       }
     );
   }
@@ -56,7 +69,6 @@ export class AmazonScraper {
 
     this.amazonService.queueService.failed = 0;
     this.amazonService.queueService.completed = 0;
-    this.amazonService.queueService.scraped = 0;
     const count = this.argsService.getCountFlag();
     const countries = await this.apiService.getCountries();
 

@@ -22,7 +22,7 @@ export class HeadlessAmazonPdpCountryScraper extends AmazonPdpCountryScraper {
     const price = this.priceHelper.getPrice(prices, country.id);
     if (!price) return;
 
-    new Promise<void>((resolvePrice, rejectPrice) => {
+    new Promise<boolean | undefined>((resolvePrice, rejectPrice) => {
       if (price.complete || price.deleted || price.pending) return;
 
       price.resolve = resolvePrice;
