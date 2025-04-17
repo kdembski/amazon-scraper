@@ -37,24 +37,32 @@ export class AmazonScraper {
     await this.proxyService.loadProxies();
 
     if (isPdp) await this.scrapPdp();
-    if (isPlp) await this.scrapPlp();
+
+    if (isPlp) {
+      this.scrapPlp();
+      this.scrapPlp();
+      this.scrapPlp();
+      this.scrapPlp();
+      this.scrapPlp();
+      new CronJob("0 0 */1 * * *", () => {
+        this.scrapPlp();
+      }).start();
+    }
   }
 
   async scrapPlp() {
-    new CronJob("0 0 */1 * * *", () => {
-      this.amazonService.queueService.failed = 0;
-      this.amazonService.queueService.completed = 0;
+    this.amazonService.queueService.failed = 0;
+    this.amazonService.queueService.completed = 0;
 
-      return this.apiService.get<AmazonAdCategory>(
-        "amazon/ads/categories/scrap",
-        {
-          onSuccess: (category) => {
-            this.plpScraper.execute(category.name);
-          },
-          onError: () => this.scrapPlp(),
-        }
-      );
-    }).start();
+    return this.apiService.get<AmazonAdCategory>(
+      "amazon/ads/categories/scrap",
+      {
+        onSuccess: (category) => {
+          this.plpScraper.execute(category.name);
+        },
+        onError: () => this.scrapPlp(),
+      }
+    );
   }
 
   async scrapPdp() {
