@@ -40,10 +40,6 @@ export class AmazonScraper {
 
     if (isPlp) {
       this.scrapPlp();
-      this.scrapPlp();
-      this.scrapPlp();
-      this.scrapPlp();
-      this.scrapPlp();
       new CronJob("0 0 */1 * * *", () => {
         this.scrapPlp();
       }).start();
