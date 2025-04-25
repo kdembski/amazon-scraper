@@ -29,7 +29,9 @@ export class AmazonService {
     this.proxyService = proxyService;
     queueService.start();
 
-    new CronJob("0 50 */1 * * *", () => this.sendScraperSpeed()).start();
+    if (argsService.getTargetFlag().isPdp) {
+      new CronJob("0 50 */1 * * *", () => this.sendScraperSpeed()).start();
+    }
   }
 
   public static getInstance(): AmazonService {
