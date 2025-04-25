@@ -18,7 +18,11 @@ export class AmazonService {
     argsService = ArgsService.getInstance(),
     apiService = ApiService.getInstance(),
     proxyService = ProxyService.getInstance(),
-    queueService = new RequestQueueService(argsService.getLimitFlag(), true)
+    queueService = new RequestQueueService(
+      argsService.getLimitFlag(),
+      true,
+      argsService.getTargetFlag().isPdp
+    )
   ) {
     this.queueService = queueService;
     this.apiService = apiService;

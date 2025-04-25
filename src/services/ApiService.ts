@@ -10,7 +10,7 @@ export class ApiService {
   categories: AmazonAdCategory[] = [];
   countries: Country[] = [];
 
-  private constructor(queueService = new RequestQueueService(5, false)) {
+  private constructor(queueService = new RequestQueueService(5)) {
     this.queueService = queueService;
     queueService.start();
 

@@ -20,6 +20,7 @@ export class RequestQueueService {
   constructor(
     limit: number,
     enableLogs = false,
+    enableRegulation = false,
     argsService = ArgsService.getInstance()
   ) {
     this.limit = limit;
@@ -34,14 +35,16 @@ export class RequestQueueService {
 
         this.previousCompleted = this.completed;
       }, 1000);
+    }
 
+    if (enableRegulation) {
       setInterval(() => {
         this.adjustLimit();
       }, this.adjustInterval * 1000);
 
       setInterval(() => {
         this.limit += this.limitStep;
-      }, 10 * this.adjustInterval * 1000);
+      }, 5 * this.adjustInterval * 1000);
 
       setTimeout(() => {
         this.limitStep = this.limitStep / 2;
@@ -154,12 +157,17 @@ export class RequestQueueService {
       this.targetedSpeed = currentSpeed + speedStep * 0.5;
     }
 
+    if (this.limit <= 0) {
+      this.limit = 20000;
+      return;
+    }
+
     if (currentMem > 90) {
       this.limit -= 2 * this.limitStep;
       return;
     }
 
-    if (currentCpu > 90) {
+    if (currentCpu > 80) {
       this.limit -= 2 * this.limitStep;
       return;
     }
@@ -169,7 +177,7 @@ export class RequestQueueService {
       return;
     }
 
-    if (currentCpu > 80) {
+    if (currentCpu > 70) {
       this.limit -= this.limitStep;
       return;
     }
