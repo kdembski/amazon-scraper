@@ -167,17 +167,17 @@ export class RequestQueueService {
       return;
     }
 
-    if (currentCpu > 80) {
-      this.limit -= 2 * this.limitStep;
-      return;
-    }
-
     if (currentMem > 80) {
       this.limit -= this.limitStep;
       return;
     }
 
-    if (currentCpu > 70) {
+    if (currentCpu > 75) {
+      this.limit -= 2 * this.limitStep;
+      return;
+    }
+
+    if (currentCpu > 65) {
       this.limit -= this.limitStep;
       return;
     }
@@ -196,7 +196,7 @@ export class RequestQueueService {
     }
 
     if (speedDiff > speedStep && speedDiff <= speedStep * 1.5) {
-      this.limit -= speedDiff * (this.limitStep / 2);
+      this.limit -= speedDiff * (this.limitStep / 3);
       return;
     }
 
