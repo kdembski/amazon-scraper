@@ -157,8 +157,8 @@ export class RequestQueueService {
       this.targetedSpeed = currentSpeed + speedStep * 0.5;
     }
 
-    if (this.limit <= 0) {
-      this.limit = 20000;
+    if (this.limit <= 1000) {
+      this.limit += 20000;
       return;
     }
 
@@ -172,12 +172,12 @@ export class RequestQueueService {
       return;
     }
 
-    if (currentCpu > 75) {
+    if (currentCpu > 70) {
       this.limit -= 2 * this.limitStep;
       return;
     }
 
-    if (currentCpu > 65) {
+    if (currentCpu > 60) {
       this.limit -= this.limitStep;
       return;
     }
@@ -201,8 +201,8 @@ export class RequestQueueService {
     }
 
     if (speedDiff > speedStep * 1.5) {
-      this.targetedSpeed -= speedStep;
-      this.limit += this.limitStep;
+      this.targetedSpeed -= speedDiff;
+      this.limit += this.limitStep * 2;
     }
   }
 }
