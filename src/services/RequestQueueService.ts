@@ -151,6 +151,7 @@ export class RequestQueueService {
 
       const scrapersCount = list.filter((p) => p.name?.includes("pdp")).length;
       const targetedCpu = (cpusCount * 80) / scrapersCount;
+      console.log(scrapersCount, targetedCpu, cpusCount);
 
       if (avgMem > 80 || avgGlobalCpu > 80) {
         this.limit -= this.limitStep;
