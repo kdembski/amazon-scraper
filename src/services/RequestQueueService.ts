@@ -1,21 +1,23 @@
 import _ from "lodash";
 import osu from "node-os-utils";
+import pm2 from "pm2";
+import pidusage from "pidusage";
 import { ArgsService } from "@/services/ArgsService";
 
 export class RequestQueueService {
   private argsService;
   private completedHistory: number[] = [];
-  private cpuHistory: number[] = [];
-  private adjustInterval = 10 * 60;
+  private globalCpuHistory: number[] = [];
+  private localCpuHistory: number[] = [];
+  private adjustInterval = 1 * 60;
   private limitStep = 4000;
+  private previousCompleted = 0;
   queue: Function[] = [];
   speed = 0;
   completed = 0;
-  previousCompleted = 0;
   failed = 0;
   pending = 0;
   limit;
-  targetedSpeed?: number;
 
   constructor(
     limit: number,
@@ -26,33 +28,21 @@ export class RequestQueueService {
     this.limit = limit;
     this.argsService = argsService;
 
-    if (enableLogs) {
-      setInterval(() => {
-        this.updateCompletedHistory();
-        this.updateCpuHistory();
-        this.calculateSpeed();
-        this.logState();
+    setInterval(() => {
+      this.updateCompletedHistory();
+      this.updateGlobalCpuHistory();
+      this.updateLocalCpuHistory();
+      this.calculateSpeed();
 
-        this.previousCompleted = this.completed;
-      }, 1000);
+      this.previousCompleted = this.completed;
+    }, 1000);
+
+    if (enableLogs) {
+      setInterval(this.logState, 1000);
     }
 
     if (enableRegulation) {
-      setInterval(() => {
-        this.adjustLimit();
-      }, this.adjustInterval * 1000);
-
-      setInterval(() => {
-        this.limit += this.limitStep;
-      }, 5 * this.adjustInterval * 1000);
-
-      setTimeout(() => {
-        this.limitStep = this.limitStep / 2;
-      }, 20 * this.adjustInterval * 1000);
-
-      setTimeout(() => {
-        this.limitStep = this.limitStep / 2;
-      }, 30 * this.adjustInterval * 1000);
+      setInterval(() => this.adjustLimit, this.adjustInterval * 1000);
     }
   }
 
@@ -69,7 +59,7 @@ export class RequestQueueService {
     return response;
   }
 
-  add(callback: () => any, top?: boolean) {
+  private add(callback: () => any, top?: boolean) {
     if (top) {
       this.queue.unshift(callback);
       return;
@@ -104,11 +94,18 @@ export class RequestQueueService {
     this.completedHistory.length = Math.min(length, 24 * 60 * 60);
   }
 
-  private async updateCpuHistory() {
+  private async updateGlobalCpuHistory() {
     const usage = await osu.cpu.usage();
 
-    const length = this.cpuHistory.unshift(usage);
-    this.cpuHistory.length = Math.min(length, 10 * 60);
+    const length = this.globalCpuHistory.unshift(usage);
+    this.globalCpuHistory.length = Math.min(length, 10 * 60);
+  }
+
+  private async updateLocalCpuHistory() {
+    const usage = (await pidusage(process.pid)).cpu;
+
+    const length = this.localCpuHistory.unshift(usage);
+    this.localCpuHistory.length = Math.min(length, 10 * 60);
   }
 
   private calculateSpeed() {
@@ -120,13 +117,18 @@ export class RequestQueueService {
   }
 
   private calculateAvg(values: number[]) {
+    if (!values.length) return 0;
     return values.reduce((sum, v) => sum + v, 0) / values.length;
+  }
+
+  private roundToTwoDecimals(value?: number) {
+    return !_.isNil(value) ? (Math.round(value * 100) / 100).toFixed(2) : "-";
   }
 
   private logState() {
     const stats = [
       `speed: ${this.roundToTwoDecimals(this.speed)}/s`,
-      `target: ${this.roundToTwoDecimals(this.targetedSpeed)}/s`,
+      `cpu: ${Math.round(this.calculateAvg(this.localCpuHistory))}%`,
       `pending: ${this.pending}`,
       `queue: ${this.queue.length}`,
       `failed: ${this.failed}`,
@@ -136,73 +138,27 @@ export class RequestQueueService {
     console.log(text);
   }
 
-  private roundToTwoDecimals(value?: number) {
-    return !_.isNil(value) ? (Math.round(value * 100) / 100).toFixed(2) : "-";
-  }
-
   private async adjustLimit() {
-    const skipIntervals = 3;
-    const speedStep = 0.2;
+    const avgGlobalCpu = this.calculateAvg(this.globalCpuHistory);
+    const avgLocalCpu = this.calculateAvg(this.localCpuHistory);
+    const cpusCount = osu.cpu.count();
 
-    if (this.completedHistory.length < this.adjustInterval * skipIntervals) {
-      return;
-    }
-
-    const currentCpu = this.calculateAvg(this.cpuHistory);
     const { totalMemMb, usedMemMb } = await osu.mem.used();
-    const currentMem = (usedMemMb * 100) / totalMemMb;
-    const currentSpeed = this.calculateAvg(this.completedHistory);
+    const avgMem = (usedMemMb * 100) / totalMemMb;
 
-    if (!this.targetedSpeed) {
-      this.targetedSpeed = currentSpeed + speedStep * 0.5;
-    }
+    pm2.list((e, list) => {
+      if (e) return;
 
-    if (this.limit <= 1000) {
-      this.limit += 20000;
-      return;
-    }
+      const scrapersCount = list.filter((p) => p.name?.includes("pdp")).length;
+      const targetedCpu = (cpusCount * 80) / scrapersCount;
 
-    if (currentMem > 90) {
-      this.limit -= 2 * this.limitStep;
-      return;
-    }
+      if (avgMem > 80 || avgGlobalCpu > 80) {
+        this.limit -= this.limitStep;
+        return;
+      }
 
-    if (currentMem > 80) {
-      this.limit -= this.limitStep;
-      return;
-    }
-
-    if (currentCpu > 70) {
-      this.limit -= 2 * this.limitStep;
-      return;
-    }
-
-    if (currentCpu > 60) {
-      this.limit -= this.limitStep;
-      return;
-    }
-
-    const speedDiff = this.targetedSpeed - currentSpeed;
-
-    if (speedDiff < -speedStep * 0.5) {
-      this.targetedSpeed += speedStep;
-      this.limit += this.limitStep * 2;
-      return;
-    }
-
-    if (speedDiff >= -speedStep * 0.5 && speedDiff <= speedStep) {
-      this.limit += (speedStep + speedDiff) * this.limitStep * 3;
-      return;
-    }
-
-    if (speedDiff > speedStep && speedDiff <= speedStep * 1.5) {
-      this.limit -= speedDiff * (this.limitStep / 3);
-      return;
-    }
-
-    if (speedDiff > speedStep * 1.5) {
-      this.targetedSpeed -= speedDiff;
-      this.limit += this.limitStep * 2;
-    }
+      const diff = targetedCpu - avgLocalCpu;
+      this.limit += (diff / 100) * this.limitStep;
+    });
   }
 }
