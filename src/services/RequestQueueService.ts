@@ -10,7 +10,7 @@ export class RequestQueueService {
   private globalCpuHistory: number[] = [];
   private localCpuHistory: number[] = [];
   private adjustInterval = 1 * 60;
-  private limitStep = 4000;
+  private limitStep = 1000;
   private previousCompleted = 0;
   queue: Function[] = [];
   speed = 0;
@@ -151,7 +151,6 @@ export class RequestQueueService {
 
       const scrapersCount = list.filter((p) => p.name?.includes("pdp")).length;
       const targetedCpu = (cpusCount * 80) / scrapersCount;
-      console.log(scrapersCount, targetedCpu, cpusCount);
 
       if (avgMem > 80 || avgGlobalCpu > 80) {
         this.limit -= this.limitStep;
