@@ -38,11 +38,11 @@ export class RequestQueueService {
     }, 1000);
 
     if (enableLogs) {
-      setInterval(this.logState, 1000);
+      setInterval(() => this.logState(), 1000);
     }
 
     if (enableRegulation) {
-      setInterval(() => this.adjustLimit, this.adjustInterval * 1000);
+      setInterval(() => this.adjustLimit(), this.adjustInterval * 1000);
     }
   }
 
