@@ -7,6 +7,8 @@ import { RequestQueueRegulator } from "@/services/RequestQueueRegulator";
 export class RequestQueueService {
   private argsService;
   private completedHistory: number[] = [];
+  private cpuUsage?: NodeJS.CpuUsage;
+  private cpuStartTime?: [number, number];
   cpuHistory: number[] = [];
   previousCompleted = 0;
   queue: Function[] = [];
@@ -93,15 +95,27 @@ export class RequestQueueService {
   }
 
   private async updateCpuHistory() {
-    pm2.describe(process.pid, (e, info) => {
-      if (e) return;
+    if (!this.cpuUsage) {
+      this.cpuUsage = process.cpuUsage();
+      this.cpuStartTime = process.hrtime();
+      return;
+    }
 
-      const usage = info[0]?.monit?.cpu;
-      if (!usage) return;
+    const elapTime = process.hrtime(this.cpuStartTime);
+    const elapUsage = process.cpuUsage(this.cpuUsage);
 
-      const length = this.cpuHistory.unshift(usage);
-      this.cpuHistory.length = Math.min(length, 10 * 60);
-    });
+    const elapTimeMS = elapTime[0] * 1000 + elapTime[1] / 1000000;
+    const elapUserMS = elapUsage.user / 1000;
+    const elapSystMS = elapUsage.system / 1000;
+
+    const cpuPercent = Math.round(
+      (100 * (elapUserMS + elapSystMS)) / elapTimeMS
+    );
+    const length = this.cpuHistory.unshift(cpuPercent);
+    this.cpuHistory.length = Math.min(length, 60 * 60);
+
+    this.cpuUsage = process.cpuUsage();
+    this.cpuStartTime = process.hrtime();
   }
 
   private calculateSpeed() {
