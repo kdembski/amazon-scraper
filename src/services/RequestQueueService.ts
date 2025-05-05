@@ -1,4 +1,4 @@
-import pidusage from "pidusage";
+import pm2 from "pm2";
 import v8 from "v8";
 import { ArgsService } from "@/services/ArgsService";
 import { calculateAvg, roundToTwoDecimals } from "@/helpers/number";
@@ -93,10 +93,15 @@ export class RequestQueueService {
   }
 
   private async updateCpuHistory() {
-    const usage = (await pidusage(process.pid)).cpu;
+    pm2.describe(process.pid, (e, info) => {
+      if (e) return;
 
-    const length = this.cpuHistory.unshift(usage);
-    this.cpuHistory.length = Math.min(length, 10 * 60);
+      const usage = info[0]?.monit?.cpu;
+      if (!usage) return;
+
+      const length = this.cpuHistory.unshift(usage);
+      this.cpuHistory.length = Math.min(length, 10 * 60);
+    });
   }
 
   private calculateSpeed() {
