@@ -1,17 +1,14 @@
-import _ from "lodash";
-import osu from "node-os-utils";
-import pm2 from "pm2";
 import pidusage from "pidusage";
 import { ArgsService } from "@/services/ArgsService";
+import { calculateAvg, roundToTwoDecimals } from "@/helpers/number";
+import { RequestQueueRegulator } from "@/services/RequestQueueRegulator";
 
 export class RequestQueueService {
   private argsService;
+  private regulator;
   private completedHistory: number[] = [];
-  private globalCpuHistory: number[] = [];
-  private localCpuHistory: number[] = [];
-  private adjustInterval = 1 * 60;
-  private limitStep = 1000;
-  private previousCompleted = 0;
+  cpuHistory: number[] = [];
+  previousCompleted = 0;
   queue: Function[] = [];
   speed = 0;
   completed = 0;
@@ -23,15 +20,16 @@ export class RequestQueueService {
     limit: number,
     enableLogs = false,
     enableRegulation = false,
-    argsService = ArgsService.getInstance()
+    argsService = ArgsService.getInstance(),
+    regulator = new RequestQueueRegulator(this)
   ) {
     this.limit = limit;
     this.argsService = argsService;
+    this.regulator = regulator;
 
     setInterval(() => {
       this.updateCompletedHistory();
-      this.updateGlobalCpuHistory();
-      this.updateLocalCpuHistory();
+      this.updateCpuHistory();
       this.calculateSpeed();
 
       this.previousCompleted = this.completed;
@@ -42,8 +40,17 @@ export class RequestQueueService {
     }
 
     if (enableRegulation) {
-      setInterval(() => this.adjustLimit(), this.adjustInterval * 1000);
+      regulator.start();
     }
+  }
+
+  start() {
+    const delay = Math.floor(Math.random() * this.argsService.getDelayFlag());
+
+    setTimeout(() => {
+      this.next();
+      this.start();
+    }, delay);
   }
 
   async request(callback: () => Promise<void>, top?: boolean) {
@@ -68,15 +75,6 @@ export class RequestQueueService {
     this.queue.push(callback);
   }
 
-  start() {
-    const delay = Math.floor(Math.random() * this.argsService.getDelayFlag());
-
-    setTimeout(() => {
-      this.next();
-      this.start();
-    }, delay);
-  }
-
   private async next() {
     if (this.pending >= this.limit) return;
     const next = this.queue.shift();
@@ -94,41 +92,23 @@ export class RequestQueueService {
     this.completedHistory.length = Math.min(length, 24 * 60 * 60);
   }
 
-  private async updateGlobalCpuHistory() {
-    const usage = await osu.cpu.usage();
-
-    const length = this.globalCpuHistory.unshift(usage);
-    this.globalCpuHistory.length = Math.min(length, 10 * 60);
-  }
-
-  private async updateLocalCpuHistory() {
+  private async updateCpuHistory() {
     const usage = (await pidusage(process.pid)).cpu;
 
-    const length = this.localCpuHistory.unshift(usage);
-    this.localCpuHistory.length = Math.min(length, 10 * 60);
+    const length = this.cpuHistory.unshift(usage);
+    this.cpuHistory.length = Math.min(length, 10 * 60);
   }
 
   private calculateSpeed() {
-    if (!this.completedHistory.length) {
-      return;
-    }
-
-    this.speed = this.calculateAvg(this.completedHistory);
-  }
-
-  private calculateAvg(values: number[]) {
-    if (!values.length) return 0;
-    return values.reduce((sum, v) => sum + v, 0) / values.length;
-  }
-
-  private roundToTwoDecimals(value?: number) {
-    return !_.isNil(value) ? (Math.round(value * 100) / 100).toFixed(2) : "-";
+    if (!this.completedHistory.length) return;
+    this.speed = calculateAvg(this.completedHistory);
   }
 
   private logState() {
     const stats = [
-      `speed: ${this.roundToTwoDecimals(this.speed)}/s`,
-      `cpu: ${Math.round(this.calculateAvg(this.localCpuHistory))}%`,
+      `speed: ${roundToTwoDecimals(this.speed)}/s`,
+      `cpu: ${Math.round(calculateAvg(this.cpuHistory))}%`,
+      `scrapers: ${this.regulator.scrapersCount || "-"}`,
       `pending: ${this.pending}`,
       `queue: ${this.queue.length}`,
       `failed: ${this.failed}`,
@@ -136,29 +116,5 @@ export class RequestQueueService {
     ];
     const text = stats.join(` | `);
     console.log(text);
-  }
-
-  private async adjustLimit() {
-    const avgGlobalCpu = this.calculateAvg(this.globalCpuHistory);
-    const avgLocalCpu = this.calculateAvg(this.localCpuHistory);
-    const cpusCount = osu.cpu.count();
-
-    const { totalMemMb, usedMemMb } = await osu.mem.used();
-    const avgMem = (usedMemMb * 100) / totalMemMb;
-
-    pm2.list((e, list) => {
-      if (e) return;
-
-      const scrapersCount = list.filter((p) => p.name?.includes("pdp")).length;
-      const targetedCpu = (cpusCount * 80) / scrapersCount;
-
-      if (avgMem > 80 || avgGlobalCpu > 80) {
-        this.limit -= this.limitStep;
-        return;
-      }
-
-      const diff = targetedCpu - avgLocalCpu;
-      this.limit += (diff / 100) * this.limitStep;
-    });
   }
 }
