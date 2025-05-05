@@ -1,11 +1,11 @@
 import pidusage from "pidusage";
+import v8 from "v8";
 import { ArgsService } from "@/services/ArgsService";
 import { calculateAvg, roundToTwoDecimals } from "@/helpers/number";
 import { RequestQueueRegulator } from "@/services/RequestQueueRegulator";
 
 export class RequestQueueService {
   private argsService;
-  private regulator;
   private completedHistory: number[] = [];
   cpuHistory: number[] = [];
   previousCompleted = 0;
@@ -25,7 +25,7 @@ export class RequestQueueService {
   ) {
     this.limit = limit;
     this.argsService = argsService;
-    this.regulator = regulator;
+    console.log(v8.getHeapStatistics().heap_size_limit / (1024 * 1024 * 1024));
 
     setInterval(() => {
       this.updateCompletedHistory();
@@ -108,7 +108,7 @@ export class RequestQueueService {
     const stats = [
       `speed: ${roundToTwoDecimals(this.speed)}/s`,
       `cpu: ${Math.round(calculateAvg(this.cpuHistory))}%`,
-      `scrapers: ${this.regulator.scrapersCount || "-"}`,
+      `limit: ${this.limit}`,
       `pending: ${this.pending}`,
       `queue: ${this.queue.length}`,
       `failed: ${this.failed}`,

@@ -8,7 +8,7 @@ export class RequestQueueRegulator {
   private queueService;
   private adjustInterval = 1 * 60;
   private limitStep = 1000;
-  scrapersCount: number | undefined;
+  private scrapersCount: number | undefined;
 
   constructor(queueService: RequestQueueService) {
     this.queueService = queueService;
@@ -16,7 +16,7 @@ export class RequestQueueRegulator {
 
   start() {
     setInterval(() => this.adjustLimit(), this.adjustInterval * 1000);
-    setInterval(() => this.updateScrapersCount(), 10 * 60 * 1000);
+    setInterval(() => this.updateScrapersCount(), 60 * 60 * 1000);
   }
 
   private updateScrapersCount() {
