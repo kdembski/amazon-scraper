@@ -1,11 +1,8 @@
-import pm2 from "pm2";
 import v8 from "v8";
-import { ArgsService } from "@/services/ArgsService";
 import { calculateAvg, roundToTwoDecimals } from "@/helpers/number";
 import { RequestQueueRegulator } from "@/services/RequestQueueRegulator";
 
 export class RequestQueueService {
-  private argsService;
   private completedHistory: number[] = [];
   private cpuUsage?: NodeJS.CpuUsage;
   private cpuStartTime?: [number, number];
@@ -22,11 +19,9 @@ export class RequestQueueService {
     limit: number,
     enableLogs = false,
     enableRegulation = false,
-    argsService = ArgsService.getInstance(),
     regulator = new RequestQueueRegulator(this)
   ) {
     this.limit = limit;
-    this.argsService = argsService;
     console.log(v8.getHeapStatistics().heap_size_limit / (1024 * 1024 * 1024));
 
     setInterval(() => {
@@ -47,7 +42,7 @@ export class RequestQueueService {
   }
 
   start() {
-    const delay = Math.floor(Math.random() * this.argsService.getDelayFlag());
+    const delay = Math.floor(Math.random() * 10);
 
     setTimeout(() => {
       this.next();

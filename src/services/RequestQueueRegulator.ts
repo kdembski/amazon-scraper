@@ -6,7 +6,7 @@ import { calculateAvg } from "@/helpers/number";
 
 export class RequestQueueRegulator {
   private queueService;
-  private adjustInterval = 1 * 60;
+  private adjustInterval = 5 * 60;
   private limitStep = 1000;
   private scrapersCount: number | undefined;
 
@@ -53,6 +53,6 @@ export class RequestQueueRegulator {
     }
 
     const diff = targetedCpu - avgCpu;
-    this.queueService.limit += (diff / 100) * this.limitStep;
+    this.queueService.limit += Math.round((diff / 100) * this.limitStep);
   }
 }

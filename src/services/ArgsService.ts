@@ -33,13 +33,6 @@ export class ArgsService {
     return parseInt(value);
   }
 
-  getDelayFlag() {
-    const value = this.getFlagValue("-d") || this.getFlagValue("--delay");
-
-    if (!value) return 100;
-    return parseInt(value);
-  }
-
   getTargetFlag() {
     const value = this.getFlagValue("-t") || this.getFlagValue("--target");
 
