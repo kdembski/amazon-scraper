@@ -1,4 +1,3 @@
-import v8 from "v8";
 import { calculateAvg, roundToTwoDecimals } from "@/helpers/number";
 import { RequestQueueRegulator } from "@/services/RequestQueueRegulator";
 
@@ -22,7 +21,6 @@ export class RequestQueueService {
     regulator = new RequestQueueRegulator(this)
   ) {
     this.limit = limit;
-    console.log(v8.getHeapStatistics().heap_size_limit / (1024 * 1024 * 1024));
 
     setInterval(() => {
       this.updateCompletedHistory();
@@ -42,12 +40,10 @@ export class RequestQueueService {
   }
 
   start() {
-    const delay = Math.floor(Math.random() * 10);
-
     setTimeout(() => {
       this.next();
       this.start();
-    }, delay);
+    }, 1);
   }
 
   async request(callback: () => Promise<void>, top?: boolean) {
