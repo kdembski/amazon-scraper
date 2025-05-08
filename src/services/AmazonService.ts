@@ -1,5 +1,5 @@
 import axios from "axios";
-import osu from "node-os-utils";
+import os from "os";
 import UserAgent from "user-agents";
 import { RequestQueueService } from "@/services/RequestQueueService";
 import { ArgsService } from "@/services/ArgsService";
@@ -84,7 +84,7 @@ export class AmazonService {
   }
 
   private sendScraperStatus() {
-    const cpusCount = osu.cpu.count();
+    const cpusCount = os.cpus().length;
     return this.apiService.post("scrapers/status", {
       name: process.env.name,
       speed: this.queueService.speed,

@@ -1,5 +1,5 @@
 import _ from "lodash";
-import osu from "node-os-utils";
+import os from "os";
 import pm2 from "pm2";
 import { RequestQueueService } from "@/services/RequestQueueService";
 import { calculateAvg } from "@/helpers/number";
@@ -40,19 +40,17 @@ export class RequestQueueRegulator {
       return;
     }
 
-    const avgCpu = calculateAvg(this.queueService.cpuHistory);
-    const cpusCount = osu.cpu.count();
+    const cpusCount = os.cpus().length;
     const targetedCpu = (cpusCount * 70) / this.scrapersCount;
+    const avgCpu = calculateAvg(this.queueService.cpuHistory);
 
-    const { totalMemMb, usedMemMb } = await osu.mem.used();
-    const avgMem = (usedMemMb * 100) / totalMemMb;
+    const targetedMem = 80 / this.scrapersCount;
+    const totalMem = os.totalmem();
+    const usedMem = (process.memoryUsage().rss * 100) / totalMem;
 
-    if (avgMem > 80) {
-      this.queueService.limit -= this.limitStep;
-      return;
-    }
-
-    const diff = targetedCpu - avgCpu;
-    this.queueService.limit += Math.round((diff / 100) * this.limitStep);
+    const diffMem = (targetedMem - usedMem) / targetedMem;
+    const diffCpu = (targetedCpu - avgCpu) / targetedCpu;
+    const minDiff = Math.min(diffCpu, diffMem);
+    this.queueService.limit += Math.round(minDiff * this.limitStep);
   }
 }
