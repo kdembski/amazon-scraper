@@ -1,21 +1,25 @@
 import { AmazonPlpBuilder } from "@/builders/AmazonPlpBuilder";
 import { AmazonService } from "@/services/AmazonService";
 import { ApiService } from "@/services/ApiService";
+import { ArgsService } from "@/services/ArgsService";
 import { AmazonPlpAdPage, AmazonPlpAd } from "@/types/amazon.types";
 import { parseHTML } from "linkedom";
 
 export class AmazonPlpPageScraper {
   private apiService;
   private amazonService;
+  private argsService;
   private builder;
 
   constructor(
     apiService = ApiService.getInstance(),
     amazonService = AmazonService.getInstance(),
+    argsService = ArgsService.getInstance(),
     builder = new AmazonPlpBuilder()
   ) {
     this.apiService = apiService;
     this.amazonService = amazonService;
+    this.argsService = argsService;
     this.builder = builder;
   }
 
@@ -68,6 +72,10 @@ export class AmazonPlpPageScraper {
     }
 
     for (const sub of subcategories) {
+      const count = this.argsService.getCountFlag();
+      const pending = this.amazonService.queueService.pending;
+      if (pending >= count) continue;
+
       const subPage = this.buildPage(page.category, sub);
       this.execute(subPage);
     }
