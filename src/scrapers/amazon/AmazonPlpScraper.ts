@@ -9,7 +9,7 @@ export class AmazonPlpScraper {
   }
 
   execute(category: string) {
-    const pages: AmazonPlpAdPage[] = [];
-    this.pageScraper.execute(pages, category);
+    const page = this.pageScraper.buildPage(category);
+    this.pageScraper.execute(page);
   }
 }

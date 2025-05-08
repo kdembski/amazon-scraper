@@ -19,12 +19,7 @@ export class AmazonPlpPageScraper {
     this.builder = builder;
   }
 
-  async execute(
-    pages: AmazonPlpAdPage[],
-    category: string,
-    subcategory?: string
-  ) {
-    const page = this.getPage(pages, category, subcategory);
+  async execute(page: AmazonPlpAdPage) {
     if (page.complete || page.pending) return;
 
     return new Promise<AmazonPlpAd[] | undefined>((resolve, reject) => {
@@ -38,7 +33,7 @@ export class AmazonPlpPageScraper {
       page.pending = true;
 
       const callback = {
-        onSuccess: (res: string) => this.onSuccess(res, page, pages),
+        onSuccess: (res: string) => this.onSuccess(res, page),
         onError: () => this.onError(page),
       };
       this.amazonService.get<string>(url, referer, callback, true);
@@ -53,15 +48,11 @@ export class AmazonPlpPageScraper {
         page.pending = false;
         page.failed++;
         this.amazonService.queueService.failed++;
-        this.execute(pages, category, subcategory);
+        this.execute(page);
       });
   }
 
-  private async onSuccess(
-    data: string,
-    page: AmazonPlpAdPage,
-    pages: AmazonPlpAdPage[]
-  ) {
+  private async onSuccess(data: string, page: AmazonPlpAdPage) {
     if (!data.length) {
       page.reject?.("Received empty data");
       return;
@@ -76,11 +67,10 @@ export class AmazonPlpPageScraper {
       return;
     }
 
-    setTimeout(() => {
-      for (const sub of subcategories) {
-        this.execute(pages, page.category, sub);
-      }
-    }, 0);
+    for (const sub of subcategories) {
+      const subPage = this.buildPage(page.category, sub);
+      this.execute(subPage);
+    }
 
     page.resolve?.(ads);
   }
@@ -102,30 +92,13 @@ export class AmazonPlpPageScraper {
     return `pl/s?i=${page.category}&s=date-desc-rank`;
   }
 
-  private getPage(
-    pages: AmazonPlpAdPage[],
-    category: string,
-    subcategory?: string
-  ) {
-    const page = pages.find(
-      (page) => page.category === category && page.subcategory === subcategory
-    );
-    return page || this.buildPage(pages, category, subcategory);
-  }
-
-  private buildPage(
-    pages: AmazonPlpAdPage[],
-    category: string,
-    subcategory?: string
-  ) {
-    const page: AmazonPlpAdPage = {
+  buildPage(category: string, subcategory?: string) {
+    return {
       category,
       subcategory,
       pending: false,
       complete: false,
       failed: 0,
     };
-    pages.push(page);
-    return page;
   }
 }
