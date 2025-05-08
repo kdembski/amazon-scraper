@@ -76,7 +76,12 @@ export class AmazonPlpPageScraper {
       return;
     }
 
-    subcategories.map((sub) => this.execute(pages, page.category, sub));
+    setTimeout(() => {
+      for (const sub of subcategories) {
+        this.execute(pages, page.category, sub);
+      }
+    }, 0);
+
     page.resolve?.(ads);
   }
 
