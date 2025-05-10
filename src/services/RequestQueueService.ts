@@ -115,11 +115,10 @@ export class RequestQueueService {
     this.cpuStartTime = process.hrtime();
   }
 
-  private updateGlobalCpuHistory() {
-    osu.cpu.usage().then((usage) => {
-      const length = this.globalCpuHistory.unshift(usage);
-      this.globalCpuHistory.length = Math.min(length, 60 * 60);
-    });
+  private async updateGlobalCpuHistory() {
+    const usage = await osu.cpu.usage();
+    const length = this.globalCpuHistory.unshift(usage);
+    this.globalCpuHistory.length = Math.min(length, 60 * 60);
   }
 
   private calculateSpeed() {
