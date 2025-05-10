@@ -15,6 +15,7 @@ export class AmazonScraper {
   private pdpScraper;
   private plpScraper;
   private proxyService;
+  private isLoadingAds = false;
 
   constructor(
     apiService = ApiService.getInstance(),
@@ -63,9 +64,12 @@ export class AmazonScraper {
   }
 
   async scrapPdp() {
+    if (this.isLoadingAds) return;
+
     const count = this.argsService.getCountFlag();
     if (this.amazonService.queueService.queue.length > count / 10) return;
 
+    this.isLoadingAds = true;
     this.amazonService.queueService.failed = 0;
     this.amazonService.queueService.completed = 0;
     const countries = await this.apiService.getCountries();
@@ -78,6 +82,9 @@ export class AmazonScraper {
             this.pdpScraper.execute(ad, countries)
           );
           await Promise.all(promises);
+        },
+        onFinally: () => {
+          this.isLoadingAds = false;
         },
       },
       true
