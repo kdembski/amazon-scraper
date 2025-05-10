@@ -1,11 +1,15 @@
+import osu from "node-os-utils";
+import os from "os";
 import { calculateAvg, roundToTwoDecimals } from "@/helpers/number";
 import { RequestQueueRegulator } from "@/services/RequestQueueRegulator";
 
 export class RequestQueueService {
+  private regulator: RequestQueueRegulator;
   private completedHistory: number[] = [];
   private cpuUsage?: NodeJS.CpuUsage;
   private cpuStartTime?: [number, number];
-  cpuHistory: number[] = [];
+  processCpuHistory: number[] = [];
+  globalCpuHistory: number[] = [];
   previousCompleted = 0;
   queue: Function[] = [];
   speed = 0;
@@ -21,10 +25,12 @@ export class RequestQueueService {
     regulator = new RequestQueueRegulator(this)
   ) {
     this.limit = limit;
+    this.regulator = regulator;
 
     setInterval(() => {
       this.updateCompletedHistory();
-      this.updateCpuHistory();
+      this.updateProccesCpuHistory();
+      this.updateGlobalCpuHistory();
       this.calculateSpeed();
 
       this.previousCompleted = this.completed;
@@ -85,7 +91,7 @@ export class RequestQueueService {
     this.completedHistory.length = Math.min(length, 24 * 60 * 60);
   }
 
-  private async updateCpuHistory() {
+  private async updateProccesCpuHistory() {
     if (!this.cpuUsage) {
       this.cpuUsage = process.cpuUsage();
       this.cpuStartTime = process.hrtime();
@@ -102,11 +108,18 @@ export class RequestQueueService {
     const cpuPercent = Math.round(
       (100 * (elapUserMS + elapSystMS)) / elapTimeMS
     );
-    const length = this.cpuHistory.unshift(cpuPercent);
-    this.cpuHistory.length = Math.min(length, 60 * 60);
+    const length = this.processCpuHistory.unshift(cpuPercent);
+    this.processCpuHistory.length = Math.min(length, 60 * 60);
 
     this.cpuUsage = process.cpuUsage();
     this.cpuStartTime = process.hrtime();
+  }
+
+  private updateGlobalCpuHistory() {
+    osu.cpu.usage().then((usage) => {
+      const length = this.globalCpuHistory.unshift(usage);
+      this.globalCpuHistory.length = Math.min(length, 60 * 60);
+    });
   }
 
   private calculateSpeed() {
@@ -117,7 +130,9 @@ export class RequestQueueService {
   private logState() {
     const stats = [
       `speed: ${roundToTwoDecimals(this.speed)}/s`,
-      `cpu: ${Math.round(calculateAvg(this.cpuHistory))}%`,
+      `pcpu: ${Math.round(calculateAvg(this.processCpuHistory))}%`,
+      `tcpu: ${this.getTargetedCpu()}%`,
+      `gcpu: ${Math.round(calculateAvg(this.globalCpuHistory))}%`,
       `limit: ${this.limit}`,
       `pending: ${this.pending}`,
       `queue: ${this.queue.length}`,
@@ -126,5 +141,14 @@ export class RequestQueueService {
     ];
     const text = stats.join(` | `);
     console.log(text);
+  }
+
+  private getTargetedCpu() {
+    const scrapersCount = this.regulator.scrapersCount;
+    const targetedGlobalCpu = this.regulator.targetedGlobalCpu;
+    const cpusCount = os.cpus().length;
+
+    if (!scrapersCount) return "-";
+    return Math.round((cpusCount * targetedGlobalCpu) / scrapersCount);
   }
 }

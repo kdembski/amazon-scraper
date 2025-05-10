@@ -51,7 +51,7 @@ module.exports = {
     {
       name: "plp-1",
       script: "./dist/index.js",
-      args: "-l 5000 -t plp",
+      args: "-l 5000 -c 10000 -t plp",
       node_args: "--max-old-space-size=8192",
     },
   ],

@@ -36,13 +36,14 @@ export class AmazonScraper {
     const { isPdp, isPlp } = this.argsService.getTargetFlag();
     await this.proxyService.loadProxies();
 
-    if (isPdp) await this.scrapPdp();
+    if (isPdp) {
+      this.scrapPdp();
+      setInterval(() => this.scrapPdp(), 5 * 1000);
+    }
 
     if (isPlp) {
       this.scrapPlp();
-      new CronJob("0 0 */1 * * *", () => {
-        this.scrapPlp();
-      }).start();
+      new CronJob("0 0 */1 * * *", () => this.scrapPlp()).start();
     }
   }
 
@@ -62,14 +63,11 @@ export class AmazonScraper {
   }
 
   async scrapPdp() {
-    if (this.amazonService.queueService.queue.length > 0) {
-      setTimeout(() => this.scrapPdp(), 5000);
-      return;
-    }
+    const count = this.argsService.getCountFlag();
+    if (this.amazonService.queueService.queue.length > count / 10) return;
 
     this.amazonService.queueService.failed = 0;
     this.amazonService.queueService.completed = 0;
-    const count = this.argsService.getCountFlag();
     const countries = await this.apiService.getCountries();
 
     this.apiService.get<AmazonAd[]>(
@@ -80,9 +78,6 @@ export class AmazonScraper {
             this.pdpScraper.execute(ad, countries)
           );
           await Promise.all(promises);
-        },
-        onFinally: () => {
-          setTimeout(() => this.scrapPdp(), 10000);
         },
       },
       true

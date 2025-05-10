@@ -8,7 +8,9 @@ export class RequestQueueRegulator {
   private queueService;
   private adjustInterval = 5 * 60;
   private limitStep = 1000;
-  private scrapersCount: number | undefined;
+  scrapersCount: number | undefined;
+  targetedGlobalCpu = 100;
+  targetedGlobalMem = 100;
 
   constructor(queueService: RequestQueueService) {
     this.queueService = queueService;
@@ -40,17 +42,36 @@ export class RequestQueueRegulator {
       return;
     }
 
+    const targetedGlobalCpu = 80;
+    const targetedGlobalMem = 80;
+
     const cpusCount = os.cpus().length;
-    const targetedCpu = (cpusCount * 70) / this.scrapersCount;
-    const avgCpu = calculateAvg(this.queueService.cpuHistory);
+    const avgGlobalCpu = calculateAvg(this.queueService.globalCpuHistory);
+    const avgProcessCpu = calculateAvg(this.queueService.processCpuHistory);
 
-    const targetedMem = 80 / this.scrapersCount;
     const totalMem = os.totalmem();
-    const usedMem = (process.memoryUsage().rss * 100) / totalMem;
+    const usedGlobalMem = ((totalMem - os.freemem()) * 100) / totalMem;
+    const usedProcessMem = (process.memoryUsage().rss * 100) / totalMem;
 
-    const diffMem = (targetedMem - usedMem) / targetedMem;
-    const diffCpu = (targetedCpu - avgCpu) / targetedCpu;
+    const targetedCpu =
+      (cpusCount * this.targetedGlobalCpu) / this.scrapersCount;
+    const targetedMem = this.targetedGlobalMem / this.scrapersCount;
+
+    const diffMem = (targetedMem - usedProcessMem) / targetedMem;
+    const diffCpu = (targetedCpu - avgProcessCpu) / targetedCpu;
     const minDiff = Math.min(diffCpu, diffMem);
+
     this.queueService.limit += Math.round(minDiff * this.limitStep);
+
+    if (diffCpu <= diffMem) {
+      this.targetedGlobalCpu =
+        this.targetedGlobalCpu + (targetedGlobalCpu - avgGlobalCpu);
+      this.targetedGlobalCpu = Math.min(this.targetedGlobalCpu, 100);
+      return;
+    }
+
+    this.targetedGlobalMem =
+      this.targetedGlobalMem + (targetedGlobalMem - usedGlobalMem);
+    this.targetedGlobalMem = Math.min(this.targetedGlobalMem, 100);
   }
 }

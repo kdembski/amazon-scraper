@@ -24,7 +24,9 @@ export class AmazonPlpPageScraper {
   }
 
   async execute(page: AmazonPlpAdPage) {
-    if (page.complete || page.pending) return;
+    const count = this.argsService.getCountFlag();
+    const queue = this.amazonService.queueService.queue.length;
+    if (queue >= count || page.complete || page.pending) return;
 
     return new Promise<AmazonPlpAd[] | undefined>((resolve, reject) => {
       page.resolve = resolve;
@@ -71,14 +73,10 @@ export class AmazonPlpPageScraper {
       return;
     }
 
-    for (const sub of subcategories) {
-      const count = this.argsService.getCountFlag();
-      const pending = this.amazonService.queueService.pending;
-      if (pending >= count) continue;
-
+    subcategories.forEach((sub) => {
       const subPage = this.buildPage(page.category, sub);
       this.execute(subPage);
-    }
+    });
 
     page.resolve?.(ads);
   }

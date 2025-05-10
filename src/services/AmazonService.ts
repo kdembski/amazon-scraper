@@ -89,7 +89,7 @@ export class AmazonService {
       name: process.env.name,
       speed: this.queueService.speed,
       pending: this.queueService.pending,
-      cpu: calculateAvg(this.queueService.cpuHistory) / cpusCount,
+      cpu: calculateAvg(this.queueService.processCpuHistory) / cpusCount,
     });
   }
 }
