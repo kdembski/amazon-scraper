@@ -35,9 +35,6 @@ export class RequestQueueRegulator {
       return;
     }
 
-    const targetedGlobalCpu = 70;
-    const targetedGlobalMem = 80;
-
     const cpusCount = os.cpus().length;
     const [avgGlobalCpu, avgProcessCpu] = await Promise.all(this.getAvgCpus());
 
@@ -54,17 +51,26 @@ export class RequestQueueRegulator {
     const minDiff = Math.min(diffCpu, diffMem);
 
     this.queueService.limit += Math.round(minDiff * this.limitStep);
+    this.updateTargetedValues(diffCpu, diffMem, avgGlobalCpu, usedGlobalMem);
+  }
+
+  private updateTargetedValues(
+    diffCpu: number,
+    diffMem: number,
+    avgGlobalCpu: number,
+    usedGlobalMem: number
+  ) {
+    const globalCpuLimit = 70;
+    const globalMemLimit = 80;
 
     if (diffCpu <= diffMem) {
-      this.targetedGlobalCpu =
-        this.targetedGlobalCpu + (targetedGlobalCpu - avgGlobalCpu);
-      this.targetedGlobalCpu = Math.min(this.targetedGlobalCpu, 100);
+      const target = this.targetedGlobalCpu + (globalCpuLimit - avgGlobalCpu);
+      this.targetedGlobalCpu = Math.min(target, 100);
       return;
     }
 
-    this.targetedGlobalMem =
-      this.targetedGlobalMem + (targetedGlobalMem - usedGlobalMem);
-    this.targetedGlobalMem = Math.min(this.targetedGlobalMem, 100);
+    const target = this.targetedGlobalMem + (globalMemLimit - usedGlobalMem);
+    this.targetedGlobalMem = Math.min(target, 100);
   }
 
   private getAvgCpus() {
