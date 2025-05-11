@@ -1,5 +1,4 @@
 import axios from "axios";
-import os from "os";
 import UserAgent from "user-agents";
 import { RequestQueueService } from "@/services/RequestQueueService";
 import { ArgsService } from "@/services/ArgsService";
@@ -7,7 +6,6 @@ import { CronJob } from "cron";
 import { ApiService } from "@/services/ApiService";
 import { ProxyService } from "@/services/ProxyService";
 import { HttpsProxyAgent } from "https-proxy-agent";
-import { calculateAvg } from "@/helpers/number";
 
 export class AmazonService {
   private static instance: AmazonService;
@@ -84,12 +82,10 @@ export class AmazonService {
   }
 
   private sendScraperStatus() {
-    const cpusCount = os.cpus().length;
     return this.apiService.post("scrapers/status", {
       name: process.env.name,
       speed: this.queueService.speed,
       pending: this.queueService.pending,
-      cpu: calculateAvg(this.queueService.processCpuHistory) / cpusCount,
     });
   }
 }

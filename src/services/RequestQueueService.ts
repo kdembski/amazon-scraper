@@ -1,4 +1,3 @@
-import osu from "node-os-utils";
 import os from "os";
 import { calculateAvg, roundToTwoDecimals } from "@/helpers/number";
 import { RequestQueueRegulator } from "@/services/RequestQueueRegulator";
@@ -6,10 +5,6 @@ import { RequestQueueRegulator } from "@/services/RequestQueueRegulator";
 export class RequestQueueService {
   private regulator: RequestQueueRegulator;
   private completedHistory: number[] = [];
-  private cpuUsage?: NodeJS.CpuUsage;
-  private cpuStartTime?: [number, number];
-  processCpuHistory: number[] = [];
-  globalCpuHistory: number[] = [];
   previousCompleted = 0;
   queue: Function[] = [];
   speed = 0;
@@ -29,11 +24,6 @@ export class RequestQueueService {
 
     setInterval(() => {
       this.updateCompletedHistory();
-      this.updateProccesCpuHistory();
-      this.updateGlobalCpuHistory();
-      this.calculateSpeed();
-
-      this.previousCompleted = this.completed;
     }, 1000);
 
     if (enableLogs) {
@@ -89,36 +79,9 @@ export class RequestQueueService {
 
     const length = this.completedHistory.unshift(diff);
     this.completedHistory.length = Math.min(length, 24 * 60 * 60);
-  }
 
-  private async updateProccesCpuHistory() {
-    if (!this.cpuUsage) {
-      this.cpuUsage = process.cpuUsage();
-      this.cpuStartTime = process.hrtime();
-      return;
-    }
-
-    const elapTime = process.hrtime(this.cpuStartTime);
-    const elapUsage = process.cpuUsage(this.cpuUsage);
-
-    const elapTimeMS = elapTime[0] * 1000 + elapTime[1] / 1000000;
-    const elapUserMS = elapUsage.user / 1000;
-    const elapSystMS = elapUsage.system / 1000;
-
-    const cpuPercent = Math.round(
-      (100 * (elapUserMS + elapSystMS)) / elapTimeMS
-    );
-    const length = this.processCpuHistory.unshift(cpuPercent);
-    this.processCpuHistory.length = Math.min(length, 60 * 60);
-
-    this.cpuUsage = process.cpuUsage();
-    this.cpuStartTime = process.hrtime();
-  }
-
-  private async updateGlobalCpuHistory() {
-    const usage = await osu.cpu.usage();
-    const length = this.globalCpuHistory.unshift(usage);
-    this.globalCpuHistory.length = Math.min(length, 60 * 60);
+    this.previousCompleted = this.completed;
+    this.calculateSpeed();
   }
 
   private calculateSpeed() {
@@ -129,9 +92,7 @@ export class RequestQueueService {
   private logState() {
     const stats = [
       `speed: ${roundToTwoDecimals(this.speed)}/s`,
-      `pcpu: ${Math.round(calculateAvg(this.processCpuHistory))}%`,
       `tcpu: ${this.getTargetedCpu()}%`,
-      `gcpu: ${Math.round(calculateAvg(this.globalCpuHistory))}%`,
       `limit: ${this.limit}`,
       `pending: ${this.pending}`,
       `queue: ${this.queue.length}`,
