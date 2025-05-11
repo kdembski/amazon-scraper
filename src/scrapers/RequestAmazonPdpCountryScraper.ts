@@ -1,4 +1,4 @@
-import { AmazonPdpCountryScraper } from "@/scrapers/amazon/abstract/AmazonPdpCountryScraper";
+import { AmazonPdpCountryScraper } from "@/scrapers/abstract/AmazonPdpCountryScraper";
 import { AmazonService } from "@/services/AmazonService";
 import { AmazonAd, Country, AmazonAdPrice } from "@/types/amazon.types";
 import { parseHTML } from "linkedom";

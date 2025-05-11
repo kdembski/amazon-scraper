@@ -18,8 +18,6 @@ export class AmazonPdpAdBuilder {
       return;
     }
 
-    const delivery = this.getDelivery(document);
-    const deliverCode = this.getDeliveryCode(delivery);
     const price = this.priceBuilder.build(document);
     const asin = this.getAsin(document);
 
@@ -27,7 +25,6 @@ export class AmazonPdpAdBuilder {
       price,
       asin,
       isCaptcha,
-      deliverCode,
     };
   }
 
@@ -38,25 +35,6 @@ export class AmazonPdpAdBuilder {
       .filter((asin): asin is string => !!asin);
 
     return asins[0];
-  }
-
-  private getDelivery(document: Document) {
-    const desktop = document
-      .querySelector(`#glow-ingress-line2`)
-      ?.textContent?.replace(/\s/g, "");
-
-    const mobile = document
-      .querySelector(`#glow-ingress-single-line`)
-      ?.textContent?.match(/[A-Za-z]+(?=\s⌵)/)?.[0];
-
-    return desktop || mobile;
-  }
-
-  getDeliveryCode(name?: string) {
-    if (!name) return;
-    if (["Canada", "Kanada"].includes(name)) return "ca";
-    if (["Germania", "Allemagne"].includes(name)) return "de";
-    if (["Polen", "Pologne", "Polonia"].includes(name)) return "pl";
   }
 
   buildUrl(country: Country, ad: AmazonAd) {

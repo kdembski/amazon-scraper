@@ -5,13 +5,20 @@ export class AmazonPlpBuilder {
     const listItemSelector = "div[role='listitem']";
     const items = [...document.querySelectorAll(listItemSelector)];
 
-    return items.reduce((accum: AmazonPlpAd[], item) => {
+    const ads = items.reduce((accum: AmazonPlpAd[], item) => {
       const ad = this.buildItem(item, category);
       if (!ad) return accum;
 
       accum.push(ad);
       return accum;
     }, []);
+
+    const subcategories = this.buildSubcategories(document);
+
+    return {
+      ads,
+      subcategories,
+    };
   }
 
   private buildItem(item: Element, category: string) {
@@ -29,7 +36,7 @@ export class AmazonPlpBuilder {
     };
   }
 
-  buildSubcategories(document: Document) {
+  private buildSubcategories(document: Document) {
     const list = document.querySelector("ul#filter-n");
     const items = list?.querySelectorAll("li[id]");
 

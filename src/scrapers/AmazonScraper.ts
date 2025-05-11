@@ -1,6 +1,6 @@
-import { AmazonPdpScraper } from "@/scrapers/amazon/AmazonPdpScraper";
-import { AmazonPlpScraper } from "@/scrapers/amazon/AmazonPlpScraper";
-import { RequestAmazonPdpCountryScraper } from "@/scrapers/amazon/RequestAmazonPdpCountryScraper";
+import { AmazonPdpScraper } from "@/scrapers/AmazonPdpScraper";
+import { AmazonPlpScraper } from "@/scrapers/AmazonPlpScraper";
+import { RequestAmazonPdpCountryScraper } from "@/scrapers/RequestAmazonPdpCountryScraper";
 import { AmazonService } from "@/services/AmazonService";
 import { ApiService } from "@/services/ApiService";
 import { ArgsService } from "@/services/ArgsService";
@@ -52,15 +52,10 @@ export class AmazonScraper {
     this.amazonService.queueService.failed = 0;
     this.amazonService.queueService.completed = 0;
 
-    return this.apiService.get<AmazonAdCategory>(
-      "amazon/ads/categories/scrap",
-      {
-        onSuccess: (category) => {
-          this.plpScraper.execute(category.name);
-        },
-        onError: () => this.scrapPlp(),
-      }
-    );
+    this.apiService
+      .get<AmazonAdCategory>("amazon/ads/categories/scrap")
+      .then((category) => this.plpScraper.execute(category.name))
+      .catch(() => this.scrapPlp());
   }
 
   async scrapPdp() {
@@ -74,20 +69,9 @@ export class AmazonScraper {
     this.amazonService.queueService.completed = 0;
     const countries = await this.apiService.getCountries();
 
-    this.apiService.get<AmazonAd[]>(
-      `amazon/ads/scrap?count=${count}`,
-      {
-        onSuccess: async (ads) => {
-          const promises = ads.map((ad) =>
-            this.pdpScraper.execute(ad, countries)
-          );
-          await Promise.all(promises);
-        },
-        onFinally: () => {
-          this.isLoadingAds = false;
-        },
-      },
-      true
-    );
+    this.apiService
+      .get<AmazonAd[]>(`amazon/ads/scrap?count=${count}`)
+      .then((ads) => ads.map((ad) => this.pdpScraper.execute(ad, countries)))
+      .finally(() => (this.isLoadingAds = false));
   }
 }

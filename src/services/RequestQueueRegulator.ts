@@ -25,10 +25,8 @@ export class RequestQueueRegulator {
     setInterval(() => this.updateScrapersCount(), 60 * 60 * 1000);
   }
 
-  private updateScrapersCount() {
-    return this.apiService.get<number>(`scrapers/count`, {
-      onSuccess: (count) => (this.scrapersCount = count),
-    });
+  private async updateScrapersCount() {
+    this.scrapersCount = await this.apiService.get<number>(`scrapers/count`);
   }
 
   private async adjustLimit() {
@@ -41,7 +39,7 @@ export class RequestQueueRegulator {
     const targetedGlobalMem = 80;
 
     const cpusCount = os.cpus().length;
-    const { avgGlobalCpu, avgProcessCpu } = await this.getAvgCpus();
+    const [avgGlobalCpu, avgProcessCpu] = await Promise.all(this.getAvgCpus());
 
     const totalMem = os.totalmem();
     const usedGlobalMem = ((totalMem - os.freemem()) * 100) / totalMem;
@@ -69,23 +67,10 @@ export class RequestQueueRegulator {
     this.targetedGlobalMem = Math.min(this.targetedGlobalMem, 100);
   }
 
-  private async getAvgCpus() {
-    let avgProcessCpu = 0;
-    let avgGlobalCpu = 0;
-
-    const promises = [
-      this.apiService.get<number>(`system/cpu`, {
-        onSuccess: (usage) => (avgGlobalCpu = usage),
-      }),
-      this.apiService.get<number>(`scrapers/${process.env.name}/cpu`, {
-        onSuccess: (usage) => (avgProcessCpu = usage),
-      }),
+  private getAvgCpus() {
+    return [
+      this.apiService.get<number>(`system/cpu`),
+      this.apiService.get<number>(`scrapers/${process.env.name}/cpu`),
     ];
-
-    await Promise.all(promises);
-    return {
-      avgGlobalCpu,
-      avgProcessCpu,
-    };
   }
 }

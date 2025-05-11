@@ -1,5 +1,5 @@
 import { AmazonPdpAdBuilder } from "@/builders/AmazonPdpAdBuilder";
-import { AmazonPdpPriceHelper } from "@/scrapers/amazon/AmazonPdpPriceHelper";
+import { AmazonPdpPriceHelper } from "@/scrapers/AmazonPdpPriceHelper";
 import { ApiService } from "@/services/ApiService";
 import { AmazonAd, Country, AmazonAdPrice } from "@/types/amazon.types";
 

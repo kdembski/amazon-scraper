@@ -82,8 +82,7 @@ export class AmazonService {
   }
 
   private sendScraperStatus() {
-    return this.apiService.post("scrapers/status", {
-      name: process.env.name,
+    this.apiService.post(`scrapers/${process.env.name}/status`, {
       speed: this.queueService.speed,
       pending: this.queueService.pending,
     });

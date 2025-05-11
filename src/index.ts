@@ -1,6 +1,5 @@
 import { configDotenv } from "dotenv";
-import { AmazonScraper } from "@/scrapers/amazon/AmazonScraper";
-import { HeadlessAmazonScraper } from "@/scrapers/amazon/headless/HeadlessAmazonScraper";
+import { AmazonScraper } from "@/scrapers/AmazonScraper";
 
 configDotenv();
 
@@ -8,7 +7,6 @@ configDotenv();
 process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = "0";
 
 new AmazonScraper().execute();
-//new HeadlessAmazonScraper().execute();
 
 process.on("uncaughtException", (e, o) => {
   console.log("uncaught exception", e, o);

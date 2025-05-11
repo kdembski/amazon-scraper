@@ -65,8 +65,7 @@ export class AmazonPlpPageScraper {
     }
 
     const { document } = parseHTML(data);
-    const ads = this.builder.build(document, page.category);
-    const subcategories = this.builder.buildSubcategories(document);
+    const { ads, subcategories } = this.builder.build(document, page.category);
 
     if (ads.length === 0) {
       page.reject?.("No ads found");
