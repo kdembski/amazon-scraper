@@ -60,18 +60,37 @@ export class ApiService {
     return (await axios.get<T>(this.url(path), { httpAgent: agent })).data;
   }
 
-  post<T>(path: string, data: unknown) {
+  async post<T>(path: string, data: unknown) {
     const agent = new http.Agent({ keepAlive: true });
-    return axios.post<T>(this.url(path), data, { httpAgent: agent });
+    return axios
+      .post<T>(this.url(path), data, { httpAgent: agent })
+      .catch((e) => {
+        this.handleError(e);
+      });
   }
 
-  put<T>(path: string, data: unknown) {
+  async put<T>(path: string, data: unknown) {
     const agent = new http.Agent({ keepAlive: true });
-    return axios.put<T>(this.url(path), data, { httpAgent: agent });
+    return axios
+      .put<T>(this.url(path), data, { httpAgent: agent })
+      .catch((e) => {
+        this.handleError(e);
+      });
   }
 
-  delete<T>(path: string) {
+  async delete<T>(path: string) {
     const agent = new http.Agent({ keepAlive: true });
-    return axios.delete<T>(this.url(path), { httpAgent: agent });
+    return axios.delete<T>(this.url(path), { httpAgent: agent }).catch((e) => {
+      this.handleError(e);
+    });
+  }
+
+  private handleError(e: any) {
+    // const { status, message, cause, response } = e;
+    // console.log("Server:");
+    // if (status) console.log("  " + status);
+    // if (message) console.log("  " + message);
+    // if (cause) console.log("  " + cause.toString());
+    // if (response?.data) console.log("  " + response.data.replaceAll("\n", " "));
   }
 }

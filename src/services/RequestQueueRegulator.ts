@@ -60,7 +60,7 @@ export class RequestQueueRegulator {
     avgGlobalCpu: number,
     usedGlobalMem: number
   ) {
-    const globalCpuLimit = 70;
+    const globalCpuLimit = 80;
     const globalMemLimit = 80;
 
     if (diffCpu <= diffMem) {

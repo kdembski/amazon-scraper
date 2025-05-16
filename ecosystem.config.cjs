@@ -9,7 +9,7 @@ module.exports = {
     {
       name: "pdp-2",
       script: "./dist/index.js",
-      args: "-c 10000 -l 50000",
+      args: "-c 10000 -l 80000",
       node_args: "--max-old-space-size=8192",
     },
     {
