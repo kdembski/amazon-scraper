@@ -86,11 +86,12 @@ export class ApiService {
   }
 
   private handleError(e: any) {
-    // const { status, message, cause, response } = e;
-    // console.log("Server:");
-    // if (status) console.log("  " + status);
-    // if (message) console.log("  " + message);
-    // if (cause) console.log("  " + cause.toString());
-    // if (response?.data) console.log("  " + response.data.replaceAll("\n", " "));
+    const { status, message, cause, response } = e;
+    console.error("Server:");
+    if (status) console.error("  " + status);
+    if (message) console.error("  " + message);
+    if (cause) console.error("  " + cause.toString());
+    if (response?.data)
+      console.error("  " + response.data.replaceAll("\n", " "));
   }
 }
