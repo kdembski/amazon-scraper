@@ -32,6 +32,7 @@ export interface AmazonPdpAd {
 export interface AmazonAd {
   id: number;
   asin: string;
+  controller?: AbortController;
 }
 
 export interface AmazonAdPrice {

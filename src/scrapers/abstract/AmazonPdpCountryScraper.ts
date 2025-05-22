@@ -39,7 +39,10 @@ export abstract class AmazonPdpCountryScraper {
     prices: AmazonAdPrice[],
     resolve: () => void
   ) {
-    if (!this.priceHelper.isComplete(prices) || prices[0].adDeleted) return;
+    const isCompleted = this.priceHelper.isComplete(prices);
+    const isDeleted = this.priceHelper.isDeleted(prices);
+    if (!isCompleted || isDeleted) return;
+
     this.priceHelper.sendCompletedPrices(prices, ad);
     resolve();
   }
@@ -65,6 +68,7 @@ export abstract class AmazonPdpCountryScraper {
     });
 
     this.apiService.delete("amazon/ads/" + ad.id);
+    ad.controller?.abort();
     resolveAd();
   }
 }

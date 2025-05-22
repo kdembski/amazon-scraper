@@ -1,5 +1,5 @@
 import http from "http";
-import axios from "axios";
+import axios, { GenericAbortSignal } from "axios";
 import { AmazonAdCategory, Country } from "@/types/amazon.types";
 import { CronJob } from "cron";
 
@@ -69,10 +69,10 @@ export class ApiService {
       });
   }
 
-  async put<T>(path: string, data: unknown) {
+  async put<T>(path: string, data: unknown, signal?: GenericAbortSignal) {
     const agent = new http.Agent({ keepAlive: true });
     return axios
-      .put<T>(this.url(path), data, { httpAgent: agent })
+      .put<T>(this.url(path), data, { httpAgent: agent, signal })
       .catch((e) => {
         this.handleError(e);
       });
