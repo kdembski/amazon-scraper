@@ -31,10 +31,18 @@ export class RequestAmazonPdpCountryScraper extends AmazonPdpCountryScraper {
       const { url, referer } = this.builder.buildUrl(country, ad);
       price.pending = true;
 
-      this.amazonService.get<string>(url, referer, {
-        onSuccess: (res) => this.onSuccess(res, price),
-        onError: (e) => this.onError(e, price, ad, prices, resolveAd),
-      });
+      const controller = new AbortController();
+      price.controller = controller;
+
+      this.amazonService.get<string>(
+        url,
+        referer,
+        {
+          onSuccess: (res) => this.onSuccess(res, price),
+          onError: (e) => this.onError(e, price, ad, prices, resolveAd),
+        },
+        controller.signal
+      );
     })
       .then((failed) => {
         price.pending = false;

@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { GenericAbortSignal } from "axios";
 import UserAgent from "user-agents";
 import { RequestQueueService } from "@/services/RequestQueueService";
 import { ArgsService } from "@/services/ArgsService";
@@ -50,7 +50,7 @@ export class AmazonService {
       onError?: (e: any) => void;
       onFinally?: () => void;
     },
-    priority?: boolean
+    signal?: GenericAbortSignal
   ) {
     this.queueService.request(async () => {
       const proxy = this.proxyService.getRandomProxy();
@@ -66,6 +66,7 @@ export class AmazonService {
               Referer: `${this.baseUrl}${referer}`,
               "Referrer-Policy": "strict-origin-when-cross-origin",
             },
+            signal,
           })
           .then((response) => {
             callback?.onSuccess?.(response.data);
@@ -78,7 +79,7 @@ export class AmazonService {
             resolve();
           });
       });
-    }, priority);
+    });
   }
 
   private sendScraperStatus() {

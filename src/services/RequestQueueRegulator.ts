@@ -65,6 +65,8 @@ export class RequestQueueRegulator {
 
     if (diffCpu <= diffMem) {
       const step = (globalCpuLimit - avgGlobalCpu) / 2;
+      if (step > -0.5 || step < 0.5) return;
+
       const target = this.targetedGlobalCpu + step;
       this.targetedGlobalCpu = Math.max(Math.min(target, 100), 1);
       return;

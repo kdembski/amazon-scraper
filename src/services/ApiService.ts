@@ -9,7 +9,7 @@ export class ApiService {
   countries: Country[] = [];
 
   private constructor() {
-    new CronJob("0 0 0 * * *", async () => {
+    new CronJob("0 0 */1 * * *", async () => {
       await this.loadCountries();
       await this.loadCategories();
     }).start();

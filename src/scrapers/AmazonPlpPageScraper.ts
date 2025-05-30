@@ -42,7 +42,7 @@ export class AmazonPlpPageScraper {
         onSuccess: (res: string) => this.onSuccess(res, page),
         onError: () => this.onError(page),
       };
-      this.amazonService.get<string>(url, referer, callback, true);
+      this.amazonService.get<string>(url, referer, callback);
     })
       .then((ads) => {
         page.pending = false;

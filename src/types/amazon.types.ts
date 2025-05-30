@@ -45,6 +45,7 @@ export interface AmazonAdPrice {
   failed: number;
   resolve?: (failed?: boolean) => void;
   reject?: (e: any) => void;
+  controller?: AbortController;
 }
 
 export interface Country {
@@ -52,4 +53,5 @@ export interface Country {
   name: string;
   code: string;
   currencyId: number;
+  active: boolean;
 }
