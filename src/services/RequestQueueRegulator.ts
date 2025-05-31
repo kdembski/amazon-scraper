@@ -9,7 +9,7 @@ export class RequestQueueRegulator {
   private adjustInterval = 20 * 60;
   private limitStep = 2000;
   scrapersCount: number | undefined;
-  targetedGlobalCpu = 100;
+  targetedGlobalCpu = 50;
   targetedGlobalMem = 100;
 
   constructor(
@@ -65,7 +65,7 @@ export class RequestQueueRegulator {
 
     if (diffCpu <= diffMem) {
       const step = (globalCpuLimit - avgGlobalCpu) / 2;
-      if (step > -0.5 || step < 0.5) return;
+      if (step > -0.5 && step < 0.5) return;
 
       const target = this.targetedGlobalCpu + step;
       this.targetedGlobalCpu = Math.max(Math.min(target, 100), 1);
