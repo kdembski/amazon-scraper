@@ -19,8 +19,8 @@ export class AmazonPdpScraper {
     }));
 
     return new Promise<void>((resolve) => {
-      countries.forEach((country) => {
-        this.countryScraper.execute(country, ad, prices, resolve);
+      prices.forEach((price) => {
+        this.countryScraper.execute(price, ad, prices, resolve);
       });
     });
   }

@@ -5,13 +5,13 @@ import { CronJob } from "cron";
 
 export class ApiService {
   private static instance: ApiService;
-  categories: AmazonAdCategory[] = [];
-  countries: Country[] = [];
+  private categories: AmazonAdCategory[] = [];
+  private countries: Country[] = [];
 
   private constructor() {
     new CronJob("0 0 */1 * * *", async () => {
-      await this.loadCountries();
-      await this.loadCategories();
+      this.loadCountries();
+      this.loadCategories();
     }).start();
   }
 
@@ -41,6 +41,9 @@ export class ApiService {
 
   async loadCountries() {
     this.get<Country[]>("countries").then((data) => {
+      data.forEach((c) => {
+        console.log("get", c.code, c.active);
+      });
       this.countries = data;
     });
   }

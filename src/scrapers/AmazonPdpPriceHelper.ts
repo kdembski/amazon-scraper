@@ -8,10 +8,6 @@ export class AmazonPdpPriceHelper {
     this.apiService = apiService;
   }
 
-  getPrice(prices: AmazonAdPrice[], countryId: number) {
-    return prices?.find((price) => price.country.id === countryId);
-  }
-
   isComplete(prices: AmazonAdPrice[]) {
     return prices?.every((price) => price.complete);
   }
@@ -26,7 +22,6 @@ export class AmazonPdpPriceHelper {
       .map((price) => ({
         adId: ad.id,
         countryId: price.country.id,
-        country: price.country,
         value: price.value,
       }));
 

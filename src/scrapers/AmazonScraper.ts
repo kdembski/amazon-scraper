@@ -68,6 +68,9 @@ export class AmazonScraper {
     this.amazonService.queueService.failed = 0;
     this.amazonService.queueService.completed = 0;
     const countries = await this.apiService.getCountries();
+    countries.forEach((c) => {
+      console.log("scrap", c.code, c.active);
+    });
 
     this.apiService
       .get<AmazonAd[]>(`amazon/ads/scrap?count=${count}`)

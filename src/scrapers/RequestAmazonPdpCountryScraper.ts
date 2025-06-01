@@ -1,6 +1,6 @@
 import { AmazonPdpCountryScraper } from "@/scrapers/abstract/AmazonPdpCountryScraper";
 import { AmazonService } from "@/services/AmazonService";
-import { AmazonAd, Country, AmazonAdPrice } from "@/types/amazon.types";
+import { AmazonAd, AmazonAdPrice } from "@/types/amazon.types";
 import { parseHTML } from "linkedom";
 
 export class RequestAmazonPdpCountryScraper extends AmazonPdpCountryScraper {
@@ -12,14 +12,11 @@ export class RequestAmazonPdpCountryScraper extends AmazonPdpCountryScraper {
   }
 
   execute(
-    country: Country,
+    price: AmazonAdPrice,
     ad: AmazonAd,
     prices: AmazonAdPrice[],
     resolveAd: () => void
   ) {
-    const price = this.priceHelper.getPrice(prices, country.id);
-    if (!price) return;
-
     new Promise<boolean | undefined>((resolvePrice, rejectPrice) => {
       if (price.complete || price.deleted || price.pending || price.adDeleted) {
         return;
@@ -28,7 +25,7 @@ export class RequestAmazonPdpCountryScraper extends AmazonPdpCountryScraper {
       price.resolve = resolvePrice;
       price.reject = rejectPrice;
 
-      const { url, referer } = this.builder.buildUrl(country, ad);
+      const { url, referer } = this.builder.buildUrl(price.country, ad);
       price.pending = true;
 
       const controller = new AbortController();
@@ -54,7 +51,7 @@ export class RequestAmazonPdpCountryScraper extends AmazonPdpCountryScraper {
         price.pending = false;
         price.failed++;
         this.amazonService.queueService.failed++;
-        this.retry(country, ad, prices, resolveAd);
+        this.retry(price, ad, prices, resolveAd);
       });
   }
 

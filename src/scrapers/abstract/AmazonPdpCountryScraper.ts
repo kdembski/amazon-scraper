@@ -1,7 +1,7 @@
 import { AmazonPdpAdBuilder } from "@/builders/AmazonPdpAdBuilder";
 import { AmazonPdpPriceHelper } from "@/scrapers/AmazonPdpPriceHelper";
 import { ApiService } from "@/services/ApiService";
-import { AmazonAd, Country, AmazonAdPrice } from "@/types/amazon.types";
+import { AmazonAd, AmazonAdPrice } from "@/types/amazon.types";
 
 export abstract class AmazonPdpCountryScraper {
   protected apiService;
@@ -19,19 +19,19 @@ export abstract class AmazonPdpCountryScraper {
   }
 
   abstract execute(
-    country: Country,
+    price: AmazonAdPrice,
     ad: AmazonAd,
     prices: AmazonAdPrice[],
     resolve: () => void
   ): void;
 
   protected retry(
-    country: Country,
+    price: AmazonAdPrice,
     ad: AmazonAd,
     prices: AmazonAdPrice[],
     resolve: () => void
   ) {
-    this.execute(country, ad, prices, resolve);
+    this.execute(price, ad, prices, resolve);
   }
 
   protected tryComplete(
@@ -68,8 +68,8 @@ export abstract class AmazonPdpCountryScraper {
       price.resolve?.();
     });
 
-    this.apiService.delete("amazon/ads/" + ad.id);
     ad.controller?.abort();
+    this.apiService.delete("amazon/ads/" + ad.id);
     resolveAd();
   }
 }

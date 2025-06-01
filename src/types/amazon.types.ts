@@ -43,9 +43,9 @@ export interface AmazonAdPrice {
   deleted: boolean;
   adDeleted: boolean;
   failed: number;
+  controller?: AbortController;
   resolve?: (failed?: boolean) => void;
   reject?: (e: any) => void;
-  controller?: AbortController;
 }
 
 export interface Country {
