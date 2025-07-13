@@ -41,9 +41,6 @@ export class ApiService {
 
   async loadCountries() {
     this.get<Country[]>("countries").then((data) => {
-      data.forEach((c) => {
-        console.log("get", c.code, c.active);
-      });
       this.countries = data;
     });
   }
