@@ -36,9 +36,12 @@ export class RequestQueueService {
   }
 
   start() {
-    while (1) {
-      this.next();
-    }
+    setTimeout(() => {
+      for (let i = 0; i < 10; i++) {
+        this.next();
+      }
+      this.start();
+    }, 1);
   }
 
   async request(callback: () => Promise<void>, top?: boolean) {
