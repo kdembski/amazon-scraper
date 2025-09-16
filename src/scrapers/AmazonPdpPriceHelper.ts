@@ -23,6 +23,7 @@ export class AmazonPdpPriceHelper {
         adId: ad.id,
         countryId: price.country.id,
         value: price.value,
+        dispatchFrom: price.dispatchFrom,
       }));
 
     if (!prices?.length) return;

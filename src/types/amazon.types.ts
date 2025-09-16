@@ -38,6 +38,7 @@ export interface AmazonAd {
 export interface AmazonAdPrice {
   country: Country;
   value?: number;
+  dispatchFrom?: string;
   pending: boolean;
   complete: boolean;
   deleted: boolean;
