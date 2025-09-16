@@ -69,6 +69,16 @@ export class RequestAmazonPdpCountryScraper extends AmazonPdpCountryScraper {
       return;
     }
 
+    if (pdpAd?.dispatchFrom && pdpAd.dispatchFrom !== "Amazon") {
+      price.resolve?.();
+      return;
+    }
+
+    if (!pdpAd?.dispatchFrom && price.failed < 2) {
+      price.reject?.("dispatchFrom not found");
+      return;
+    }
+
     price.value = pdpAd?.price;
     price.resolve?.();
   }

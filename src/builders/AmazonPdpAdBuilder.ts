@@ -20,11 +20,13 @@ export class AmazonPdpAdBuilder {
 
     const price = this.priceBuilder.build(document);
     const asin = this.getAsin(document);
+    const dispatchFrom = this.getDispatchFrom(document);
 
     return {
       price,
       asin,
       isCaptcha,
+      dispatchFrom,
     };
   }
 
@@ -35,6 +37,18 @@ export class AmazonPdpAdBuilder {
       .filter((asin): asin is string => !!asin);
 
     return asins[0];
+  }
+
+  private getDispatchFrom(document: Document) {
+    const fulfillerSelector =
+      "#fulfillerInfoFeature_feature_div .offer-display-feature-text-message";
+    const merchantSelector =
+      "#merchantInfoFeature_feature_div .offer-display-feature-text-message";
+
+    const fulfiller = document.querySelector(fulfillerSelector)?.textContent;
+    const merchant = document.querySelector(merchantSelector)?.textContent;
+
+    return fulfiller || merchant;
   }
 
   buildUrl(country: Country, ad: AmazonAd) {

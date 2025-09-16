@@ -7,7 +7,7 @@ export class RequestQueueRegulator {
   private queueService;
   private apiService;
   private adjustInterval = 20 * 60;
-  private limitStep = 500;
+  private limitStep = 2000;
   scrapersCount: number | undefined;
   targetedGlobalCpu = 50;
 
