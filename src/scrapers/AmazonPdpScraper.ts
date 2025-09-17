@@ -16,6 +16,7 @@ export class AmazonPdpScraper {
       deleted: false,
       adDeleted: false,
       failed: 0,
+      missingData: 0,
     }));
 
     return new Promise<void>((resolve) => {

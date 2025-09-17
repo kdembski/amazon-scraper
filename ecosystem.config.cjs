@@ -3,37 +3,37 @@ module.exports = {
     {
       name: "pdp-1",
       script: "./dist/index.js",
-      args: "-c 20000 -l 50000",
+      args: "-c 5000 -l 20000",
       node_args: "--max-old-space-size=8192",
     },
     {
       name: "pdp-2",
       script: "./dist/index.js",
-      args: "-c 20000 -l 50000",
+      args: "-c 5000 -l 20000",
       node_args: "--max-old-space-size=8192",
     },
     {
       name: "pdp-3",
       script: "./dist/index.js",
-      args: "-c 20000 -l 50000",
+      args: "-c 5000 -l 20000",
       node_args: "--max-old-space-size=8192",
     },
     {
       name: "pdp-4",
       script: "./dist/index.js",
-      args: "-c 20000 -l 50000",
+      args: "-c 5000 -l 20000",
       node_args: "--max-old-space-size=8192",
     },
     {
       name: "pdp-5",
       script: "./dist/index.js",
-      args: "-c 20000 -l 50000",
+      args: "-c 5000 -l 20000",
       node_args: "--max-old-space-size=8192",
     },
     {
       name: "pdp-6",
       script: "./dist/index.js",
-      args: "-c 20000 -l 50000",
+      args: "-c 5000 -l 20000",
       node_args: "--max-old-space-size=8192",
     },
     {

@@ -62,20 +62,26 @@ export class RequestAmazonPdpCountryScraper extends AmazonPdpCountryScraper {
     }
 
     const { document } = parseHTML(data);
-    const pdpAd = this.builder.build(document);
+    const {
+      isCaptcha,
+      isMissingData,
+      dispatchFrom,
+      price: priceValue,
+    } = this.builder.build(document);
 
-    if (pdpAd?.isCaptcha) {
+    if (isCaptcha) {
       price.reject?.("Captcha occured");
       return;
     }
 
-    if (!pdpAd?.dispatchFrom && price.failed < 2) {
-      price.reject?.("dispatchFrom not found");
+    if (isMissingData && price.missingData < 2) {
+      price.missingData++;
+      price.reject?.("Missing data");
       return;
     }
 
-    price.value = pdpAd?.price;
-    price.dispatchFrom = pdpAd?.dispatchFrom;
+    price.value = priceValue;
+    price.dispatchFrom = dispatchFrom;
     price.resolve?.();
   }
 
