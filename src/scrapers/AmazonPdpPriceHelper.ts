@@ -27,14 +27,6 @@ export class AmazonPdpPriceHelper {
       }));
 
     if (!prices?.length) return;
-
-    const controller = new AbortController();
-    ad.controller = controller;
-
-    this.apiService.put(
-      "amazon/ads/" + ad.id,
-      { prices: prepared },
-      controller.signal
-    );
+    this.apiService.put("amazon/ads/" + ad.id, { prices: prepared });
   }
 }

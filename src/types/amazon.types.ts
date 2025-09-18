@@ -32,7 +32,6 @@ export interface AmazonPdpAd {
 export interface AmazonAd {
   id: number;
   asin: string;
-  controller?: AbortController;
 }
 
 export interface AmazonAdPrice {
@@ -44,7 +43,6 @@ export interface AmazonAdPrice {
   deleted: boolean;
   adDeleted: boolean;
   failed: number;
-  controller?: AbortController;
   resolve?: (failed?: boolean) => void;
   reject?: (e: any) => void;
 }

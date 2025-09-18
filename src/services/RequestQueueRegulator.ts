@@ -34,6 +34,9 @@ export class RequestQueueRegulator {
       return;
     }
 
+    const mem = await this.getMemoryUsage();
+    if (mem > 90) return;
+
     const cpusCount = os.cpus().length;
     const [avgGlobalCpu, avgProcessCpu] = await Promise.all(this.getAvgCpus());
 
@@ -61,5 +64,9 @@ export class RequestQueueRegulator {
       this.apiService.get<number>(`system/cpu`),
       this.apiService.get<number>(`scrapers/${process.env.name}/cpu`),
     ];
+  }
+
+  private getMemoryUsage() {
+    return this.apiService.get<number>(`system/mem`);
   }
 }

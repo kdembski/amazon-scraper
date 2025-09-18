@@ -64,11 +64,9 @@ export abstract class AmazonPdpCountryScraper {
     prices.forEach((price) => {
       price.deleted = true;
       price.adDeleted = true;
-      price.controller?.abort();
       price.resolve?.();
     });
 
-    ad.controller?.abort();
     this.apiService.delete("amazon/ads/" + ad.id);
     resolveAd();
   }
