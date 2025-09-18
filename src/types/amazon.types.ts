@@ -44,7 +44,6 @@ export interface AmazonAdPrice {
   deleted: boolean;
   adDeleted: boolean;
   failed: number;
-  missingData: number;
   controller?: AbortController;
   resolve?: (failed?: boolean) => void;
   reject?: (e: any) => void;

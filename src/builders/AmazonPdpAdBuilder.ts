@@ -21,14 +21,12 @@ export class AmazonPdpAdBuilder {
     const price = this.priceBuilder.build(document);
     const asin = this.getAsin(document);
     const dispatchFrom = this.getDispatchFrom(document);
-    const isMissingData = !price || !dispatchFrom;
 
     return {
       price,
       asin,
       isCaptcha,
       dispatchFrom,
-      isMissingData,
     };
   }
 
