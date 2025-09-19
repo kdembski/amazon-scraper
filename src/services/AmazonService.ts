@@ -49,8 +49,7 @@ export class AmazonService {
       onSuccess?: (data: T) => void;
       onError?: (e: any) => void;
       onFinally?: () => void;
-    },
-    signal?: GenericAbortSignal
+    }
   ) {
     this.queueService.request(async () => {
       const proxy = this.proxyService.getRandomProxy();
@@ -66,7 +65,6 @@ export class AmazonService {
               Referer: `${this.baseUrl}${referer}`,
               "Referrer-Policy": "strict-origin-when-cross-origin",
             },
-            signal,
           })
           .then((response) => {
             callback?.onSuccess?.(response.data);

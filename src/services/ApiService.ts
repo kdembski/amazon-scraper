@@ -69,10 +69,10 @@ export class ApiService {
       });
   }
 
-  async put<T>(path: string, data: unknown, signal?: GenericAbortSignal) {
+  async put<T>(path: string, data: unknown) {
     const agent = new http.Agent({ keepAlive: true });
     return axios
-      .put<T>(this.url(path), data, { httpAgent: agent, signal })
+      .put<T>(this.url(path), data, { httpAgent: agent })
       .catch((e) => {
         this.handleError(e);
       });
