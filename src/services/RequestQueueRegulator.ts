@@ -35,7 +35,7 @@ export class RequestQueueRegulator {
     }
 
     const mem = await this.getMemoryUsage();
-    if (mem > 90) return;
+    if (mem > 85) return;
 
     const cpusCount = os.cpus().length;
     const [avgGlobalCpu, avgProcessCpu] = await Promise.all(this.getAvgCpus());
