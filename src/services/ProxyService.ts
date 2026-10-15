@@ -1,5 +1,12 @@
 import axios from "axios";
 import { CronJob } from "cron";
+import { readFile } from "fs/promises";
+import path from "path";
+
+// TEMP: load proxies from free-proxies.txt instead of webshare. Set to false to switch back.
+const USE_FREE_PROXY_FILE = true;
+const FREE_PROXY_FILE = path.resolve(process.cwd(), "free-proxies.txt");
+
 export class ProxyService {
   private static instance: ProxyService;
   private proxies: string[] = [];
@@ -21,6 +28,10 @@ export class ProxyService {
 
   getRandomProxy() {
     const proxy = this.proxies[Math.floor(Math.random() * this.proxies.length)];
+    if (proxy.includes("://")) {
+      return proxy;
+    }
+
     const parts = proxy.split(":");
     return `http://${parts[2]}:${parts[3]}@${parts[0]}:${parts[1]}`;
   }
@@ -45,6 +56,20 @@ export class ProxyService {
   }
 
   private intervalLoad(resolve: () => void) {
+    if (USE_FREE_PROXY_FILE) {
+      readFile(FREE_PROXY_FILE, "utf-8")
+        .then((data) => {
+          this.proxies = this.formatProxies(data);
+          this.isLoading = false;
+          resolve();
+        })
+        .catch((e) => {
+          console.log("Proxy file error: " + e);
+          setTimeout(() => this.intervalLoad(resolve), 2 * 60 * 1000);
+        });
+      return;
+    }
+
     const url = `https://proxy.webshare.io/api/v2/proxy/list/download/${process.env.PROXY_LIST_TOKEN}/-/any/username/direct/-/`;
 
     axios

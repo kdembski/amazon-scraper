@@ -19,24 +19,6 @@ module.exports = {
       node_args: "--max-old-space-size=32768",
     },
     {
-      name: "pdp-4",
-      script: "./dist/index.js",
-      args: "-c 5000 -l 10000",
-      node_args: "--max-old-space-size=32768",
-    },
-    {
-      name: "pdp-5",
-      script: "./dist/index.js",
-      args: "-c 5000 -l 10000",
-      node_args: "--max-old-space-size=32768",
-    },
-    {
-      name: "pdp-6",
-      script: "./dist/index.js",
-      args: "-c 5000 -l 10000",
-      node_args: "--max-old-space-size=32768",
-    },
-    {
       name: "plp-1",
       script: "./dist/index.js",
       args: "-c 1000 -l 500 -t plp",

@@ -21,7 +21,7 @@ export class AmazonService {
     queueService = new RequestQueueService(
       argsService.getLimitFlag(),
       true,
-      argsService.getTargetFlag().isPdp
+      false // regulation temporarily disabled (was: argsService.getTargetFlag().isPdp)
     )
   ) {
     this.queueService = queueService;
