@@ -15,16 +15,6 @@ services:
     environment:
       <<: *pdp-env
       name: pdp-1
-  pdp-2:
-    <<: *pdp
-    environment:
-      <<: *pdp-env
-      name: pdp-2
-  pdp-3:
-    <<: *pdp
-    environment:
-      <<: *pdp-env
-      name: pdp-3
   plp-1:
     image: amazon-scraper
     build: .
