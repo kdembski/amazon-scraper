@@ -1,7 +1,13 @@
+import { AmazonAodAdBuilder } from "@/builders/AmazonAodAdBuilder";
 import { AmazonPdpAdBuilder } from "@/builders/AmazonPdpAdBuilder";
 import { AmazonPdpPriceHelper } from "@/scrapers/AmazonPdpPriceHelper";
 import { ApiService } from "@/services/ApiService";
-import { AmazonAd, AmazonAdPrice } from "@/types/amazon.types";
+import { ArgsService } from "@/services/ArgsService";
+import {
+  AmazonAd,
+  AmazonAdBuilder,
+  AmazonAdPrice,
+} from "@/types/amazon.types";
 
 export abstract class AmazonPdpCountryScraper {
   protected apiService;
@@ -10,7 +16,9 @@ export abstract class AmazonPdpCountryScraper {
 
   constructor(
     apiService = ApiService.getInstance(),
-    builder = new AmazonPdpAdBuilder(),
+    builder: AmazonAdBuilder = ArgsService.getInstance().getSourceFlag().isAod
+      ? new AmazonAodAdBuilder()
+      : new AmazonPdpAdBuilder(),
     priceHelper = new AmazonPdpPriceHelper()
   ) {
     this.apiService = apiService;
