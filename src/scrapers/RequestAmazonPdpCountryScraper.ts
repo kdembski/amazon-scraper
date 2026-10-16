@@ -17,7 +17,7 @@ export class RequestAmazonPdpCountryScraper extends AmazonPdpCountryScraper {
     prices: AmazonAdPrice[],
     resolveAd: () => void
   ) {
-    new Promise<boolean | undefined>((resolvePrice, rejectPrice) => {
+    new Promise<void>((resolvePrice, rejectPrice) => {
       if (price.complete || price.deleted || price.pending || price.adDeleted) {
         return;
       }
@@ -33,10 +33,10 @@ export class RequestAmazonPdpCountryScraper extends AmazonPdpCountryScraper {
         onError: (e) => this.onError(e, price, ad, prices, resolveAd),
       });
     })
-      .then((failed) => {
+      .then(() => {
         price.pending = false;
         price.complete = true;
-        if (!failed) this.amazonService.queueService.completed++;
+        this.amazonService.queueService.completed++;
         this.tryComplete(ad, prices, resolveAd);
       })
       .catch(() => {
@@ -80,11 +80,6 @@ export class RequestAmazonPdpCountryScraper extends AmazonPdpCountryScraper {
   ) {
     if (e.status === 404) {
       this.tryDelete(ad, price, prices, resolveAd);
-      return;
-    }
-
-    if (price.failed > 200) {
-      price.resolve?.(true);
       return;
     }
 
