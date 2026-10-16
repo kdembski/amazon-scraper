@@ -87,5 +87,6 @@ Buildery w `src/builders/` dostają `Document` z `linkedom` (`parseHTML`) i opie
 - Współdzielone serwisy to singletony z prywatnym konstruktorem i metodą `getInstance()` (`ApiService`, `AmazonService`, `ArgsService`, `ProxyService`). Pozostałe klasy przyjmują zależności jako parametry konstruktora z wartościami domyślnymi, np. `apiService = ApiService.getInstance()` albo `builder = new AmazonPdpAdBuilder()`. Nowe klasy powinny trzymać się tego wzorca.
 - Zadania okresowe realizuje `CronJob` z pakietu `cron` (wyrażenia z polem sekund) albo `setInterval`.
 - Komentarze w kodzie piszemy wyłącznie po angielsku.
+- Opisy commitów są krótkie i mówią tylko, co zostało zmienione, bez efektów, pomiarów i uzasadnień. Nie dodajemy linii `Co-Authored-By`.
 - Repo nie ma konfiguracji prettiera ani eslinta. Obowiązujący styl: 2 spacje, podwójne cudzysłowy, średniki, `lodash` importowany jako `_`.
 - `WebSocketService` (a z nim zależność `ws`) oraz typy `AmazonPdpAd` i `AmazonPlpAdPageSort` nie są obecnie nigdzie używane.
