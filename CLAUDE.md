@@ -9,7 +9,7 @@ Worker w Node.js/TypeScript (ESM), który scrapuje Amazona przez rotowane proxy.
 - **PDP** (domyślny): dla partii produktów (ASIN) z backendu pobiera cenę i sprzedawcę/wysyłkę we wszystkich krajach zwróconych przez backend. Domyślnie z fragmentu AJAX „All Offers Display” (`amazon.<kod>/gp/product/ajax/aodAjaxMain/?asin=<asin>&pc=dp`, ~9 KB), a z flagą `-s pdp` z pełnej strony `amazon.<kod>/dp/<asin>` (~300–400 KB).
 - **PLP**: przechodzi listingi kategorii na `amazon.pl` (na sztywno), posortowane od najnowszych, rekurencyjnie wchodzi w podkategorie i wysyła znalezione produkty do backendu. Bierze tylko pierwszą stronę wyników, bez paginacji.
 
-Repo nie ma README, lintera, testów jednostkowych ani CI.
+Repo nie ma README, lintera ani CI. Testy jednostkowe są w Vitest.
 
 ## Komendy
 
@@ -18,11 +18,15 @@ npm start                              # tsx ./src/index.ts, tryb PDP z domyśln
 npm start -- -t plp -c 1000 -l 500     # z flagami CLI
 npm run build                          # pkgroll → dist/ (z tego startuje PM2)
 npx tsc --noEmit                       # sprawdzenie typów (nie ma osobnego skryptu)
-npm test -- <ASIN> [-s pdp]            # ręczny smoke test, opis niżej
+npm test                               # testy jednostkowe (vitest run)
+npm run test:watch                     # vitest w trybie watch
+npm run smoke -- <ASIN> [-s pdp]       # ręczny smoke test, opis niżej
 pm2 start ecosystem.config.cjs         # produkcja: 6× PDP + 1× PLP na dist/index.js
 ```
 
-`npm test` nie uruchamia testów jednostkowych. `src/test.ts` pobiera jeden ASIN z 5 krajów (de, fr, it, pl, se) przez prawdziwe proxy ze źródła wybranego flagą `-s`, zapisuje HTML do `test-html/<asin>-<kraj>-<aod|pdp>.html` i wypisuje wynik buildera. Wymaga `.env` i istniejącego katalogu `test-html/` (jest w `.gitignore`). Proces nie kończy się sam, bo singletony uruchamiają timery i crony, więc trzeba go przerwać ręcznie. Zapisane pliki HTML służą do debugowania selektorów w builderach.
+Testy leżą obok kodu jako `src/**/*.test.ts`, a alias `@/` jest skonfigurowany w `vitest.config.ts`. Testy builderów składają minimalne fragmenty HTML odtwarzające selektory Amazona (helpery w `src/__fixtures__/html.ts`) zamiast całych zapisanych stron. Przy zmianie selektora trzeba dopisać przypadek z nowym markupem.
+
+`npm run smoke` (`src/test.ts`) pobiera jeden ASIN z 5 krajów (de, fr, it, pl, se) przez prawdziwe proxy ze źródła wybranego flagą `-s`, zapisuje HTML do `test-html/<asin>-<kraj>-<aod|pdp>.html` i wypisuje wynik buildera. Wymaga `.env` i istniejącego katalogu `test-html/` (jest w `.gitignore`). Proces nie kończy się sam, bo singletony uruchamiają timery i crony, więc trzeba go przerwać ręcznie. Zapisane pliki HTML służą do debugowania selektorów w builderach.
 
 ## Konfiguracja
 
