@@ -40,6 +40,17 @@ describe("ArgsService", () => {
     });
   });
 
+  describe("getRateFlag", () => {
+    it("defaults to 0 (unlimited)", () => {
+      expect(args.getRateFlag()).toBe(0);
+    });
+
+    it.each([["-r"], ["--rate"]])("reads %s", (flag) => {
+      setArgs(flag, "200");
+      expect(args.getRateFlag()).toBe(200);
+    });
+  });
+
   describe("getCountFlag", () => {
     it("defaults to 50", () => {
       expect(args.getCountFlag()).toBe(50);

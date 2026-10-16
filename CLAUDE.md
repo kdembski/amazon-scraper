@@ -37,6 +37,7 @@ Zmienne środowiskowe (`.env` ładowany przez `dotenv`; w repo nie ma `.env.exam
 Flagi CLI (`ArgsService`):
 - `-t/--target pdp|plp`: tryb (domyślnie `pdp`).
 - `-l/--limit`: startowy limit współbieżnych requestów do Amazona (domyślnie 10). W PDP regulator zmienia go w trakcie działania.
+- `-r/--rate`: maksymalna liczba requestów do Amazona uruchamianych na sekundę (domyślnie 0, czyli bez limitu). Token bucket w `RequestQueueService` o pojemności jednej sekundy działa niezależnie od `-l`, a requesty ponad limit czekają w kolejce. Limit obowiązuje per proces. Jeden request AOD to ok. 11 KB downloadu, więc 1 Mb/s ≈ 11 req/s.
 - `-s/--source aod|pdp`: źródło danych w trybie PDP (domyślnie `aod`, opis w „Parsowanie HTML”). `pdp` służy jako rollback.
 - `-c/--count` (domyślnie 50): w PDP wielkość partii ASIN-ów pobieranej z backendu, w PLP długość kolejki, powyżej której nowe strony nie są dodawane.
 

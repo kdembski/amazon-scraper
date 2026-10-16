@@ -6,20 +6,27 @@ export class RequestQueueService {
   private regulator: RequestQueueRegulator;
   private completedHistory: number[] = [];
   previousCompleted = 0;
-  queue: Function[] = [];
+  queue: (() => any)[] = [];
   speed = 0;
   completed = 0;
   failed = 0;
   pending = 0;
   limit;
+  // Max requests started per second, 0 means unlimited
+  rate;
+  private tokens;
+  private lastRefill = Date.now();
 
   constructor(
     limit: number,
+    rate = 0,
     enableLogs = false,
     enableRegulation = false,
     regulator = new RequestQueueRegulator(this)
   ) {
     this.limit = limit;
+    this.rate = rate;
+    this.tokens = rate;
     this.regulator = regulator;
 
     setInterval(() => {
@@ -45,16 +52,12 @@ export class RequestQueueService {
   }
 
   async request(callback: () => Promise<void>, top?: boolean) {
-    if (this.pending >= this.limit) {
+    if (!this.canStart()) {
       this.add(callback, top);
       return;
     }
 
-    this.pending++;
-    const response = await callback();
-    this.pending--;
-
-    return response;
+    return this.run(callback);
   }
 
   private add(callback: () => any, top?: boolean) {
@@ -67,12 +70,37 @@ export class RequestQueueService {
   }
 
   private async next() {
-    if (this.pending >= this.limit) return;
-    const next = this.queue.shift();
+    if (!this.queue.length || !this.canStart()) return;
+    const next = this.queue.shift()!;
+
+    await this.run(next);
+  }
+
+  private async run(callback: () => any) {
+    if (this.rate) this.tokens--;
 
     this.pending++;
-    await next?.();
+    const response = await callback();
     this.pending--;
+
+    return response;
+  }
+
+  private canStart() {
+    if (this.pending >= this.limit) return false;
+    if (!this.rate) return true;
+
+    this.refillTokens();
+    return this.tokens >= 1;
+  }
+
+  // Token bucket holding at most one second worth of requests
+  private refillTokens() {
+    const now = Date.now();
+    const refill = ((now - this.lastRefill) * this.rate) / 1000;
+
+    this.tokens = Math.min(this.rate, this.tokens + refill);
+    this.lastRefill = now;
   }
 
   private updateCompletedHistory() {
@@ -96,6 +124,7 @@ export class RequestQueueService {
       `speed: ${roundToTwoDecimals(this.speed)}/s`,
       `tcpu: ${this.getTargetedCpu()}%`,
       `limit: ${this.limit}`,
+      `rate: ${this.rate || "-"}/s`,
       `pending: ${this.pending}`,
       `queue: ${this.queue.length}`,
       `failed: ${this.failed}`,

@@ -20,6 +20,7 @@ export class AmazonService {
     proxyService = ProxyService.getInstance(),
     queueService = new RequestQueueService(
       argsService.getLimitFlag(),
+      argsService.getRateFlag(),
       true,
       false // regulation temporarily disabled (was: argsService.getTargetFlag().isPdp)
     )
