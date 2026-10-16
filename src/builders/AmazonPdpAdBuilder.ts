@@ -15,7 +15,7 @@ export class AmazonPdpAdBuilder {
 
     if (isCaptcha) {
       console.warn("Warning: Captcha triggered!");
-      return {};
+      return { isCaptcha };
     }
 
     const price = this.priceBuilder.build(document);
