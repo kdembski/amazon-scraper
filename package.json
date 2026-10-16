@@ -8,8 +8,7 @@
   "scripts": {
     "start": "tsx ./src/index.ts",
     "build": "pkgroll",
-    "test:unit": "vitest run --project unit",
-    "smoke": "tsx ./src/test.ts"
+    "test:unit": "vitest run --project unit"
   },
   "license": "ISC",
   "dependencies": {

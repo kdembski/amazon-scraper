@@ -13,22 +13,19 @@ Node.js/TypeScript (ESM) worker that scrapes Amazon through rotating proxies. No
 
 ```bash
 npm start -- [-t plp] [-c 1000] [-l 500]   # tsx ./src/index.ts
-npm run build                              # pkgroll → dist/ (used by PM2)
+npm run build                              # pkgroll → dist/ (used by Docker)
 npx tsc --noEmit                           # type check
 npm run test:unit                          # vitest
-npm run smoke -- <ASIN> [-s pdp]           # real fetch from de/fr/it/pl/se, saves HTML to test-html/
-pm2 start ecosystem.config.cjs             # production
+docker compose up -d --build               # production
 ```
-
-Smoke needs `.env` and an existing `test-html/` dir, and must be stopped manually (timers keep it alive).
 
 Tests: `src/a/X.ts` → `tests/unit/a/X.test.ts`, one file per source file. Builder tests use minimal HTML fragments (`tests/support/html.ts`), not saved pages; a selector change needs a new test case.
 
 ## Configuration
 
-- Env: `API_URL`, `PROXY_LIST_TOKEN` (webshare.io), `name` (set by PM2, used in `scrapers/<name>/...`; `undefined` locally).
+- Env: `API_URL`, `PROXY_LIST_TOKEN` (webshare.io), `name` (set in docker-compose.yml, used in `scrapers/<name>/...`; `undefined` locally).
 - Flags (`ArgsService`): `-t pdp|plp`, `-l` concurrency limit (default 10, adjusted at runtime in PDP), `-r` max requests/s per process (default 0 = unlimited), `-s aod|pdp` (default `aod`), `-c` batch size in PDP / max queue length in PLP (default 50).
-- `uncaughtException`/`unhandledRejection` only log, so the process never crashes and PM2 never restarts it. TLS verification is disabled globally.
+- `uncaughtException`/`unhandledRejection` only log, so the process never crashes and Docker never restarts it. TLS verification is disabled globally.
 
 ## Architecture
 
