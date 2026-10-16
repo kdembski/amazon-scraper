@@ -7,10 +7,9 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "start": "tsx ./src/index.ts",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "smoke": "tsx ./src/test.ts",
-    "build": "pkgroll"
+    "build": "pkgroll",
+    "test:unit": "vitest run --project unit",
+    "smoke": "tsx ./src/test.ts"
   },
   "license": "ISC",
   "dependencies": {

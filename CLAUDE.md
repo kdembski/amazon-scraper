@@ -18,13 +18,12 @@ npm start                              # tsx ./src/index.ts, tryb PDP z domyśln
 npm start -- -t plp -c 1000 -l 500     # z flagami CLI
 npm run build                          # pkgroll → dist/ (z tego startuje PM2)
 npx tsc --noEmit                       # sprawdzenie typów (nie ma osobnego skryptu)
-npm test                               # testy jednostkowe (vitest run)
-npm run test:watch                     # vitest w trybie watch
+npm run test:unit                      # testy jednostkowe (vitest, projekt unit)
 npm run smoke -- <ASIN> [-s pdp]       # ręczny smoke test, opis niżej
 pm2 start ecosystem.config.cjs         # produkcja: 6× PDP + 1× PLP na dist/index.js
 ```
 
-Testy leżą obok kodu jako `src/**/*.test.ts`, a alias `@/` jest skonfigurowany w `vitest.config.ts`. Testy builderów składają minimalne fragmenty HTML odtwarzające selektory Amazona (helpery w `src/__fixtures__/html.ts`) zamiast całych zapisanych stron. Przy zmianie selektora trzeba dopisać przypadek z nowym markupem.
+Testy jednostkowe leżą w `tests/unit/` pod tą samą ścieżką względną co plik źródłowy (`src/builders/X.ts` → `tests/unit/builders/X.test.ts`), jeden plik testów na plik źródłowy. Kod testowany importują przez `@/` (alias w `vitest.config.ts`), a wspólne helpery z `tests/support/` przez `@@tests/` (np. `@@tests/support/html`). Testy builderów składają minimalne fragmenty HTML odtwarzające selektory Amazona (helpery w `tests/support/html.ts`) zamiast całych zapisanych stron. Przy zmianie selektora trzeba dopisać przypadek z nowym markupem.
 
 `npm run smoke` (`src/test.ts`) pobiera jeden ASIN z 5 krajów (de, fr, it, pl, se) przez prawdziwe proxy ze źródła wybranego flagą `-s`, zapisuje HTML do `test-html/<asin>-<kraj>-<aod|pdp>.html` i wypisuje wynik buildera. Wymaga `.env` i istniejącego katalogu `test-html/` (jest w `.gitignore`). Proces nie kończy się sam, bo singletony uruchamiają timery i crony, więc trzeba go przerwać ręcznie. Zapisane pliki HTML służą do debugowania selektorów w builderach.
 
@@ -84,7 +83,7 @@ Buildery w `src/builders/` dostają `Document` z `linkedom` (`parseHTML`) i opie
 
 ## Konwencje
 
-- Importy zawsze przez alias `@/` (wskazuje na `src/`, zdefiniowany w `tsconfig.json`).
+- Importy zawsze przez alias `@/` (wskazuje na `src/`), a w testach helpery przez `@@tests/` (wskazuje na `tests/`). Oba są zdefiniowane w `tsconfig.json` i `vitest.config.ts`.
 - Współdzielone serwisy to singletony z prywatnym konstruktorem i metodą `getInstance()` (`ApiService`, `AmazonService`, `ArgsService`, `ProxyService`). Pozostałe klasy przyjmują zależności jako parametry konstruktora z wartościami domyślnymi, np. `apiService = ApiService.getInstance()` albo `builder = new AmazonPdpAdBuilder()`. Nowe klasy powinny trzymać się tego wzorca.
 - Zadania okresowe realizuje `CronJob` z pakietu `cron` (wyrażenia z polem sekund) albo `setInterval`.
 - Komentarze w kodzie piszemy wyłącznie po angielsku.

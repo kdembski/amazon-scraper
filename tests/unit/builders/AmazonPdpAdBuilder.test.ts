@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AmazonPdpAdBuilder } from "@/builders/AmazonPdpAdBuilder";
-import { aPrice, captchaPage, toDocument } from "@/__fixtures__/html";
+import { aPrice, captchaPage, toDocument } from "@@tests/support/html";
 import { AmazonAd, Country } from "@/types/amazon.types";
 
 const builder = new AmazonPdpAdBuilder();

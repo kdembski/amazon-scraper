@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AmazonPlpBuilder } from "@/builders/AmazonPlpBuilder";
-import { toDocument } from "@/__fixtures__/html";
+import { toDocument } from "@@tests/support/html";
 
 const builder = new AmazonPlpBuilder();
 const build = (body: string, category = "electronics") =>
