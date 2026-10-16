@@ -1,5 +1,6 @@
 import { AmazonAodAdBuilder } from "@/builders/AmazonAodAdBuilder";
 import { AmazonPdpAdBuilder } from "@/builders/AmazonPdpAdBuilder";
+import { getRetryDelay, MAX_FAILED_ATTEMPTS } from "@/helpers/retry";
 import { AmazonPdpPriceHelper } from "@/scrapers/AmazonPdpPriceHelper";
 import { ApiService } from "@/services/ApiService";
 import { ArgsService } from "@/services/ArgsService";
@@ -39,7 +40,17 @@ export abstract class AmazonPdpCountryScraper {
     prices: AmazonAdPrice[],
     resolve: () => void
   ) {
-    this.execute(price, ad, prices, resolve);
+    // Give up on this country, the ad is completed without its price
+    if (price.failed >= MAX_FAILED_ATTEMPTS) {
+      price.complete = true;
+      this.tryComplete(ad, prices, resolve);
+      return;
+    }
+
+    setTimeout(
+      () => this.execute(price, ad, prices, resolve),
+      getRetryDelay(price.failed)
+    );
   }
 
   protected tryComplete(

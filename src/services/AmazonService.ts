@@ -9,6 +9,7 @@ import { ProxyService } from "@/services/ProxyService";
 export class AmazonService {
   private static instance: AmazonService;
   private baseUrl = "https://www.amazon.";
+  private timeout = 20 * 1000;
   private apiService;
   private proxyService;
   queueService;
@@ -58,6 +59,9 @@ export class AmazonService {
         return axios
           .get<T>(`${this.baseUrl}${url}`, {
             httpsAgent,
+            // Hard limit for the whole request; axios `timeout` does not
+            // cover a proxy that hangs on CONNECT
+            signal: AbortSignal.timeout(this.timeout),
             headers: {
               "User-Agent": userAgent,
               Referer: `${this.baseUrl}${referer}`,

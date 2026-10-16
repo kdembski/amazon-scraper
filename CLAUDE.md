@@ -9,7 +9,7 @@ Worker w Node.js/TypeScript (ESM), który scrapuje Amazona przez rotowane proxy.
 - **PDP** (domyślny): dla partii produktów (ASIN) z backendu pobiera cenę i sprzedawcę/wysyłkę we wszystkich krajach zwróconych przez backend. Domyślnie z fragmentu AJAX „All Offers Display” (`amazon.<kod>/gp/product/ajax/aodAjaxMain/?asin=<asin>&pc=dp`, ~9 KB), a z flagą `-s pdp` z pełnej strony `amazon.<kod>/dp/<asin>` (~300–400 KB).
 - **PLP**: przechodzi listingi kategorii na `amazon.pl` (na sztywno), posortowane od najnowszych, rekurencyjnie wchodzi w podkategorie i wysyła znalezione produkty do backendu. Bierze tylko pierwszą stronę wyników, bez paginacji.
 
-Repo nie ma README, lintera, testów jednostkowych ani CI.
+Repo nie ma README, lintera ani CI. Testy jednostkowe są w Vitest.
 
 ## Komendy
 
@@ -18,11 +18,14 @@ npm start                              # tsx ./src/index.ts, tryb PDP z domyśln
 npm start -- -t plp -c 1000 -l 500     # z flagami CLI
 npm run build                          # pkgroll → dist/ (z tego startuje PM2)
 npx tsc --noEmit                       # sprawdzenie typów (nie ma osobnego skryptu)
-npm test -- <ASIN> [-s pdp]            # ręczny smoke test, opis niżej
+npm run test:unit                      # testy jednostkowe (vitest, projekt unit)
+npm run smoke -- <ASIN> [-s pdp]       # ręczny smoke test, opis niżej
 pm2 start ecosystem.config.cjs         # produkcja: 6× PDP + 1× PLP na dist/index.js
 ```
 
-`npm test` nie uruchamia testów jednostkowych. `src/test.ts` pobiera jeden ASIN z 5 krajów (de, fr, it, pl, se) przez prawdziwe proxy ze źródła wybranego flagą `-s`, zapisuje HTML do `test-html/<asin>-<kraj>-<aod|pdp>.html` i wypisuje wynik buildera. Wymaga `.env` i istniejącego katalogu `test-html/` (jest w `.gitignore`). Proces nie kończy się sam, bo singletony uruchamiają timery i crony, więc trzeba go przerwać ręcznie. Zapisane pliki HTML służą do debugowania selektorów w builderach.
+Testy jednostkowe leżą w `tests/unit/` pod tą samą ścieżką względną co plik źródłowy (`src/builders/X.ts` → `tests/unit/builders/X.test.ts`), jeden plik testów na plik źródłowy. Kod testowany importują przez `@/` (alias w `vitest.config.ts`), a wspólne helpery z `tests/support/` przez `@@tests/` (np. `@@tests/support/html`). Testy builderów składają minimalne fragmenty HTML odtwarzające selektory Amazona (helpery w `tests/support/html.ts`) zamiast całych zapisanych stron. Przy zmianie selektora trzeba dopisać przypadek z nowym markupem.
+
+`npm run smoke` (`src/test.ts`) pobiera jeden ASIN z 5 krajów (de, fr, it, pl, se) przez prawdziwe proxy ze źródła wybranego flagą `-s`, zapisuje HTML do `test-html/<asin>-<kraj>-<aod|pdp>.html` i wypisuje wynik buildera. Wymaga `.env` i istniejącego katalogu `test-html/` (jest w `.gitignore`). Proces nie kończy się sam, bo singletony uruchamiają timery i crony, więc trzeba go przerwać ręcznie. Zapisane pliki HTML służą do debugowania selektorów w builderach.
 
 ## Konfiguracja
 
@@ -45,7 +48,7 @@ Flagi CLI (`ArgsService`):
 
 `scraper → AmazonService.get(url, referer, { onSuccess, onError, onFinally }) → RequestQueueService`
 
-- `AmazonService` (singleton) jest jedynym miejscem, które odpytuje Amazona. `url` jest doklejany do `https://www.amazon.`, więc zaczyna się od kodu kraju/TLD (`de/dp/...`, `pl/s?...`). Każdy request dostaje losowe proxy i losowy User-Agent. `ProxyService.getRandomAgent()` trzyma jeden `HttpsProxyAgent` z `keepAlive` na każde proxy, więc kolejne requesty przez to samo proxy do tej samej domeny używają już otwartego tunelu i sesji TLS (przy ~10 KB odpowiedziach AOD nowe połączenie kosztuje ~7–8 KB). Agenci proxy, które zniknęły z listy, są niszczeni przy jej przeładowaniu. API opiera się na callbackach: `get()` niczego nie zwraca, a wynik trafia wyłącznie do callbacków.
+- `AmazonService` (singleton) jest jedynym miejscem, które odpytuje Amazona. `url` jest doklejany do `https://www.amazon.`, więc zaczyna się od kodu kraju/TLD (`de/dp/...`, `pl/s?...`). Każdy request dostaje losowe proxy, losowy User-Agent i twardy limit 20 s na całość (`signal: AbortSignal.timeout`, bo `timeout` axiosa nie obejmuje zawieszonego CONNECT do proxy). `ProxyService.getRandomAgent()` trzyma jeden `HttpsProxyAgent` z `keepAlive` na każde proxy, więc kolejne requesty przez to samo proxy do tej samej domeny używają już otwartego tunelu i sesji TLS (przy ~10 KB odpowiedziach AOD nowe połączenie kosztuje ~7–8 KB). Agenci proxy, które zniknęły z listy, są niszczeni przy jej przeładowaniu. API opiera się na callbackach: `get()` niczego nie zwraca, a wynik trafia wyłącznie do callbacków.
 - `RequestQueueService` to własny limiter współbieżności. `request()` wykonuje zadanie od razu, jeśli `pending < limit`, a w przeciwnym razie dodaje je do `queue`. Pętla `start()` co 1 ms pobiera do 10 zadań z kolejki. Co sekundę loguje statystyki do stdout. Liczniki `completed`/`failed` zwiększają **scrapery**, a nie kolejka, i są zerowane przy pobraniu każdej nowej partii.
 - `RequestQueueRegulator` działa tylko w trybie PDP. Co 20 minut koryguje `limit` na podstawie metryk CPU/RAM, które **pobiera z backendu** (`system/cpu`, `system/mem`, `scrapers/<name>/cpu`, `scrapers/count`) zamiast mierzyć lokalnie. Docelowe CPU maszyny (`targetedGlobalCpu`, które dąży do 80%) dzieli przez liczbę scraperów i zmienia limit proporcjonalnie do odchyłki (krok 500, minimum 100). Gdy zużycie pamięci przekracza 85%, pomija korektę. Parametry regulacji są często strojone, co widać w historii gita.
 
@@ -54,8 +57,9 @@ Flagi CLI (`ArgsService`):
 Co 5 sekund `AmazonScraper.scrapPdp()` sprawdza kolejkę. Jeśli jest krótsza niż `count/10`, pobiera `GET amazon/ads/scrap?count=<count>` i dla każdego ogłoszenia wywołuje `AmazonPdpScraper.execute(ad, countries)`.
 
 Dla każdego ogłoszenia powstaje tablica obiektów `AmazonAdPrice`, po jednym na kraj. Działają one jak ręczna maszyna stanów (`pending`, `complete`, `deleted`, `adDeleted`, `failed`), a funkcje `resolve`/`reject` promise'a są zapisane na samym obiekcie. Logika jest rozłożona na trzy miejsca: `RequestAmazonPdpCountryScraper` (request i obsługa odpowiedzi), abstrakcyjną klasę bazową `scrapers/abstract/AmazonPdpCountryScraper` (retry, complete, delete) oraz `AmazonPdpPriceHelper`. Przebieg wygląda tak:
-- Sukces: cena i `dispatchFrom` pochodzą z buildera wybranego flagą `-s` (`AmazonAodAdBuilder` albo `AmazonPdpAdBuilder`, wspólny interfejs `AmazonAdBuilder`). Captcha, pusta odpowiedź lub odpowiedź niebędąca fragmentem AOD (`isValid: false`, np. bot challenge) powoduje reject i retry, czyli ponowne dodanie na koniec kolejki.
-- Błąd sieci: retry. Po ponad 200 porażkach kraj zostaje zakończony bez ceny.
+- Sukces: cena i `dispatchFrom` pochodzą z buildera wybranego flagą `-s` (`AmazonAodAdBuilder` albo `AmazonPdpAdBuilder`, wspólny interfejs `AmazonAdBuilder`). Captcha, pusta odpowiedź lub odpowiedź niebędąca fragmentem AOD (`isValid: false`, np. bot challenge) powoduje reject i retry.
+- Błąd sieci lub timeout: retry.
+- Retry (`retry()` w klasie bazowej) czeka z wykładniczym backoffem z `helpers/retry.ts` (1 s, 2 s, 4 s… do 60 s, losowo 50–100%), a potem dodaje request na koniec kolejki. Po `MAX_FAILED_ATTEMPTS` (15) porażkach dowolnego typu kraj zostaje zakończony bez ceny. PLP (`AmazonPlpPageScraper.retry`) działa tak samo, a po limicie porzuca stronę razem z jej podkategoriami.
 - 404: kraj zostaje oznaczony jako usunięty. Gdy nieusunięte zostają najwyżej 2 kraje, całe ogłoszenie jest usuwane przez `DELETE amazon/ads/<id>`.
 - Gdy wszystkie kraje mają `complete`, wyniki trafiają do `PUT amazon/ads/<id>` z treścią `{ prices: [{ adId, countryId, value, dispatchFrom }] }`.
 
@@ -79,9 +83,10 @@ Buildery w `src/builders/` dostają `Document` z `linkedom` (`parseHTML`) i opie
 
 ## Konwencje
 
-- Importy zawsze przez alias `@/` (wskazuje na `src/`, zdefiniowany w `tsconfig.json`).
+- Importy zawsze przez alias `@/` (wskazuje na `src/`), a w testach helpery przez `@@tests/` (wskazuje na `tests/`). Oba są zdefiniowane w `tsconfig.json` i `vitest.config.ts`.
 - Współdzielone serwisy to singletony z prywatnym konstruktorem i metodą `getInstance()` (`ApiService`, `AmazonService`, `ArgsService`, `ProxyService`). Pozostałe klasy przyjmują zależności jako parametry konstruktora z wartościami domyślnymi, np. `apiService = ApiService.getInstance()` albo `builder = new AmazonPdpAdBuilder()`. Nowe klasy powinny trzymać się tego wzorca.
 - Zadania okresowe realizuje `CronJob` z pakietu `cron` (wyrażenia z polem sekund) albo `setInterval`.
 - Komentarze w kodzie piszemy wyłącznie po angielsku.
+- Opisy commitów są krótkie i mówią tylko, co zostało zmienione, bez efektów, pomiarów i uzasadnień. Nie dodajemy linii `Co-Authored-By`.
 - Repo nie ma konfiguracji prettiera ani eslinta. Obowiązujący styl: 2 spacje, podwójne cudzysłowy, średniki, `lodash` importowany jako `_`.
 - `WebSocketService` (a z nim zależność `ws`) oraz typy `AmazonPdpAd` i `AmazonPlpAdPageSort` nie są obecnie nigdzie używane.

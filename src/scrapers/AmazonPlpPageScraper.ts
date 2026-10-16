@@ -1,4 +1,5 @@
 import { AmazonPlpBuilder } from "@/builders/AmazonPlpBuilder";
+import { getRetryDelay, MAX_FAILED_ATTEMPTS } from "@/helpers/retry";
 import { AmazonService } from "@/services/AmazonService";
 import { ApiService } from "@/services/ApiService";
 import { ArgsService } from "@/services/ArgsService";
@@ -54,8 +55,17 @@ export class AmazonPlpPageScraper {
         page.pending = false;
         page.failed++;
         this.amazonService.queueService.failed++;
-        this.execute(page);
+        this.retry(page);
       });
+  }
+
+  private retry(page: AmazonPlpAdPage) {
+    if (page.failed >= MAX_FAILED_ATTEMPTS) {
+      page.complete = true;
+      return;
+    }
+
+    setTimeout(() => this.execute(page), getRetryDelay(page.failed));
   }
 
   private async onSuccess(data: string, page: AmazonPlpAdPage) {
@@ -81,12 +91,6 @@ export class AmazonPlpPageScraper {
   }
 
   private onError(page: AmazonPlpAdPage) {
-    if (page.failed > 200) {
-      page.resolve?.();
-      return;
-    }
-
-    page.failed++;
     page.reject?.("Failed");
   }
 

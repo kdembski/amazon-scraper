@@ -7,10 +7,12 @@
     "module": "esnext",
     "moduleResolution": "node",
     "esModuleInterop":true,
+    "skipLibCheck": true,
     "target": "ES2022",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@@tests/*": ["./tests/*"]
     }
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*", "tests/**/*", "vitest.config.ts"]
 }
