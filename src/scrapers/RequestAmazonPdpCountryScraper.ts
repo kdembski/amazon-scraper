@@ -1,13 +1,20 @@
 import { AmazonPdpCountryScraper } from "@/scrapers/abstract/AmazonPdpCountryScraper";
+import { AmazonPdpPriceHelper } from "@/scrapers/AmazonPdpPriceHelper";
 import { AmazonService } from "@/services/AmazonService";
-import { AmazonAd, AmazonAdPrice } from "@/types/amazon.types";
+import { ApiService } from "@/services/ApiService";
+import { AmazonAd, AmazonAdBuilder, AmazonAdPrice } from "@/types/amazon.types";
 import { parseHTML } from "linkedom";
 
 export class RequestAmazonPdpCountryScraper extends AmazonPdpCountryScraper {
   private amazonService;
 
-  constructor(amazonService = AmazonService.getInstance()) {
-    super();
+  constructor(
+    amazonService = AmazonService.getInstance(),
+    apiService?: ApiService,
+    builder?: AmazonAdBuilder,
+    priceHelper?: AmazonPdpPriceHelper
+  ) {
+    super(apiService, builder, priceHelper);
     this.amazonService = amazonService;
   }
 

@@ -1,0 +1,177 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { AmazonPlpPageScraper } from "@/scrapers/AmazonPlpPageScraper";
+import type { AmazonPlpBuilder } from "@/builders/AmazonPlpBuilder";
+import { MAX_FAILED_ATTEMPTS } from "@/helpers/retry";
+import { AmazonPlpAd } from "@/types/amazon.types";
+import { buildPlpPage } from "@@tests/support/factories";
+import {
+  fakeAmazonService,
+  fakeApiService,
+  fakeArgsService,
+} from "@@tests/support/fakes";
+
+const html = "<html><body></body></html>";
+const ads: AmazonPlpAd[] = [
+  { asin: "B0TESTASIN", name: "Test", image: "img", categoryName: "electronics" },
+];
+
+const setup = ({ count = 50 } = {}) => {
+  const amazon = fakeAmazonService();
+  const api = fakeApiService();
+  const args = fakeArgsService({ count });
+  const build = vi.fn(() => ({ ads, subcategories: [] as string[] }));
+  const builder = { build } as unknown as AmazonPlpBuilder;
+  const scraper = new AmazonPlpPageScraper(
+    api.service,
+    amazon.service,
+    args.service,
+    builder
+  );
+  return { amazon, api, build, scraper };
+};
+
+const flush = () => vi.advanceTimersByTimeAsync(0);
+
+describe("AmazonPlpPageScraper", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, "random").mockReturnValue(1);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  describe("buildPage", () => {
+    it("builds a fresh page", () => {
+      const { scraper } = setup();
+      expect(scraper.buildPage("toys", "n%3A123")).toEqual({
+        category: "toys",
+        subcategory: "n%3A123",
+        pending: false,
+        complete: false,
+        failed: 0,
+      });
+    });
+  });
+
+  describe("execute", () => {
+    it("requests the category listing sorted by newest", () => {
+      const { amazon, scraper } = setup();
+      const page = buildPlpPage();
+      scraper.execute(page);
+
+      expect(amazon.requests[0].url).toBe(
+        "pl/s?i=electronics&s=date-desc-rank"
+      );
+      expect(amazon.requests[0].referer).toMatch(/^pl\/b\?node=\d+$/);
+      expect(page.pending).toBe(true);
+    });
+
+    it("requests a subcategory listing", () => {
+      const { amazon, scraper } = setup();
+      scraper.execute(buildPlpPage({ subcategory: "n%3A123" }));
+
+      expect(amazon.requests[0].url).toBe(
+        "pl/s?i=electronics&rh=n%3A123&s=date-desc-rank"
+      );
+    });
+
+    it.each([["complete"], ["pending"]] as const)(
+      "skips a page that is already %s",
+      (state) => {
+        const { amazon, scraper } = setup();
+        scraper.execute(buildPlpPage({ [state]: true }));
+        expect(amazon.get).not.toHaveBeenCalled();
+      }
+    );
+
+    it("skips pages while the queue is full", () => {
+      const { amazon, scraper } = setup({ count: 2 });
+      amazon.queueService.queue.push(vi.fn(), vi.fn());
+
+      scraper.execute(buildPlpPage());
+      expect(amazon.get).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("on success", () => {
+    it("sends the ads and completes the page", async () => {
+      const { amazon, api, build, scraper } = setup();
+      const page = buildPlpPage();
+      const done = scraper.execute(page);
+
+      amazon.respond(0, html);
+      await done;
+
+      expect(build).toHaveBeenCalledWith(expect.anything(), "electronics");
+      expect(api.post).toHaveBeenCalledWith("amazon/ads", ads);
+      expect(page).toMatchObject({ pending: false, complete: true });
+      expect(amazon.queueService.completed).toBe(1);
+    });
+
+    it("scrapes every subcategory", async () => {
+      const { amazon, build, scraper } = setup();
+      build.mockReturnValueOnce({ ads, subcategories: ["n%3A1", "n%3A2"] });
+      scraper.execute(buildPlpPage());
+
+      amazon.respond(0, html);
+      await flush();
+
+      expect(amazon.requests.map((request) => request.url)).toEqual([
+        "pl/s?i=electronics&s=date-desc-rank",
+        "pl/s?i=electronics&rh=n%3A1&s=date-desc-rank",
+        "pl/s?i=electronics&rh=n%3A2&s=date-desc-rank",
+      ]);
+    });
+  });
+
+  describe("retries", () => {
+    it.each([
+      ["an empty response", (s: ReturnType<typeof setup>) => s.amazon.respond(0, "")],
+      [
+        "a page without ads",
+        (s: ReturnType<typeof setup>) => {
+          s.build.mockReturnValueOnce({ ads: [], subcategories: ["n%3A1"] });
+          s.amazon.respond(0, html);
+        },
+      ],
+      ["a network error", (s: ReturnType<typeof setup>) => s.amazon.fail(0)],
+    ])("on %s", async (_name, answer) => {
+      const s = setup();
+      const page = buildPlpPage();
+      s.scraper.execute(page);
+
+      answer(s);
+      await flush();
+
+      expect(page).toMatchObject({ pending: false, complete: false, failed: 1 });
+      expect(s.amazon.queueService.failed).toBe(1);
+      expect(s.api.post).not.toHaveBeenCalled();
+      expect(s.amazon.get).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(s.amazon.get).toHaveBeenCalledTimes(2);
+      expect(s.amazon.requests[1].url).toBe(s.amazon.requests[0].url);
+    });
+
+    it("gives up on the page after the attempt limit", async () => {
+      const { amazon, api, scraper } = setup();
+      const page = buildPlpPage();
+      scraper.execute(page);
+
+      for (let i = 0; i < MAX_FAILED_ATTEMPTS; i++) {
+        amazon.fail(amazon.requests.length - 1);
+        await vi.runAllTimersAsync();
+      }
+
+      expect(page).toMatchObject({
+        complete: true,
+        failed: MAX_FAILED_ATTEMPTS,
+      });
+      expect(amazon.get).toHaveBeenCalledTimes(MAX_FAILED_ATTEMPTS);
+      expect(api.post).not.toHaveBeenCalled();
+    });
+  });
+});
