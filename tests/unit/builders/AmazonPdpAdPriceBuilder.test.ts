@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AmazonPdpAdPriceBuilder } from "@/builders/AmazonPdpAdPriceBuilder";
-import { aPrice, toDocument } from "@/__fixtures__/html";
+import { aPrice, toDocument } from "@@tests/support/html";
 
 const builder = new AmazonPdpAdPriceBuilder();
 const build = (body: string) => builder.build(toDocument(body));
