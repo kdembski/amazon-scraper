@@ -1,7 +1,7 @@
 import { AmazonPdpAdPriceBuilder } from "@/builders/AmazonPdpAdPriceBuilder";
-import { Country, AmazonAd } from "@/types/amazon.types";
+import { Country, AmazonAd, AmazonAdBuilder } from "@/types/amazon.types";
 
-export class AmazonPdpAdBuilder {
+export class AmazonPdpAdBuilder implements AmazonAdBuilder {
   private priceBuilder;
 
   constructor(priceBuilder = new AmazonPdpAdPriceBuilder()) {
@@ -15,7 +15,7 @@ export class AmazonPdpAdBuilder {
 
     if (isCaptcha) {
       console.warn("Warning: Captcha triggered!");
-      return {};
+      return { isCaptcha };
     }
 
     const price = this.priceBuilder.build(document);
@@ -48,7 +48,7 @@ export class AmazonPdpAdBuilder {
     const fulfiller = document.querySelector(fulfillerSelector)?.textContent;
     const merchant = document.querySelector(merchantSelector)?.textContent;
 
-    return fulfiller || merchant;
+    return fulfiller || merchant || undefined;
   }
 
   buildUrl(country: Country, ad: AmazonAd) {

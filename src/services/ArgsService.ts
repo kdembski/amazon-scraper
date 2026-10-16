@@ -40,4 +40,14 @@ export class ArgsService {
     const isPdp = !value || value === "pdp";
     return { isPdp, isPlp };
   }
+
+  // Where PDP mode reads prices from: the light "All Offers Display" ajax
+  // fragment (default) or the full product page
+  getSourceFlag() {
+    const value = this.getFlagValue("-s") || this.getFlagValue("--source");
+
+    const isPage = value === "pdp";
+    const isAod = !isPage;
+    return { isAod, isPage };
+  }
 }

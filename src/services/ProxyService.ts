@@ -1,9 +1,11 @@
 import axios from "axios";
 import { CronJob } from "cron";
+import { HttpsProxyAgent } from "https-proxy-agent";
 
 export class ProxyService {
   private static instance: ProxyService;
   private proxies: string[] = [];
+  private agents = new Map<string, HttpsProxyAgent<string>>();
   private isLoading = false;
 
   private constructor() {
@@ -20,10 +22,23 @@ export class ProxyService {
     return ProxyService.instance;
   }
 
-  getRandomProxy() {
+  private getRandomProxy() {
     const proxy = this.proxies[Math.floor(Math.random() * this.proxies.length)];
-    const parts = proxy.split(":");
-    return `http://${parts[2]}:${parts[3]}@${parts[0]}:${parts[1]}`;
+    return this.toUrl(proxy);
+  }
+
+  // One agent per proxy, so keep-alive connections (proxy tunnel + TLS
+  // session) are reused instead of being set up for every request
+  getRandomAgent() {
+    const proxy = this.getRandomProxy();
+    let agent = this.agents.get(proxy);
+
+    if (!agent) {
+      agent = new HttpsProxyAgent(proxy, { keepAlive: true });
+      this.agents.set(proxy, agent);
+    }
+
+    return agent;
   }
 
   loadProxies() {
@@ -53,6 +68,7 @@ export class ProxyService {
       .then((response) => {
         const data = response.data;
         this.proxies = this.formatProxies(data);
+        this.removeStaleAgents();
         this.isLoading = false;
         resolve();
       })
@@ -60,6 +76,23 @@ export class ProxyService {
         console.log("Proxy error: " + e);
         setTimeout(() => this.intervalLoad(resolve), 2 * 60 * 1000);
       });
+  }
+
+  // Close connections of proxies that are no longer on the list
+  private removeStaleAgents() {
+    const urls = new Set(this.proxies.map((proxy) => this.toUrl(proxy)));
+
+    this.agents.forEach((agent, url) => {
+      if (urls.has(url)) return;
+
+      agent.destroy();
+      this.agents.delete(url);
+    });
+  }
+
+  private toUrl(proxy: string) {
+    const parts = proxy.split(":");
+    return `http://${parts[2]}:${parts[3]}@${parts[0]}:${parts[1]}`;
   }
 
   private formatProxies(data: string) {

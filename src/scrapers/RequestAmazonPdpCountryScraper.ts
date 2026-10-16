@@ -61,6 +61,11 @@ export class RequestAmazonPdpCountryScraper extends AmazonPdpCountryScraper {
       return;
     }
 
+    if (ad.isValid === false) {
+      price.reject?.("Unexpected response");
+      return;
+    }
+
     price.value = ad.price;
     price.dispatchFrom = ad.dispatchFrom;
     price.resolve?.();

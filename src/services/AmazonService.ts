@@ -5,7 +5,6 @@ import { ArgsService } from "@/services/ArgsService";
 import { CronJob } from "cron";
 import { ApiService } from "@/services/ApiService";
 import { ProxyService } from "@/services/ProxyService";
-import { HttpsProxyAgent } from "https-proxy-agent";
 
 export class AmazonService {
   private static instance: AmazonService;
@@ -52,9 +51,8 @@ export class AmazonService {
     }
   ) {
     this.queueService.request(async () => {
-      const proxy = this.proxyService.getRandomProxy();
+      const httpsAgent = this.proxyService.getRandomAgent();
       const userAgent = new UserAgent().toString();
-      const httpsAgent = new HttpsProxyAgent(proxy, { keepAlive: true });
 
       return new Promise<void>(async (resolve) => {
         return axios
