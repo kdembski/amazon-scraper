@@ -103,6 +103,20 @@ describe("ApiService", () => {
   });
 
   describe("countries and categories", () => {
+    it("loads countries on first use", async () => {
+      const service = setup();
+      mocked.get.mockResolvedValue({ data: countries });
+
+      await expect(service.getCountries()).resolves.toEqual(countries);
+    });
+
+    it("loads categories on first use", async () => {
+      const service = setup();
+      mocked.get.mockResolvedValue({ data: categories });
+
+      await expect(service.getCategories()).resolves.toEqual(categories);
+    });
+
     it("serves loaded countries from the cache", async () => {
       const service = setup();
       mocked.get.mockResolvedValue({ data: countries });

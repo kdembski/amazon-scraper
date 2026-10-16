@@ -13,7 +13,8 @@ export class AmazonPdpPriceHelper {
   }
 
   isDeleted(prices: AmazonAdPrice[]) {
-    return prices?.filter((price) => !price.deleted).length <= 2;
+    const remaining = prices.filter((price) => !price.deleted).length;
+    return remaining < prices.length && remaining <= 2;
   }
 
   sendCompletedPrices(prices: AmazonAdPrice[], ad: AmazonAd) {

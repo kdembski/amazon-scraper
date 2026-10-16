@@ -67,11 +67,15 @@ export class AmazonScraper {
     this.isLoadingAds = true;
     this.amazonService.queueService.failed = 0;
     this.amazonService.queueService.completed = 0;
-    const countries = await this.apiService.getCountries();
 
-    this.apiService
-      .get<AmazonAd[]>(`amazon/ads/scrap?count=${count}`)
-      .then((ads) => ads.map((ad) => this.pdpScraper.execute(ad, countries)))
-      .finally(() => (this.isLoadingAds = false));
+    try {
+      const countries = await this.apiService.getCountries();
+      const ads = await this.apiService.get<AmazonAd[]>(
+        `amazon/ads/scrap?count=${count}`
+      );
+      ads.forEach((ad) => this.pdpScraper.execute(ad, countries));
+    } finally {
+      this.isLoadingAds = false;
+    }
   }
 }

@@ -40,15 +40,13 @@ export class ApiService {
   }
 
   async loadCountries() {
-    this.get<Country[]>("countries").then((data) => {
-      this.countries = data;
-    });
+    this.countries = await this.get<Country[]>("countries");
   }
 
   async loadCategories() {
-    this.get<AmazonAdCategory[]>("amazon/ads/categories").then((data) => {
-      this.categories = data;
-    });
+    this.categories = await this.get<AmazonAdCategory[]>(
+      "amazon/ads/categories"
+    );
   }
 
   private url(path: string) {

@@ -114,6 +114,21 @@ describe("RequestAmazonPdpCountryScraper", () => {
       expect(resolveAd).toHaveBeenCalledTimes(1);
     });
 
+    it.each([[1], [2]])(
+      "sends the prices of an ad with %i countries",
+      async (count) => {
+        const { amazon, api, resolveAd, run } = setup({ price: 10 });
+        const prices = buildPrices(count);
+        run(prices);
+
+        prices.forEach((_, i) => amazon.respond(i, html));
+        await flush();
+
+        expect(api.put).toHaveBeenCalledTimes(1);
+        expect(resolveAd).toHaveBeenCalledTimes(1);
+      }
+    );
+
     it("completes a country without an offer with no price", async () => {
       const { amazon, run } = setup({ isCaptcha: false, isValid: true });
       const prices = buildPrices(3);

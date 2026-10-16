@@ -43,8 +43,13 @@ describe("AmazonPdpPriceHelper", () => {
       expect(helper.isDeleted(withDeleted(5, 5))).toBe(true);
     });
 
-    it("is true for an ad with 2 countries even when none is deleted", () => {
-      expect(helper.isDeleted(withDeleted(2, 0))).toBe(true);
+    it("is false while no country is deleted, even with 2 countries", () => {
+      expect(helper.isDeleted(withDeleted(2, 0))).toBe(false);
+      expect(helper.isDeleted(withDeleted(1, 0))).toBe(false);
+    });
+
+    it("is true for an ad with 2 countries when one is deleted", () => {
+      expect(helper.isDeleted(withDeleted(2, 1))).toBe(true);
     });
   });
 
@@ -73,6 +78,7 @@ describe("AmazonPdpPriceHelper", () => {
       });
     });
 
+    // The backend logs every PUT as a scraped ad in its stats
     it("sends an empty list when no country has a price", () => {
       const { api, helper } = setup();
       helper.sendCompletedPrices([buildPrice(), buildPrice()], ad);

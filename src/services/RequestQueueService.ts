@@ -73,17 +73,19 @@ export class RequestQueueService {
     if (!this.queue.length || !this.canStart()) return;
     const next = this.queue.shift()!;
 
-    await this.run(next);
+    // Nobody awaits a queued request, so its error would be unhandled
+    await this.run(next).catch((e) => console.error(e));
   }
 
   private async run(callback: () => any) {
     if (this.rate) this.tokens--;
 
     this.pending++;
-    const response = await callback();
-    this.pending--;
-
-    return response;
+    try {
+      return await callback();
+    } finally {
+      this.pending--;
+    }
   }
 
   private canStart() {

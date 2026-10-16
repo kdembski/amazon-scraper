@@ -9,8 +9,15 @@ export function fakeApiService() {
   const post = vi.fn().mockResolvedValue(undefined);
   const put = vi.fn().mockResolvedValue(undefined);
   const del = vi.fn().mockResolvedValue(undefined);
-  const service = { get, post, put, delete: del } as unknown as ApiService;
-  return { service, get, post, put, delete: del };
+  const getCountries = vi.fn().mockResolvedValue([]);
+  const service = {
+    get,
+    post,
+    put,
+    delete: del,
+    getCountries,
+  } as unknown as ApiService;
+  return { service, get, post, put, delete: del, getCountries };
 }
 
 type GetCallback = {

@@ -60,6 +60,38 @@ describe("RequestQueueService", () => {
       await expect(queue.request(callback)).resolves.toBe("data");
     });
 
+    it("frees the slot when a request throws", async () => {
+      const queue = setup({ limit: 1 });
+      const callback = vi.fn(async () => {
+        throw new Error("boom");
+      });
+
+      await expect(queue.request(callback)).rejects.toThrow("boom");
+      expect(queue.pending).toBe(0);
+    });
+
+    it("keeps running queued requests after one of them throws", async () => {
+      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      const queue = setup({ limit: 1 });
+      const first = deferred();
+      const failing = vi.fn(async () => {
+        throw new Error("boom");
+      });
+      const last = deferred();
+      queue.request(first.callback);
+      queue.request(failing);
+      queue.request(last.callback);
+      queue.start();
+
+      first.finish();
+      await vi.advanceTimersByTimeAsync(5);
+
+      expect(failing).toHaveBeenCalled();
+      expect(error).toHaveBeenCalledWith(new Error("boom"));
+      expect(last.callback).toHaveBeenCalled();
+      expect(queue.pending).toBe(1);
+    });
+
     it("queues requests over the limit", () => {
       const queue = setup({ limit: 1 });
       const first = deferred();
