@@ -3,8 +3,6 @@ x-pdp: &pdp
   build: .
   restart: unless-stopped
   env_file: .env
-  volumes:
-    - ./free-proxies.txt:/app/free-proxies.txt:ro
   extra_hosts:
     - "host.docker.internal:host-gateway"
   command: ["-c", "5000", "-l", "10000"]
@@ -32,8 +30,6 @@ services:
     build: .
     restart: unless-stopped
     env_file: .env
-    volumes:
-      - ./free-proxies.txt:/app/free-proxies.txt:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
     command: ["-c", "1000", "-l", "500", "-t", "plp"]
