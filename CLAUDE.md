@@ -44,6 +44,14 @@ Integration (`tests/integration/`) and e2e (`tests/e2e/`) tests share fakes in `
 - PLP flow: hourly category from `amazon/ads/categories/scrap` → `AmazonPlpPageScraper` → `AmazonPlpBuilder` → `POST amazon/ads`, recursing into subcategories.
 - `ApiService`: `get()` throws, `post`/`put`/`delete` only log errors.
 
+## Connection limits
+
+The bottleneck is open connections (home router NAT, host conntrack), not bandwidth.
+- Connections = `pending` (capped by `-l`) + idle keep-alive sockets (`maxFreeSockets: 1` per proxy × domain, closed after 15 s).
+- Set the idle timeout via `agent.options.timeout` after construction; `HttpsProxyAgent` ignores `timeout` passed to the constructor.
+- Do not disable keep-alive or shorten the idle timeout.
+- Measure with `nf_conntrack_count` on the host, or `docker exec <container> sh -c "netstat -tn | grep -c ESTABLISHED"` (not `ss` on the host).
+
 ## HTML parsing (fragile)
 
 Builders in `src/builders/` use `linkedom` and Amazon's DOM selectors; layout changes break them silently.
