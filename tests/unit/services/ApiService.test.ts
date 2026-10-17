@@ -17,7 +17,6 @@ const mocked = {
   delete: vi.mocked(axios.delete),
 };
 const countries = [{ id: 1, name: "Germany", code: "de", currencyId: 1, active: true }];
-const categories = [{ id: 1, name: "electronics" }];
 
 const setup = () => {
   resetSingleton(ApiService);
@@ -102,19 +101,12 @@ describe("ApiService", () => {
     });
   });
 
-  describe("countries and categories", () => {
+  describe("countries", () => {
     it("loads countries on first use", async () => {
       const service = setup();
       mocked.get.mockResolvedValue({ data: countries });
 
       await expect(service.getCountries()).resolves.toEqual(countries);
-    });
-
-    it("loads categories on first use", async () => {
-      const service = setup();
-      mocked.get.mockResolvedValue({ data: categories });
-
-      await expect(service.getCategories()).resolves.toEqual(categories);
     });
 
     it("serves loaded countries from the cache", async () => {
@@ -128,21 +120,7 @@ describe("ApiService", () => {
       expect(mocked.get).toHaveBeenCalledWith("http://api.test/countries", withAgent);
     });
 
-    it("serves loaded categories from the cache", async () => {
-      const service = setup();
-      mocked.get.mockResolvedValue({ data: categories });
-      await service.loadCategories();
-      await new Promise((resolve) => setImmediate(resolve));
-
-      await expect(service.getCategories()).resolves.toEqual(categories);
-      expect(mocked.get).toHaveBeenCalledTimes(1);
-      expect(mocked.get).toHaveBeenCalledWith(
-        "http://api.test/amazon/ads/categories",
-        withAgent
-      );
-    });
-
-    it("reloads both every hour", async () => {
+    it("reloads countries every hour", async () => {
       setup();
       mocked.get.mockResolvedValue({ data: [] });
 
@@ -152,10 +130,6 @@ describe("ApiService", () => {
 
       await cronJobs[0].onTick();
       expect(mocked.get).toHaveBeenCalledWith("http://api.test/countries", withAgent);
-      expect(mocked.get).toHaveBeenCalledWith(
-        "http://api.test/amazon/ads/categories",
-        withAgent
-      );
     });
   });
 });

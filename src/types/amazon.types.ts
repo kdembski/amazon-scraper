@@ -19,16 +19,6 @@ export interface AmazonPlpAdPage {
   resolve?: (value?: AmazonPlpAd[] | PromiseLike<AmazonPlpAd[]>) => void;
   reject?: (e: any) => void;
 }
-export interface AmazonPlpAdPageSort {
-  min: number;
-  max?: number;
-}
-
-export interface AmazonPdpAd {
-  price?: number;
-  asin?: string;
-}
-
 export interface AmazonAd {
   id: number;
   asin: string;

@@ -57,4 +57,3 @@ Builders in `src/builders/` use `linkedom` and Amazon's DOM selectors; layout ch
 - Shared services are singletons with `getInstance()`; other classes take dependencies as defaulted constructor params.
 - Style: 2 spaces, double quotes, semicolons, `lodash` as `_`. Comments in English.
 - Commit messages: short, only what changed. No `Co-Authored-By` lines.
-- Unused: `WebSocketService` (`ws`), types `AmazonPdpAd`, `AmazonPlpAdPageSort`.

@@ -1,4 +1,4 @@
-import axios, { GenericAbortSignal } from "axios";
+import axios from "axios";
 import UserAgent from "user-agents";
 import { RequestQueueService } from "@/services/RequestQueueService";
 import { ArgsService } from "@/services/ArgsService";
@@ -48,7 +48,6 @@ export class AmazonService {
     callback?: {
       onSuccess?: (data: T) => void;
       onError?: (e: any) => void;
-      onFinally?: () => void;
     }
   ) {
     this.queueService.request(async () => {
@@ -74,10 +73,7 @@ export class AmazonService {
           .catch((e) => {
             callback?.onError?.(e);
           })
-          .finally(() => {
-            callback?.onFinally?.();
-            resolve();
-          });
+          .finally(() => resolve());
       });
     });
   }

@@ -1,5 +1,4 @@
 import { AmazonPlpPageScraper } from "@/scrapers/AmazonPlpPageScraper";
-import { AmazonPlpAdPage } from "@/types/amazon.types";
 
 export class AmazonPlpScraper {
   private pageScraper;

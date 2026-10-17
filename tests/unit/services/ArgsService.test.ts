@@ -96,12 +96,12 @@ describe("ArgsService", () => {
 
   describe("getSourceFlag", () => {
     it("defaults to aod", () => {
-      expect(args.getSourceFlag()).toEqual({ isAod: true, isPage: false });
+      expect(args.getSourceFlag()).toEqual({ isAod: true });
     });
 
     it.each([["-s"], ["--source"]])("reads pdp from %s", (flag) => {
       setArgs(flag, "pdp");
-      expect(args.getSourceFlag()).toEqual({ isAod: false, isPage: true });
+      expect(args.getSourceFlag()).toEqual({ isAod: false });
     });
   });
 });

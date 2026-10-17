@@ -2,7 +2,6 @@ import { calculateAvg, roundToTwoDecimals } from "@/helpers/number";
 
 export class RequestQueueService {
   private completedHistory: number[] = [];
-  previousCompleted = 0;
   queue: (() => any)[] = [];
   speed = 0;
   completed = 0;
@@ -13,6 +12,7 @@ export class RequestQueueService {
   rate;
   private tokens;
   private lastRefill = Date.now();
+  private previousCompleted = 0;
 
   constructor(limit: number, rate = 0, enableLogs = false) {
     this.limit = limit;
@@ -37,22 +37,13 @@ export class RequestQueueService {
     }, 1);
   }
 
-  async request(callback: () => Promise<void>, top?: boolean) {
+  async request(callback: () => Promise<void>) {
     if (!this.canStart()) {
-      this.add(callback, top);
+      this.queue.push(callback);
       return;
     }
 
     return this.run(callback);
-  }
-
-  private add(callback: () => any, top?: boolean) {
-    if (top) {
-      this.queue.unshift(callback);
-      return;
-    }
-
-    this.queue.push(callback);
   }
 
   private async next() {

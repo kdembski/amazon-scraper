@@ -87,16 +87,6 @@ describe("RequestQueueService", () => {
       expect(queue.pending).toBe(1);
     });
 
-    it("puts requests marked as top at the front of the queue", () => {
-      const queue = setup({ limit: 1 });
-      const [first, second, third] = [deferred(), deferred(), deferred()];
-
-      queue.request(first.callback);
-      queue.request(second.callback);
-      queue.request(third.callback, true);
-
-      expect(queue.queue).toEqual([third.callback, second.callback]);
-    });
   });
 
   describe("start", () => {
@@ -221,7 +211,6 @@ describe("RequestQueueService", () => {
       await vi.advanceTimersByTimeAsync(1000);
 
       expect(queue.speed).toBe(2);
-      expect(queue.previousCompleted).toBe(0);
     });
   });
 

@@ -108,7 +108,6 @@ describe("AmazonService", () => {
       const callback = {
         onSuccess: vi.fn(),
         onError: vi.fn(),
-        onFinally: vi.fn(),
       };
 
       service.get("de/dp/B0TESTASIN", "de", callback);
@@ -116,7 +115,6 @@ describe("AmazonService", () => {
 
       expect(callback.onSuccess).toHaveBeenCalledWith("<html>");
       expect(callback.onError).not.toHaveBeenCalled();
-      expect(callback.onFinally).toHaveBeenCalled();
     });
 
     it("passes the error to onError and still finishes the queued task", async () => {
@@ -126,7 +124,6 @@ describe("AmazonService", () => {
       const callback = {
         onSuccess: vi.fn(),
         onError: vi.fn(),
-        onFinally: vi.fn(),
       };
 
       service.get("de/dp/B0TESTASIN", "de", callback);
@@ -134,7 +131,6 @@ describe("AmazonService", () => {
 
       expect(callback.onError).toHaveBeenCalledWith(error);
       expect(callback.onSuccess).not.toHaveBeenCalled();
-      expect(callback.onFinally).toHaveBeenCalled();
     });
 
     it("works without callbacks", async () => {
