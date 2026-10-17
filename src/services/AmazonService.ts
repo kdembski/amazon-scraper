@@ -53,7 +53,7 @@ export class AmazonService {
   ) {
     this.queueService.request(async () => {
       const httpsAgent = this.proxyService.getRandomAgent();
-      const userAgent = new UserAgent().toString();
+      const userAgent = new UserAgent({ deviceCategory: "desktop" }).toString();
 
       return new Promise<void>(async (resolve) => {
         return axios

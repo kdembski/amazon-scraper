@@ -122,6 +122,22 @@ describe("AmazonService", () => {
       });
     });
 
+    it("sends only desktop User-Agents", async () => {
+      const { service, requests } = setup();
+      get.mockResolvedValue({ data: "<html>" });
+
+      for (let i = 0; i < 50; i++) service.get("pl/s?i=toys", "pl");
+      await Promise.all(requests);
+
+      const userAgents = get.mock.calls.map(
+        ([, config]) => config!.headers!["User-Agent"] as string
+      );
+      expect(userAgents).toHaveLength(50);
+      userAgents.forEach((userAgent) => {
+        expect(userAgent).not.toMatch(/Mobile|Android|iPhone|iPad/);
+      });
+    });
+
     it("passes the response data to onSuccess", async () => {
       const { service, requests } = setup();
       get.mockResolvedValue({ data: "<html>" });
