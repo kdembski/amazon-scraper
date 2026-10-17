@@ -1,18 +1,14 @@
 import http from "http";
-import axios, { GenericAbortSignal } from "axios";
-import { AmazonAdCategory, Country } from "@/types/amazon.types";
+import axios from "axios";
+import { Country } from "@/types/amazon.types";
 import { CronJob } from "cron";
 
 export class ApiService {
   private static instance: ApiService;
-  private categories: AmazonAdCategory[] = [];
   private countries: Country[] = [];
 
   private constructor() {
-    new CronJob("0 0 */1 * * *", async () => {
-      this.loadCountries();
-      this.loadCategories();
-    }).start();
+    new CronJob("0 0 */1 * * *", () => this.loadCountries()).start();
   }
 
   public static getInstance(): ApiService {
@@ -31,22 +27,8 @@ export class ApiService {
     return this.countries;
   }
 
-  async getCategories() {
-    if (!this.categories.length) {
-      await this.loadCategories();
-    }
-
-    return this.categories;
-  }
-
   async loadCountries() {
     this.countries = await this.get<Country[]>("countries");
-  }
-
-  async loadCategories() {
-    this.categories = await this.get<AmazonAdCategory[]>(
-      "amazon/ads/categories"
-    );
   }
 
   private url(path: string) {

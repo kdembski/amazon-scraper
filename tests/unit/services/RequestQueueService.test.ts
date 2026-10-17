@@ -1,26 +1,8 @@
-import os from "os";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RequestQueueService } from "@/services/RequestQueueService";
-import type { RequestQueueRegulator } from "@/services/RequestQueueRegulator";
 
-const fakeRegulator = (scrapersCount?: number, targetedGlobalCpu = 50) => {
-  const start = vi.fn();
-  const regulator = {
-    start,
-    scrapersCount,
-    targetedGlobalCpu,
-  } as unknown as RequestQueueRegulator;
-  return { regulator, start };
-};
-
-const setup = ({
-  limit = 2,
-  rate = 0,
-  enableLogs = false,
-  enableRegulation = false,
-  regulator = fakeRegulator().regulator,
-} = {}) =>
-  new RequestQueueService(limit, rate, enableLogs, enableRegulation, regulator);
+const setup = ({ limit = 2, rate = 0, enableLogs = false } = {}) =>
+  new RequestQueueService(limit, rate, enableLogs);
 
 // A request that stays pending until finish() is called
 const deferred = () => {
@@ -105,16 +87,6 @@ describe("RequestQueueService", () => {
       expect(queue.pending).toBe(1);
     });
 
-    it("puts requests marked as top at the front of the queue", () => {
-      const queue = setup({ limit: 1 });
-      const [first, second, third] = [deferred(), deferred(), deferred()];
-
-      queue.request(first.callback);
-      queue.request(second.callback);
-      queue.request(third.callback, true);
-
-      expect(queue.queue).toEqual([third.callback, second.callback]);
-    });
   });
 
   describe("start", () => {
@@ -239,21 +211,6 @@ describe("RequestQueueService", () => {
       await vi.advanceTimersByTimeAsync(1000);
 
       expect(queue.speed).toBe(2);
-      expect(queue.previousCompleted).toBe(0);
-    });
-  });
-
-  describe("regulation", () => {
-    it("starts the regulator when enabled", () => {
-      const { regulator, start } = fakeRegulator();
-      setup({ enableRegulation: true, regulator });
-      expect(start).toHaveBeenCalled();
-    });
-
-    it("does not start the regulator by default", () => {
-      const { regulator, start } = fakeRegulator();
-      setup({ regulator });
-      expect(start).not.toHaveBeenCalled();
     });
   });
 
@@ -267,19 +224,16 @@ describe("RequestQueueService", () => {
       await vi.advanceTimersByTimeAsync(1000);
 
       expect(log).toHaveBeenCalledWith(
-        "speed: 7.00/s | tcpu: -% | limit: 5 | rate: 3/s | pending: 0 | queue: 0 | failed: 2 | completed: 7"
+        "speed: 7.00/s | limit: 5 | rate: 3/s | pending: 0 | queue: 0 | failed: 2 | completed: 7"
       );
     });
 
-    it("shows the targeted cpu of this scraper", async () => {
-      vi.spyOn(os, "cpus").mockReturnValue(new Array(4));
+    it("shows a dash when the rate is unlimited", async () => {
       const log = vi.spyOn(console, "log").mockImplementation(() => {});
-      const { regulator } = fakeRegulator(2, 50);
-      setup({ enableLogs: true, regulator });
+      setup({ enableLogs: true });
 
       await vi.advanceTimersByTimeAsync(1000);
 
-      expect(log.mock.calls[0][0]).toContain("tcpu: 100%");
       expect(log.mock.calls[0][0]).toContain("rate: -/s");
     });
 

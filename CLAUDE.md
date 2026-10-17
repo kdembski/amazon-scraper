@@ -30,14 +30,13 @@ Integration (`tests/integration/`) and e2e (`tests/e2e/`) tests share fakes in `
 ## Configuration
 
 - Env: `API_URL`, `PROXY_LIST_TOKEN` (webshare.io), `PROXY_LIST_URL` (overrides the webshare list URL, used by e2e), `name` (set in docker-compose.yml, used in `scrapers/<name>/...`; `undefined` locally).
-- Flags (`ArgsService`): `-t pdp|plp`, `-l` concurrency limit (default 10, adjusted at runtime in PDP), `-r` max requests/s per process (default 0 = unlimited), `-s aod|pdp` (default `aod`), `-c` batch size in PDP / max queue length in PLP (default 50).
+- Flags (`ArgsService`): `-t pdp|plp`, `-l` concurrency limit (default 10), `-r` max requests/s per process (default 0 = unlimited), `-s aod|pdp` (default `aod`), `-c` batch size in PDP / max queue length in PLP (default 50).
 - `uncaughtException`/`unhandledRejection` only log, so the process never crashes and Docker never restarts it. TLS verification is disabled globally.
 
 ## Architecture
 
 - `AmazonService.get(url, referer, callbacks)` is the only path to Amazon; results go only to callbacks. `url` starts with the TLD (`de/dp/...`). Random proxy and User-Agent, hard 20 s `AbortSignal` timeout, one keep-alive agent per proxy.
 - `RequestQueueService`: custom concurrency limiter plus token bucket for `-r`. Its `completed`/`failed` counters are incremented by the scrapers.
-- `RequestQueueRegulator` (PDP only): every 20 min adjusts `limit` from CPU/RAM metrics fetched **from the backend**.
 - PDP flow: `AmazonScraper` fetches `amazon/ads/scrap` when the queue is low → `AmazonPdpScraper` creates one `AmazonAdPrice` per country (manual state machine) → `RequestAmazonPdpCountryScraper` + base class `AmazonPdpCountryScraper` + `AmazonPdpPriceHelper`.
   - Captcha, empty or invalid response, network error: retry with exponential backoff; after 15 failures the country finishes without a price.
   - 404: country deleted; if ≤2 countries remain, `DELETE amazon/ads/<id>`.
@@ -58,4 +57,3 @@ Builders in `src/builders/` use `linkedom` and Amazon's DOM selectors; layout ch
 - Shared services are singletons with `getInstance()`; other classes take dependencies as defaulted constructor params.
 - Style: 2 spaces, double quotes, semicolons, `lodash` as `_`. Comments in English.
 - Commit messages: short, only what changed. No `Co-Authored-By` lines.
-- Unused: `WebSocketService` (`ws`), types `AmazonPdpAd`, `AmazonPlpAdPageSort`.

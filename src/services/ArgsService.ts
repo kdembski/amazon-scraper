@@ -54,8 +54,7 @@ export class ArgsService {
   getSourceFlag() {
     const value = this.getFlagValue("-s") || this.getFlagValue("--source");
 
-    const isPage = value === "pdp";
-    const isAod = !isPage;
-    return { isAod, isPage };
+    const isAod = value !== "pdp";
+    return { isAod };
   }
 }

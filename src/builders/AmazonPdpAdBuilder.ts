@@ -19,24 +19,13 @@ export class AmazonPdpAdBuilder implements AmazonAdBuilder {
     }
 
     const price = this.priceBuilder.build(document);
-    const asin = this.getAsin(document);
     const dispatchFrom = this.getDispatchFrom(document);
 
     return {
       price,
-      asin,
       isCaptcha,
       dispatchFrom,
     };
-  }
-
-  private getAsin(document: Document) {
-    const els = document.querySelectorAll(`[data-csa-c-asin]`);
-    const asins = [...els]
-      .map((el) => el.getAttribute("data-csa-c-asin"))
-      .filter((asin): asin is string => !!asin);
-
-    return asins[0];
   }
 
   private getDispatchFrom(document: Document) {

@@ -7,6 +7,7 @@ export class ProxyService {
   private proxies: string[] = [];
   private agents = new Map<string, HttpsProxyAgent<string>>();
   private isLoading = false;
+  private idleTimeout = 15 * 1000;
 
   private constructor() {
     new CronJob("0 0 */1 * * *", async () => {
@@ -28,13 +29,19 @@ export class ProxyService {
   }
 
   // One agent per proxy, so keep-alive connections (proxy tunnel + TLS
-  // session) are reused instead of being set up for every request
+  // session) are reused instead of being set up for every request. Idle
+  // connections are capped and closed after a while, otherwise they pile up
+  // for every proxy x country pair and fill the router's NAT table
   getRandomAgent() {
     const proxy = this.getRandomProxy();
     let agent = this.agents.get(proxy);
 
     if (!agent) {
-      agent = new HttpsProxyAgent(proxy, { keepAlive: true });
+      agent = new HttpsProxyAgent(proxy, { keepAlive: true, maxFreeSockets: 1 });
+      // HttpsProxyAgent replaces `options`, so a `timeout` passed to the
+      // constructor never reaches http.Agent, which reads it from there to
+      // close idle sockets
+      agent.options.timeout = this.idleTimeout;
       this.agents.set(proxy, agent);
     }
 

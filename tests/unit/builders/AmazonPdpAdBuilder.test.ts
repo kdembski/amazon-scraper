@@ -29,11 +29,8 @@ describe("AmazonPdpAdBuilder", () => {
     expect(result.isCaptcha).toBe(false);
   });
 
-  it("builds price, asin and dispatchFrom from a product page", () => {
+  it("builds price and dispatchFrom from a product page", () => {
     const body = `
-      <div data-csa-c-asin=""></div>
-      <div data-csa-c-asin="B0TESTASIN"></div>
-      <div data-csa-c-asin="B0OTHER"></div>
       <div id="corePriceDisplay_desktop_feature_div">${aPrice("24", "99")}</div>
       ${offerText("fulfillerInfoFeature", "Amazon")}
       ${offerText("merchantInfoFeature", "Some Seller")}
@@ -41,7 +38,6 @@ describe("AmazonPdpAdBuilder", () => {
 
     expect(build(body)).toEqual({
       price: 24.99,
-      asin: "B0TESTASIN",
       isCaptcha: false,
       dispatchFrom: "Amazon",
     });
@@ -55,7 +51,6 @@ describe("AmazonPdpAdBuilder", () => {
   it("leaves missing fields undefined", () => {
     expect(build(`<div id="dp"></div>`)).toEqual({
       price: undefined,
-      asin: undefined,
       isCaptcha: false,
       dispatchFrom: undefined,
     });
