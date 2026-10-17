@@ -16,14 +16,20 @@ npm start -- [-t plp] [-c 1000] [-l 500]   # tsx ./src/index.ts
 npm run build                              # pkgroll → dist/ (used by Docker)
 npx tsc --noEmit                           # type check
 npm run test:unit                          # vitest
+npm run test:integration                   # whole app in-process against fakes
+npm run test:e2e                           # builds dist/ and runs it as a process
+npm run test:e2e:docker                    # same tests against the built Docker image
+npm run test:live                          # real Amazon via real proxies (PROXY_LIST_TOKEN in .env)
 docker compose up -d --build               # production
 ```
 
 Tests: `src/a/X.ts` → `tests/unit/a/X.test.ts`, one file per source file. Builder tests use minimal HTML fragments (`tests/support/html.ts`), not saved pages; a selector change needs a new test case.
 
+Integration (`tests/integration/`) and e2e (`tests/e2e/`) tests share fakes in `tests/support/fake/`: `FakeBackend` (HTTP server behind `API_URL`, also serves the proxy list via `PROXY_LIST_URL`) and `FakeAmazon` (proxy that accepts CONNECT to `www.amazon.<tld>`, terminates TLS with a self-signed cert and answers from a responder). Integration runs the real object graph with cron mocked, retry delay 0 and only `setInterval` faked (`tests/support/integrationSetup.ts`); e2e spawns `node dist/index.js` (or `docker run` of the image in `e2e-docker`, reaching the fakes via `host.docker.internal`) and stays on fast paths since real backoff applies. Live tests (`tests/live/`) are a manual canary for selector breakage: blocked requests (captcha, 503) are retried and skipped, assertions only cover responses that got through; `LIVE_ASINS`/`LIVE_MARKETS` override the defaults.
+
 ## Configuration
 
-- Env: `API_URL`, `PROXY_LIST_TOKEN` (webshare.io), `name` (set in docker-compose.yml, used in `scrapers/<name>/...`; `undefined` locally).
+- Env: `API_URL`, `PROXY_LIST_TOKEN` (webshare.io), `PROXY_LIST_URL` (overrides the webshare list URL, used by e2e), `name` (set in docker-compose.yml, used in `scrapers/<name>/...`; `undefined` locally).
 - Flags (`ArgsService`): `-t pdp|plp`, `-l` concurrency limit (default 10, adjusted at runtime in PDP), `-r` max requests/s per process (default 0 = unlimited), `-s aod|pdp` (default `aod`), `-c` batch size in PDP / max queue length in PLP (default 50).
 - `uncaughtException`/`unhandledRejection` only log, so the process never crashes and Docker never restarts it. TLS verification is disabled globally.
 

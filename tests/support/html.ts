@@ -25,3 +25,66 @@ export const aPrice = (whole: string, fraction: string, offscreen = "") => `
     </span>
   </span>
 `;
+
+// "All Offers Display" fragment (aodAjaxMain); without a price it is the
+// "no featured offers" variant
+export const aodPage = ({
+  price,
+  shipsFrom = "Amazon",
+}: { price?: string; shipsFrom?: string } = {}) => {
+  const [whole, fraction] = price?.split(",") ?? [];
+  const priceBox = price
+    ? `<div id="aod-price-0">${aPrice(whole, fraction)}</div>`
+    : "";
+
+  return `
+    <div id="aod-container">
+      <div id="aod-pinned-offer">
+        ${priceBox}
+        <div id="aod-offer-shipsFrom">
+          <div class="a-col-left"><span>Versand</span></div>
+          <div class="a-col-right"><span class="a-size-small">${shipsFrom}</span></div>
+        </div>
+      </div>
+    </div>
+  `;
+};
+
+// Product page (/dp/<asin>) with the buy box price and shipper
+export const pdpPage = ({
+  asin = "B0TESTASIN",
+  price = "24,99",
+  shipsFrom = "Amazon",
+} = {}) => {
+  const [whole, fraction] = price.split(",");
+
+  return `
+    <div data-csa-c-asin="${asin}"></div>
+    <div id="corePriceDisplay_desktop_feature_div">${aPrice(whole, fraction)}</div>
+    <div id="fulfillerInfoFeature_feature_div">
+      <span class="offer-display-feature-text-message">${shipsFrom}</span>
+    </div>
+  `;
+};
+
+// Search listing (/s?i=...) with products and the category filter
+export const plpPage = ({
+  asins = [] as string[],
+  subcategories = [] as string[],
+} = {}) => `
+  <div class="s-main-slot">
+    ${asins
+      .map(
+        (asin) => `
+          <div role="listitem" data-asin="${asin}">
+            <img src="https://m.media-amazon.com/images/I/${asin}.jpg" />
+            <a href="/dp/${asin}"><h2><span>Product ${asin}</span></h2></a>
+          </div>
+        `
+      )
+      .join("")}
+  </div>
+  <ul id="filter-n">
+    ${subcategories.map((id) => `<li id="${id}"><a>${id}</a></li>`).join("")}
+  </ul>
+`;

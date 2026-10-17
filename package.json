@@ -8,7 +8,11 @@
   "scripts": {
     "start": "tsx ./src/index.ts",
     "build": "pkgroll",
-    "test:unit": "vitest run --project unit"
+    "test:unit": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "test:e2e": "vitest run --project e2e",
+    "test:e2e:docker": "vitest run --project e2e-docker",
+    "test:live": "vitest run --project live"
   },
   "license": "ISC",
   "dependencies": {
@@ -28,6 +32,7 @@
     "@types/user-agents": "^1.0.4",
     "@types/ws": "^8.5.14",
     "pkgroll": "^2.11.2",
+    "selfsigned": "^5.5.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",
     "vitest": "^3.2.7"
