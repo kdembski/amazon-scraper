@@ -48,6 +48,21 @@ export class ProxyService {
     return agent;
   }
 
+  // Open sockets of all proxy agents, in use and idle
+  countConnections() {
+    let count = 0;
+
+    this.agents.forEach((agent) => {
+      [agent.sockets, agent.freeSockets].forEach((pool) => {
+        Object.values(pool).forEach((sockets) => {
+          count += sockets?.length ?? 0;
+        });
+      });
+    });
+
+    return count;
+  }
+
   loadProxies() {
     return new Promise<void>((resolve) => {
       if (this.isLoading) {

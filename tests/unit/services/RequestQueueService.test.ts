@@ -228,6 +228,15 @@ describe("RequestQueueService", () => {
       );
     });
 
+    it("logs open connections after pending when they are counted", async () => {
+      const log = vi.spyOn(console, "log").mockImplementation(() => {});
+      new RequestQueueService(5, 3, true, () => 42);
+
+      await vi.advanceTimersByTimeAsync(1000);
+
+      expect(log.mock.calls[0][0]).toContain("pending: 0 | connections: 42 | queue: 0");
+    });
+
     it("shows a dash when the rate is unlimited", async () => {
       const log = vi.spyOn(console, "log").mockImplementation(() => {});
       setup({ enableLogs: true });

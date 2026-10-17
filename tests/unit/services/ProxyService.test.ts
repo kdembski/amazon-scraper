@@ -181,4 +181,31 @@ describe("ProxyService", () => {
       expect(service.getRandomAgent()).toBe(kept);
     });
   });
+
+  describe("countConnections", () => {
+    type Pool = Record<string, unknown[]>;
+
+    it("counts sockets in use and idle across all agents", async () => {
+      const service = setup();
+      get.mockResolvedValue(list("1.1.1.1:8080:u1:p1", "2.2.2.2:8081:u2:p2"));
+      await service.loadProxies();
+
+      vi.spyOn(Math, "random").mockReturnValue(0);
+      const first = service.getRandomAgent();
+      vi.spyOn(Math, "random").mockReturnValue(0.99);
+      const second = service.getRandomAgent();
+
+      const sockets = first.sockets as unknown as Pool;
+      sockets["www.amazon.de:443"] = [{}, {}];
+      sockets["www.amazon.fr:443"] = [{}];
+      (first.freeSockets as unknown as Pool)["www.amazon.de:443"] = [{}];
+      (second.freeSockets as unknown as Pool)["www.amazon.it:443"] = [{}];
+
+      expect(service.countConnections()).toBe(5);
+    });
+
+    it("returns 0 without agents", () => {
+      expect(setup().countConnections()).toBe(0);
+    });
+  });
 });

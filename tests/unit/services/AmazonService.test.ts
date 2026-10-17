@@ -61,6 +61,26 @@ describe("AmazonService", () => {
     expect(queue.start).toHaveBeenCalled();
   });
 
+  it("logs open proxy connections with the queue state", async () => {
+    vi.useFakeTimers();
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const args = {
+      getTargetFlag: vi.fn(() => ({ isPdp: true, isPlp: false })),
+      getLimitFlag: vi.fn(() => 10),
+      getRateFlag: vi.fn(() => 0),
+    };
+    const proxy = { countConnections: vi.fn(() => 7) };
+
+    const Service = AmazonService as unknown as new (
+      ...deps: unknown[]
+    ) => AmazonService;
+    new Service(args, fakeApiService().service, proxy);
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(log.mock.calls[0][0]).toContain("connections: 7");
+    vi.useRealTimers();
+  });
+
   describe("status", () => {
     it("is sent every hour in PDP mode", () => {
       const { api } = setup({ isPdp: true });

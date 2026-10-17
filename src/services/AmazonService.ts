@@ -21,7 +21,8 @@ export class AmazonService {
     queueService = new RequestQueueService(
       argsService.getLimitFlag(),
       argsService.getRateFlag(),
-      true
+      true,
+      () => proxyService.countConnections()
     )
   ) {
     this.queueService = queueService;
