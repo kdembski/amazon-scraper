@@ -61,7 +61,10 @@ export class ProxyService {
   }
 
   private intervalLoad(resolve: () => void) {
-    const url = `https://proxy.webshare.io/api/v2/proxy/list/download/${process.env.PROXY_LIST_TOKEN}/-/any/username/direct/-/`;
+    // PROXY_LIST_URL points the list at another source (used by e2e tests)
+    const url =
+      process.env.PROXY_LIST_URL ||
+      `https://proxy.webshare.io/api/v2/proxy/list/download/${process.env.PROXY_LIST_TOKEN}/-/any/username/direct/-/`;
 
     axios
       .get<string>(url)

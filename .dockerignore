@@ -3,7 +3,5 @@ dist
 .git
 .env
 proxies.txt
-test-html
 *.md
 docker-compose.yml
-ecosystem.config.cjs

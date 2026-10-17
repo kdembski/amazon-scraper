@@ -1,0 +1,161 @@
+import http from "http";
+import axios from "axios";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiService } from "@/services/ApiService";
+import { cronJobs } from "@@tests/support/cron";
+import { resetSingleton } from "@@tests/support/singleton";
+
+vi.mock("cron", async () => (await import("@@tests/support/cron")).cronModule);
+vi.mock("axios", () => ({
+  default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
+}));
+
+const mocked = {
+  get: vi.mocked(axios.get),
+  post: vi.mocked(axios.post),
+  put: vi.mocked(axios.put),
+  delete: vi.mocked(axios.delete),
+};
+const countries = [{ id: 1, name: "Germany", code: "de", currencyId: 1, active: true }];
+const categories = [{ id: 1, name: "electronics" }];
+
+const setup = () => {
+  resetSingleton(ApiService);
+  return ApiService.getInstance();
+};
+
+const withAgent = { httpAgent: expect.any(http.Agent) };
+
+describe("ApiService", () => {
+  beforeEach(() => {
+    vi.stubEnv("API_URL", "http://api.test");
+    cronJobs.length = 0;
+    Object.values(mocked).forEach((fn) => fn.mockReset());
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("is a singleton", () => {
+    const service = setup();
+    expect(ApiService.getInstance()).toBe(service);
+  });
+
+  describe("get", () => {
+    it("returns the response data", async () => {
+      const service = setup();
+      mocked.get.mockResolvedValue({ data: { ok: true } });
+
+      await expect(service.get("system/cpu")).resolves.toEqual({ ok: true });
+      expect(mocked.get).toHaveBeenCalledWith(
+        "http://api.test/system/cpu",
+        withAgent
+      );
+    });
+
+    it("throws on error", async () => {
+      const service = setup();
+      mocked.get.mockRejectedValue(new Error("down"));
+
+      await expect(service.get("system/cpu")).rejects.toThrow("down");
+    });
+  });
+
+  describe.each([
+    ["post", (s: ApiService) => s.post("amazon/ads", { a: 1 }), [{ a: 1 }]],
+    ["put", (s: ApiService) => s.put("amazon/ads/1", { a: 1 }), [{ a: 1 }]],
+    ["delete", (s: ApiService) => s.delete("amazon/ads/1"), []],
+  ] as const)("%s", (method, call, body) => {
+    const path = method === "post" ? "amazon/ads" : "amazon/ads/1";
+
+    it("sends the request", async () => {
+      const service = setup();
+      mocked[method].mockResolvedValue({ data: "ok" });
+
+      await call(service);
+      expect(mocked[method]).toHaveBeenCalledWith(
+        `http://api.test/${path}`,
+        ...body,
+        withAgent
+      );
+    });
+
+    it("logs errors instead of throwing", async () => {
+      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      const service = setup();
+      mocked[method].mockRejectedValue({
+        status: 500,
+        message: "Request failed",
+        cause: new Error("socket hang up"),
+        response: { data: "line 1\nline 2" },
+      });
+
+      await expect(call(service)).resolves.toBeUndefined();
+      expect(error.mock.calls.map((args) => args[0])).toEqual([
+        "Server:",
+        "  500",
+        "  Request failed",
+        "  Error: socket hang up",
+        "  line 1 line 2",
+      ]);
+    });
+  });
+
+  describe("countries and categories", () => {
+    it("loads countries on first use", async () => {
+      const service = setup();
+      mocked.get.mockResolvedValue({ data: countries });
+
+      await expect(service.getCountries()).resolves.toEqual(countries);
+    });
+
+    it("loads categories on first use", async () => {
+      const service = setup();
+      mocked.get.mockResolvedValue({ data: categories });
+
+      await expect(service.getCategories()).resolves.toEqual(categories);
+    });
+
+    it("serves loaded countries from the cache", async () => {
+      const service = setup();
+      mocked.get.mockResolvedValue({ data: countries });
+      await service.loadCountries();
+      await new Promise((resolve) => setImmediate(resolve));
+
+      await expect(service.getCountries()).resolves.toEqual(countries);
+      expect(mocked.get).toHaveBeenCalledTimes(1);
+      expect(mocked.get).toHaveBeenCalledWith("http://api.test/countries", withAgent);
+    });
+
+    it("serves loaded categories from the cache", async () => {
+      const service = setup();
+      mocked.get.mockResolvedValue({ data: categories });
+      await service.loadCategories();
+      await new Promise((resolve) => setImmediate(resolve));
+
+      await expect(service.getCategories()).resolves.toEqual(categories);
+      expect(mocked.get).toHaveBeenCalledTimes(1);
+      expect(mocked.get).toHaveBeenCalledWith(
+        "http://api.test/amazon/ads/categories",
+        withAgent
+      );
+    });
+
+    it("reloads both every hour", async () => {
+      setup();
+      mocked.get.mockResolvedValue({ data: [] });
+
+      expect(cronJobs).toHaveLength(1);
+      expect(cronJobs[0].cronTime).toBe("0 0 */1 * * *");
+      expect(cronJobs[0].start).toHaveBeenCalled();
+
+      await cronJobs[0].onTick();
+      expect(mocked.get).toHaveBeenCalledWith("http://api.test/countries", withAgent);
+      expect(mocked.get).toHaveBeenCalledWith(
+        "http://api.test/amazon/ads/categories",
+        withAgent
+      );
+    });
+  });
+});

@@ -51,6 +51,17 @@ describe("ArgsService", () => {
     });
   });
 
+  describe("getRateFlag", () => {
+    it("defaults to 0 (unlimited)", () => {
+      expect(args.getRateFlag()).toBe(0);
+    });
+
+    it.each([["-r"], ["--rate"]])("reads %s", (flag) => {
+      setArgs(flag, "11");
+      expect(args.getRateFlag()).toBe(11);
+    });
+  });
+
   describe("getCountFlag", () => {
     it("defaults to 50", () => {
       expect(args.getCountFlag()).toBe(50);
