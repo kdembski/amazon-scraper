@@ -64,4 +64,5 @@ Builders in `src/builders/` use `linkedom` and Amazon's DOM selectors; layout ch
 - Imports via `@/` (`src/`) and, in tests, `@@tests/` (`tests/`).
 - Shared services are singletons with `getInstance()`; other classes take dependencies as defaulted constructor params.
 - Style: 2 spaces, double quotes, semicolons, `lodash` as `_`. Comments in English.
+- Do not add comments explaining why something is done; put the reasoning in the reply or the commit message instead.
 - Commit messages: short, only what changed. No `Co-Authored-By` lines.

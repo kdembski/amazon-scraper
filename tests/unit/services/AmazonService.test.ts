@@ -61,6 +61,26 @@ describe("AmazonService", () => {
     expect(queue.start).toHaveBeenCalled();
   });
 
+  it("logs open proxy connections with the queue state", async () => {
+    vi.useFakeTimers();
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const args = {
+      getTargetFlag: vi.fn(() => ({ isPdp: true, isPlp: false })),
+      getLimitFlag: vi.fn(() => 10),
+      getRateFlag: vi.fn(() => 0),
+    };
+    const proxy = { countConnections: vi.fn(() => 7) };
+
+    const Service = AmazonService as unknown as new (
+      ...deps: unknown[]
+    ) => AmazonService;
+    new Service(args, fakeApiService().service, proxy);
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(log.mock.calls[0][0]).toContain("connections: 7");
+    vi.useRealTimers();
+  });
+
   describe("status", () => {
     it("is sent every hour in PDP mode", () => {
       const { api } = setup({ isPdp: true });
@@ -99,6 +119,22 @@ describe("AmazonService", () => {
           Referer: "https://www.amazon.de/s?k=B0TESTASIN",
           "Referrer-Policy": "strict-origin-when-cross-origin",
         },
+      });
+    });
+
+    it("sends only desktop User-Agents", async () => {
+      const { service, requests } = setup();
+      get.mockResolvedValue({ data: "<html>" });
+
+      for (let i = 0; i < 50; i++) service.get("pl/s?i=toys", "pl");
+      await Promise.all(requests);
+
+      const userAgents = get.mock.calls.map(
+        ([, config]) => config!.headers!["User-Agent"] as string
+      );
+      expect(userAgents).toHaveLength(50);
+      userAgents.forEach((userAgent) => {
+        expect(userAgent).not.toMatch(/Mobile|Android|iPhone|iPad/);
       });
     });
 

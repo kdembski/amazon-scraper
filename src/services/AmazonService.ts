@@ -21,7 +21,8 @@ export class AmazonService {
     queueService = new RequestQueueService(
       argsService.getLimitFlag(),
       argsService.getRateFlag(),
-      true
+      true,
+      () => proxyService.countConnections()
     )
   ) {
     this.queueService = queueService;
@@ -52,7 +53,7 @@ export class AmazonService {
   ) {
     this.queueService.request(async () => {
       const httpsAgent = this.proxyService.getRandomAgent();
-      const userAgent = new UserAgent().toString();
+      const userAgent = new UserAgent({ deviceCategory: "desktop" }).toString();
 
       return new Promise<void>(async (resolve) => {
         return axios

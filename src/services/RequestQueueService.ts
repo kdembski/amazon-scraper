@@ -13,11 +13,19 @@ export class RequestQueueService {
   private tokens;
   private lastRefill = Date.now();
   private previousCompleted = 0;
+  // Open connections shown in the logs, omitted when not set
+  private countConnections;
 
-  constructor(limit: number, rate = 0, enableLogs = false) {
+  constructor(
+    limit: number,
+    rate = 0,
+    enableLogs = false,
+    countConnections?: () => number
+  ) {
     this.limit = limit;
     this.rate = rate;
     this.tokens = rate;
+    this.countConnections = countConnections;
 
     setInterval(() => {
       this.updateCompletedHistory();
@@ -104,6 +112,9 @@ export class RequestQueueService {
       `limit: ${this.limit}`,
       `rate: ${this.rate || "-"}/s`,
       `pending: ${this.pending}`,
+      ...(this.countConnections
+        ? [`connections: ${this.countConnections()}`]
+        : []),
       `queue: ${this.queue.length}`,
       `failed: ${this.failed}`,
       `completed: ${this.completed}`,
