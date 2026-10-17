@@ -62,6 +62,16 @@ describe("ProxyService", () => {
       );
     });
 
+    it("downloads the list from PROXY_LIST_URL when it is set", async () => {
+      const service = setup();
+      vi.stubEnv("PROXY_LIST_URL", "http://127.0.0.1:9000/proxies");
+      get.mockResolvedValue(list("1.1.1.1:8080:user:pass"));
+
+      await service.loadProxies();
+
+      expect(get).toHaveBeenCalledWith("http://127.0.0.1:9000/proxies");
+    });
+
     it.each([
       ["\\n", "1.1.1.1:8080:u1:p1\n2.2.2.2:8081:u2:p2\n"],
       ["\\r\\n", "1.1.1.1:8080:u1:p1\r\n2.2.2.2:8081:u2:p2\r\n"],

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { AmazonScraper } from "@/scrapers/AmazonScraper";
 import type { AmazonPdpScraper } from "@/scrapers/AmazonPdpScraper";
 import type { AmazonPlpScraper } from "@/scrapers/AmazonPlpScraper";
@@ -16,15 +16,17 @@ const setup = ({ count = 50 } = {}) => {
   const args = fakeArgsService({ count });
   const pdpExecute = vi.fn();
   const pdpScraper = { execute: pdpExecute } as unknown as AmazonPdpScraper;
+  const plpExecute = vi.fn();
+  const plpScraper = { execute: plpExecute } as unknown as AmazonPlpScraper;
   const scraper = new AmazonScraper(
     api.service,
     amazon.service,
     args.service,
     pdpScraper,
-    {} as AmazonPlpScraper,
+    plpScraper,
     {} as ProxyService
   );
-  return { api, amazon, pdpExecute, scraper };
+  return { api, amazon, pdpExecute, plpExecute, scraper };
 };
 
 const flush = () => new Promise((resolve) => setImmediate(resolve));
@@ -89,6 +91,44 @@ describe("AmazonScraper", () => {
       await flush();
 
       expect(pdpExecute).toHaveBeenCalledWith(ads[0], countries);
+    });
+  });
+
+  describe("scrapPlp", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("scrapes the category from the backend", async () => {
+      const { api, amazon, plpExecute, scraper } = setup();
+      amazon.queueService.completed = 4;
+      api.get.mockResolvedValue({ id: 1, name: "electronics" });
+
+      await scraper.scrapPlp();
+      await flush();
+
+      expect(api.get).toHaveBeenCalledWith("amazon/ads/categories/scrap");
+      expect(plpExecute).toHaveBeenCalledWith("electronics");
+      expect(amazon.queueService.completed).toBe(0);
+    });
+
+    it("asks for the category again a minute after loading fails", async () => {
+      vi.useFakeTimers();
+      const { api, plpExecute, scraper } = setup();
+      api.get
+        .mockRejectedValueOnce(new Error("down"))
+        .mockResolvedValue({ id: 1, name: "electronics" });
+
+      await scraper.scrapPlp();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(api.get).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(59 * 1000);
+      expect(api.get).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(api.get).toHaveBeenCalledTimes(2);
+      expect(plpExecute).toHaveBeenCalledWith("electronics");
     });
   });
 });

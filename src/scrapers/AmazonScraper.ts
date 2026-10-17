@@ -16,6 +16,7 @@ export class AmazonScraper {
   private plpScraper;
   private proxyService;
   private isLoadingAds = false;
+  private categoryRetryDelay = 60 * 1000;
 
   constructor(
     apiService = ApiService.getInstance(),
@@ -55,7 +56,10 @@ export class AmazonScraper {
     this.apiService
       .get<AmazonAdCategory>("amazon/ads/categories/scrap")
       .then((category) => this.plpScraper.execute(category.name))
-      .catch(() => this.scrapPlp());
+      // Wait before asking again, so a backend outage is not flooded
+      .catch(() => {
+        setTimeout(() => this.scrapPlp(), this.categoryRetryDelay);
+      });
   }
 
   async scrapPdp() {
