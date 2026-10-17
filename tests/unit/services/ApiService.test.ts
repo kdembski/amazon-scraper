@@ -47,9 +47,9 @@ describe("ApiService", () => {
       const service = setup();
       mocked.get.mockResolvedValue({ data: { ok: true } });
 
-      await expect(service.get("system/cpu")).resolves.toEqual({ ok: true });
+      await expect(service.get("amazon/ads/scrap")).resolves.toEqual({ ok: true });
       expect(mocked.get).toHaveBeenCalledWith(
-        "http://api.test/system/cpu",
+        "http://api.test/amazon/ads/scrap",
         withAgent
       );
     });
@@ -58,7 +58,7 @@ describe("ApiService", () => {
       const service = setup();
       mocked.get.mockRejectedValue(new Error("down"));
 
-      await expect(service.get("system/cpu")).rejects.toThrow("down");
+      await expect(service.get("amazon/ads/scrap")).rejects.toThrow("down");
     });
   });
 

@@ -1,9 +1,6 @@
-import os from "os";
 import { calculateAvg, roundToTwoDecimals } from "@/helpers/number";
-import { RequestQueueRegulator } from "@/services/RequestQueueRegulator";
 
 export class RequestQueueService {
-  private regulator: RequestQueueRegulator;
   private completedHistory: number[] = [];
   previousCompleted = 0;
   queue: (() => any)[] = [];
@@ -17,17 +14,10 @@ export class RequestQueueService {
   private tokens;
   private lastRefill = Date.now();
 
-  constructor(
-    limit: number,
-    rate = 0,
-    enableLogs = false,
-    enableRegulation = false,
-    regulator = new RequestQueueRegulator(this)
-  ) {
+  constructor(limit: number, rate = 0, enableLogs = false) {
     this.limit = limit;
     this.rate = rate;
     this.tokens = rate;
-    this.regulator = regulator;
 
     setInterval(() => {
       this.updateCompletedHistory();
@@ -35,10 +25,6 @@ export class RequestQueueService {
 
     if (enableLogs) {
       setInterval(() => this.logState(), 1000);
-    }
-
-    if (enableRegulation) {
-      regulator.start();
     }
   }
 
@@ -124,7 +110,6 @@ export class RequestQueueService {
   private logState() {
     const stats = [
       `speed: ${roundToTwoDecimals(this.speed)}/s`,
-      `tcpu: ${this.getTargetedCpu()}%`,
       `limit: ${this.limit}`,
       `rate: ${this.rate || "-"}/s`,
       `pending: ${this.pending}`,
@@ -134,14 +119,5 @@ export class RequestQueueService {
     ];
     const text = stats.join(` | `);
     console.log(text);
-  }
-
-  private getTargetedCpu() {
-    const scrapersCount = this.regulator.scrapersCount;
-    const targetedGlobalCpu = this.regulator.targetedGlobalCpu;
-    const cpusCount = os.cpus().length;
-
-    if (!scrapersCount) return "-";
-    return Math.round((cpusCount * targetedGlobalCpu) / scrapersCount);
   }
 }
