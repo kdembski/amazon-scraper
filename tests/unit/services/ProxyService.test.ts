@@ -149,6 +149,16 @@ describe("ProxyService", () => {
       expect(service.getRandomAgent().keepAlive).toBe(true);
     });
 
+    it("caps idle connections and closes them after 15 s", async () => {
+      const service = setup();
+      get.mockResolvedValue(list("1.1.1.1:8080:user:pass"));
+      await service.loadProxies();
+
+      const agent = service.getRandomAgent();
+      expect(agent.maxFreeSockets).toBe(1);
+      expect(agent.options.timeout).toBe(15 * 1000);
+    });
+
     it("destroys agents of proxies removed from the list", async () => {
       const service = setup();
       get.mockResolvedValueOnce(list("1.1.1.1:8080:u1:p1", "2.2.2.2:8081:u2:p2"));
