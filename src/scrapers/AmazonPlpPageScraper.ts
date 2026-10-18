@@ -5,6 +5,7 @@ import { ApiService } from "@/services/ApiService";
 import { ArgsService } from "@/services/ArgsService";
 import { AmazonPlpAdPage, AmazonPlpAd } from "@/types/amazon.types";
 import { parseHTML } from "linkedom";
+import _ from "lodash";
 
 export class AmazonPlpPageScraper {
   private apiService;
@@ -13,6 +14,16 @@ export class AmazonPlpPageScraper {
   private builder;
   private queueFullDelay = 1000;
   private maxPages = 10;
+  // Amazon price filter (p_36) in grosze
+  private priceRanges = [
+    "-1999",
+    "2000-4999",
+    "5000-9999",
+    "10000-19999",
+    "20000-49999",
+    "50000-99999",
+    "100000-",
+  ];
 
   constructor(
     apiService = ApiService.getInstance(),
@@ -24,6 +35,16 @@ export class AmazonPlpPageScraper {
     this.amazonService = amazonService;
     this.argsService = argsService;
     this.builder = builder;
+  }
+
+  executeCategory(
+    category: string,
+    subcategory?: string,
+    visited = new Set<string>()
+  ) {
+    this.priceRanges.forEach((price) => {
+      this.execute(this.buildPage(category, subcategory, visited, 1, price));
+    });
   }
 
   async execute(page: AmazonPlpAdPage) {
@@ -96,12 +117,14 @@ export class AmazonPlpPageScraper {
       .filter((sub) => !page.visited.has(sub))
       .forEach((sub) => {
         page.visited.add(sub);
-        this.execute(this.buildPage(page.category, sub, page.visited));
+        this.executeCategory(page.category, sub, page.visited);
       });
 
     if (hasNextPage && page.number < this.maxPages) {
-      const { category, subcategory, visited, number } = page;
-      this.execute(this.buildPage(category, subcategory, visited, number + 1));
+      const { category, subcategory, visited, number, price } = page;
+      this.execute(
+        this.buildPage(category, subcategory, visited, number + 1, price)
+      );
     }
 
     page.resolve?.(ads);
@@ -112,16 +135,19 @@ export class AmazonPlpPageScraper {
   }
 
   private getUrl(page: AmazonPlpAdPage) {
-    const subcategory = page.subcategory ? `&rh=${page.subcategory}` : "";
+    const price = page.price && `p_36%3A${page.price}`;
+    const filters = _.compact([page.subcategory, price]).join("%2C");
+    const rh = filters ? `&rh=${filters}` : "";
     const number = page.number > 1 ? `&page=${page.number}` : "";
-    return `pl/s?i=${page.category}${subcategory}&s=date-desc-rank${number}`;
+    return `pl/s?i=${page.category}${rh}&s=date-desc-rank${number}`;
   }
 
   buildPage(
     category: string,
     subcategory?: string,
     visited = new Set<string>(),
-    number = 1
+    number = 1,
+    price?: string
   ): AmazonPlpAdPage {
     return {
       category,
@@ -131,6 +157,7 @@ export class AmazonPlpPageScraper {
       failed: 0,
       visited,
       number,
+      price,
     };
   }
 }

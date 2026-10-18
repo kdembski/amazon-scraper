@@ -18,6 +18,7 @@ export interface AmazonPlpAdPage {
   failed: number;
   visited: Set<string>;
   number: number;
+  price?: string;
   resolve?: (value?: AmazonPlpAd[] | PromiseLike<AmazonPlpAd[]>) => void;
   reject?: (e: any) => void;
 }
