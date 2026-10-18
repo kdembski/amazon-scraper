@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AmazonPdpCountryScraper } from "@/marketplaces/amazon/pdp/AmazonPdpCountryScraper";
-import { ArgsService } from "@/shared/args/ArgsService";
 import { AmazonPdpPriceHelper } from "@/marketplaces/amazon/pdp/AmazonPdpPriceHelper";
 import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
 import { AmazonAdBuildResult, AmazonAdPrice } from "@/marketplaces/amazon/types/amazon.types";
@@ -306,24 +305,18 @@ describe("AmazonPdpCountryScraper", () => {
     });
   });
 
-  describe("builder", () => {
-    it.each([
-      [true, "c1/gp/product/ajax/aodAjaxMain/?asin=B0TESTASIN&pc=dp"],
-      [false, "c1/dp/B0TESTASIN"],
-    ])("with isAod %s requests %s", (isAod, url) => {
-      vi.spyOn(ArgsService, "getInstance").mockReturnValue({
-        getSourceFlag: () => ({ isAod }),
-      } as unknown as ArgsService);
-      const amazon = fakeAmazonService();
-      const scraper = new AmazonPdpCountryScraper(
-        amazon.service,
-        fakeApiService().service
-      );
-      const prices = buildPrices(1);
+  it("reads prices from the AOD fragment by default", () => {
+    const amazon = fakeAmazonService();
+    const scraper = new AmazonPdpCountryScraper(
+      amazon.service,
+      fakeApiService().service
+    );
+    const prices = buildPrices(1);
 
-      scraper.execute(prices[0], buildAd(), prices, vi.fn());
+    scraper.execute(prices[0], buildAd(), prices, vi.fn());
 
-      expect(amazon.requests[0].url).toBe(url);
-    });
+    expect(amazon.requests[0].url).toBe(
+      "c1/gp/product/ajax/aodAjaxMain/?asin=B0TESTASIN&pc=dp"
+    );
   });
 });

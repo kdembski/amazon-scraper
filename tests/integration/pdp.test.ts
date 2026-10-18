@@ -3,7 +3,7 @@ import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
 import { ProxyService } from "@/shared/http/ProxyService";
 import { cronJobs } from "@@tests/support/cron";
 import { buildAd, buildCountry } from "@@tests/support/factories";
-import { aodPage, captchaPage, pdpPage } from "@@tests/support/html";
+import { aodPage, captchaPage } from "@@tests/support/html";
 import {
   bootScraper,
   sleep,
@@ -87,23 +87,6 @@ describe("PDP", () => {
     expect(de.headers["user-agent"]).toMatch(/Mozilla/);
   });
 
-  it("reads the product page with -s pdp", async () => {
-    world.amazon.respondPerCountry({
-      de: [pdpPage({ price: "24,99", shipsFrom: "Amazon" })],
-      fr: [pdpPage({ price: "25,49", shipsFrom: "Amazon" })],
-      it: [pdpPage({ price: "26,00", shipsFrom: "Some Seller" })],
-    });
-    scrape(["-c", "10", "-s", "pdp"]);
-
-    const put = await world.backend.waitFor("PUT", "amazon/ads/7");
-
-    expect(world.amazon.requestsTo("de")[0].url).toBe("de/dp/B0TESTASIN");
-    expect(put.body.prices).toEqual([
-      price(1, 24.99, "Amazon"),
-      price(2, 25.49, "Amazon"),
-      price(3, 26, "Some Seller"),
-    ]);
-  });
 
   it("leaves out a country without an offer", async () => {
     world.amazon.respondPerCountry({ ...offers, it: [aodPage()] });

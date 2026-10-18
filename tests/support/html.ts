@@ -50,23 +50,6 @@ export const aodPage = ({
   `;
 };
 
-// Product page (/dp/<asin>) with the buy box price and shipper
-export const pdpPage = ({
-  asin = "B0TESTASIN",
-  price = "24,99",
-  shipsFrom = "Amazon",
-} = {}) => {
-  const [whole, fraction] = price.split(",");
-
-  return `
-    <div data-csa-c-asin="${asin}"></div>
-    <div id="corePriceDisplay_desktop_feature_div">${aPrice(whole, fraction)}</div>
-    <div id="fulfillerInfoFeature_feature_div">
-      <span class="offer-display-feature-text-message">${shipsFrom}</span>
-    </div>
-  `;
-};
-
 // Entry of the category filter, indent 1 is the current category, 2 its child
 export const categoryItem = (id: string, indent?: 1 | 2) =>
   `<li id="${id}" class="a-spacing-micro${

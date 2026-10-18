@@ -93,15 +93,4 @@ describe("ArgsService", () => {
       expect(args.getTargetFlag()).toEqual({ isPdp: false, isPlp: false });
     });
   });
-
-  describe("getSourceFlag", () => {
-    it("defaults to aod", () => {
-      expect(args.getSourceFlag()).toEqual({ isAod: true });
-    });
-
-    it.each([["-s"], ["--source"]])("reads pdp from %s", (flag) => {
-      setArgs(flag, "pdp");
-      expect(args.getSourceFlag()).toEqual({ isAod: false });
-    });
-  });
 });

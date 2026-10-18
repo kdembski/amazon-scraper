@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Node.js/TypeScript (ESM) worker that scrapes Amazon through rotating proxies. No own state: it fetches work from a backend (`API_URL`) and sends results back. Two modes:
 
-- **PDP** (default): price and shipper for a batch of ASINs in every country from the backend. Source: AOD AJAX fragment (`gp/product/ajax/aodAjaxMain/?asin=<asin>&pc=dp`, ~9 KB) or, with `-s pdp`, the full `/dp/<asin>` page (rollback).
+- **PDP** (default): price and shipper for a batch of ASINs in every country from the backend. Source: AOD AJAX fragment (`gp/product/ajax/aodAjaxMain/?asin=<asin>&pc=dp`, ~9 KB).
 - **PLP**: category listings on `amazon.pl`, newest first, first page only, recursing into subcategories; found products go to the backend.
 
 ## Commands
@@ -30,7 +30,7 @@ Integration (`tests/integration/`) and e2e (`tests/e2e/`) tests share fakes in `
 ## Configuration
 
 - Env: `API_URL`, `PROXY_LIST_TOKEN` (webshare.io), `PROXY_LIST_URL` (overrides the webshare list URL, used by e2e), `name` (set in docker-compose.yml, used in `scrapers/<name>/...`; `undefined` locally).
-- Flags (`ArgsService`): `-t pdp|plp`, `-l` concurrency limit (default 10), `-r` max requests/s per process (default 0 = unlimited), `-s aod|pdp` (default `aod`), `-c` batch size in PDP / max queue length in PLP (default 50).
+- Flags (`ArgsService`): `-t pdp|plp`, `-l` concurrency limit (default 10), `-r` max requests/s per process (default 0 = unlimited), `-c` batch size in PDP / max queue length in PLP (default 50).
 - `uncaughtException`/`unhandledRejection` only log, so the process never crashes and Docker never restarts it. TLS verification is disabled globally.
 
 ## Structure
@@ -67,7 +67,6 @@ The bottleneck is open connections (home router NAT, host conntrack), not bandwi
 Builders in `src/marketplaces/amazon/pdp/` and `src/marketplaces/amazon/plp/` use `linkedom` and Amazon's DOM selectors; layout changes break them silently.
 - `cleanUpPrice` assumes a comma decimal separator (EU format).
 - `AmazonAodAdBuilder` reads only `#aod-pinned-offer` (= PDP buybox); no price element means no offer. Price comes from `.a-price-whole` + `.a-price-fraction`. `Amazon.nl` etc. is normalized to `Amazon` (backend checks `dispatchFrom === "Amazon"`).
-- `AmazonPdpAdPriceBuilder` takes the most frequent price across several selectors.
 
 ## Conventions
 

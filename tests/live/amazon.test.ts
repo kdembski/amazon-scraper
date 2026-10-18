@@ -2,7 +2,6 @@ import { configDotenv } from "dotenv";
 import { parseHTML } from "linkedom";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { AmazonAodAdBuilder } from "@/marketplaces/amazon/pdp/AmazonAodAdBuilder";
-import { AmazonPdpAdBuilder } from "@/marketplaces/amazon/pdp/AmazonPdpAdBuilder";
 import { AmazonPlpBuilder } from "@/marketplaces/amazon/plp/AmazonPlpBuilder";
 import { AmazonService } from "@/marketplaces/amazon/AmazonService";
 import { ProxyService } from "@/shared/http/ProxyService";
@@ -135,16 +134,6 @@ describe("live Amazon", () => {
     expect(priced.length).toBeGreaterThanOrEqual(answered.length * 0.75);
   });
 
-  it("finds the price on the product page (-s pdp)", async () => {
-    const results = await scrapeAll(new AmazonPdpAdBuilder(), ["de", "pl"]);
-    console.info(summarize(results).join("\n"));
-
-    const answered = answeredOf(results);
-    const priced = answered.filter((result) => result.price! > 0);
-
-    expect(answered.length, "every request was blocked").toBeGreaterThan(0);
-    expect(priced.length).toBeGreaterThanOrEqual(answered.length * 0.75);
-  });
 
   it("finds products and subcategories on an amazon.pl listing", async () => {
     const builder = new AmazonPlpBuilder();

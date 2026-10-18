@@ -1,13 +1,11 @@
 import { AmazonService } from "@/marketplaces/amazon/AmazonService";
 import { AmazonAodAdBuilder } from "@/marketplaces/amazon/pdp/AmazonAodAdBuilder";
-import { AmazonPdpAdBuilder } from "@/marketplaces/amazon/pdp/AmazonPdpAdBuilder";
 import { AmazonPdpPriceHelper } from "@/marketplaces/amazon/pdp/AmazonPdpPriceHelper";
 import {
   AmazonAd,
   AmazonAdBuilder,
   AmazonAdPrice,
 } from "@/marketplaces/amazon/types/amazon.types";
-import { ArgsService } from "@/shared/args/ArgsService";
 import { ApiService } from "@/shared/backend/ApiService";
 import { getRetryDelay, MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
 import { parseHTML } from "linkedom";
@@ -21,9 +19,7 @@ export class AmazonPdpCountryScraper {
   constructor(
     amazonService = AmazonService.getInstance(),
     apiService = ApiService.getInstance(),
-    builder: AmazonAdBuilder = ArgsService.getInstance().getSourceFlag().isAod
-      ? new AmazonAodAdBuilder()
-      : new AmazonPdpAdBuilder(),
+    builder: AmazonAdBuilder = new AmazonAodAdBuilder(),
     priceHelper = new AmazonPdpPriceHelper()
   ) {
     this.amazonService = amazonService;
