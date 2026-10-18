@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { AmazonScraper } from "@/marketplaces/amazon/AmazonScraper";
 import type { AmazonPdpScraper } from "@/marketplaces/amazon/pdp/AmazonPdpScraper";
 import type { AmazonPlpScraper } from "@/marketplaces/amazon/plp/AmazonPlpScraper";
-import type { ProxyService } from "@/shared/http/ProxyService";
+import type { ProxyService } from "@/shared/http/proxy/ProxyService";
 import { buildAd, buildCountry } from "@@tests/support/factories";
 import {
   fakeAmazonService,

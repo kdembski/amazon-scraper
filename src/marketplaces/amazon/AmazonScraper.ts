@@ -5,7 +5,7 @@ import { AmazonService } from "@/marketplaces/amazon/AmazonService";
 import { ApiService } from "@/shared/backend/ApiService";
 import { CountryService } from "@/shared/backend/CountryService";
 import { ArgsService } from "@/shared/args/ArgsService";
-import { ProxyService } from "@/shared/http/ProxyService";
+import { ProxyService } from "@/shared/http/proxy/ProxyService";
 import { AmazonAd, AmazonAdCategory } from "@/marketplaces/amazon/types/amazon.types";
 import { MarketplaceScraper } from "@/shared/interfaces/MarketplaceScraper";
 import { CronJob } from "cron";

@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import { AmazonAodAdBuilder } from "@/marketplaces/amazon/pdp/AmazonAodAdBuilder";
 import { AmazonPlpBuilder } from "@/marketplaces/amazon/plp/AmazonPlpBuilder";
 import { AmazonService } from "@/marketplaces/amazon/AmazonService";
-import { ProxyService } from "@/shared/http/ProxyService";
+import { ProxyService } from "@/shared/http/proxy/ProxyService";
 import { AmazonAdBuilder, AmazonAdBuildResult } from "@/marketplaces/amazon/types/amazon.types";
 import { buildAd, buildCountry } from "@@tests/support/factories";
 

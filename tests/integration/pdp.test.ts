@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
-import { ProxyService } from "@/shared/http/ProxyService";
+import { ProxyService } from "@/shared/http/proxy/ProxyService";
 import { cronJobs } from "@@tests/support/cron";
 import { buildAd, buildCountry } from "@@tests/support/factories";
 import { aodPage, captchaPage } from "@@tests/support/html";

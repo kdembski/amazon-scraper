@@ -1,7 +1,7 @@
 import type net from "node:net";
 import { HttpsProxyAgent } from "https-proxy-agent";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { MeteredProxyAgent } from "@/shared/http/MeteredProxyAgent";
+import { MeteredProxyAgent } from "@/shared/http/proxy/MeteredProxyAgent";
 
 const connect = (agent: MeteredProxyAgent) =>
   agent.connect({} as never, {} as never);

@@ -1,7 +1,7 @@
 import axios from "axios";
 import UserAgent from "user-agents";
 import { ArgsService } from "@/shared/args/ArgsService";
-import { ProxyService } from "@/shared/http/ProxyService";
+import { ProxyService } from "@/shared/http/proxy/ProxyService";
 import { RequestQueueService } from "@/shared/http/RequestQueueService";
 import { MetricsService } from "@/shared/metrics/MetricsService";
 import type { MetricLabels, RequestOutcome } from "@/shared/metrics/metrics.types";

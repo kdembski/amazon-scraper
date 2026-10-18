@@ -2,7 +2,7 @@ import axios from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ScrapingClient } from "@/shared/http/ScrapingClient";
 import type { ArgsService } from "@/shared/args/ArgsService";
-import type { ProxyService } from "@/shared/http/ProxyService";
+import type { ProxyService } from "@/shared/http/proxy/ProxyService";
 import type { RequestQueueService } from "@/shared/http/RequestQueueService";
 
 vi.mock("axios", () => ({ default: { get: vi.fn() } }));

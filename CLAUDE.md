@@ -36,7 +36,7 @@ Integration (`tests/integration/`) and e2e (`tests/e2e/`) tests share fakes in `
 
 ## Structure
 
-- `src/shared/`: code that knows no shop — `args/` (`ArgsService`), `backend/` (`ApiService`, `CountryService`, `MetricsReporter`), `metrics/` (`MetricsService`), `http/` (`ProxyService`, `RequestQueueService`, `ScrapingClient`), `interfaces/`, `types/`, `utils/`.
+- `src/shared/`: code that knows no shop — `args/` (`ArgsService`), `backend/` (`ApiService`, `CountryService`, `MetricsReporter`), `metrics/` (`MetricsService`), `http/` (`RequestQueueService`, `ScrapingClient`; `proxy/`: `ProxyService` over `ProxyList`, `ProxyAgentPool`, `ProxyTrafficMeter`), `interfaces/`, `types/`, `utils/`.
 - `src/marketplaces/<name>/`: one folder per shop — scraper implementing `MarketplaceScraper`, a thin service over `ScrapingClient`, `types/`, and one folder per flow (`amazon/pdp/`, `amazon/plp/`) holding its scrapers and builders.
 - `src/shared` imports nothing from `src/marketplaces`.
 - `src/marketplaces.ts` (`createScraper()`) starts `MetricsReporter` and returns the scraper; `src/index.ts` calls `createScraper().execute()`.

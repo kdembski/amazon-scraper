@@ -3,7 +3,7 @@ import { MetricsReporter } from "@/shared/backend/MetricsReporter";
 import { MetricsService } from "@/shared/metrics/MetricsService";
 import type { ArgsService } from "@/shared/args/ArgsService";
 import type { ScrapingClient } from "@/shared/http/ScrapingClient";
-import type { ProxyService } from "@/shared/http/ProxyService";
+import type { ProxyService } from "@/shared/http/proxy/ProxyService";
 import { cronJobs } from "@@tests/support/cron";
 import { fakeApiService } from "@@tests/support/fakes";
 import { resetSingleton } from "@@tests/support/singleton";

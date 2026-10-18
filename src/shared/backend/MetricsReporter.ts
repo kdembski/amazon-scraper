@@ -1,6 +1,6 @@
 import { ArgsService } from "@/shared/args/ArgsService";
 import { ApiService } from "@/shared/backend/ApiService";
-import { ProxyService } from "@/shared/http/ProxyService";
+import { ProxyService } from "@/shared/http/proxy/ProxyService";
 import { ScrapingClient } from "@/shared/http/ScrapingClient";
 import { MetricsService } from "@/shared/metrics/MetricsService";
 import { CronJob } from "cron";
