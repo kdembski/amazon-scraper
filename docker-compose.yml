@@ -10,12 +10,12 @@ x-pdp: &pdp
     NODE_OPTIONS: --max-old-space-size=32768
 
 services:
-  pdp-1:
+  amazon-pdp:
     <<: *pdp
     environment:
       <<: *pdp-env
-      name: pdp-1
-  plp-1:
+      name: amazon-pdp
+  amazon-plp:
     image: amazon-scraper
     build: .
     restart: unless-stopped
@@ -25,4 +25,4 @@ services:
     command: ["-c", "1000", "-l", "100", "-r", "5", "-t", "plp"]
     environment:
       NODE_OPTIONS: --max-old-space-size=8192
-      name: plp-1
+      name: amazon-plp
