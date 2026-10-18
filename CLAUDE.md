@@ -31,6 +31,7 @@ Integration (`tests/integration/`) and e2e (`tests/e2e/`) tests share fakes in `
 
 - Env: `API_URL`, `PROXY_LIST_TOKEN` (webshare.io), `PROXY_LIST_URL` (overrides the webshare list URL, used by e2e), `name` (set in docker-compose.yml, used in `scrapers/<name>/...`; `undefined` locally).
 - Flags (`ArgsService`): `-t pdp|plp`, `-l` concurrency limit (default 10), `-r` max requests/s per process (default 0 = unlimited), `-c` batch size in PDP / max queue length in PLP (default 50).
+- Flags configure the scraper as a whole, never one marketplace: every flag must take effect in every mode (`-t`) and every marketplace. Do not add a flag that is ignored in some mode or marketplace; put marketplace-specific behaviour in the marketplace code.
 - `uncaughtException`/`unhandledRejection` only log, so the process never crashes and Docker never restarts it. TLS verification is disabled globally.
 
 ## Structure
