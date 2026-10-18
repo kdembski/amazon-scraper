@@ -7,9 +7,10 @@ import { CountryService } from "@/shared/backend/CountryService";
 import { ArgsService } from "@/shared/args/ArgsService";
 import { ProxyService } from "@/shared/http/ProxyService";
 import { AmazonAd, AmazonAdCategory } from "@/types/amazon.types";
+import { MarketplaceScraper } from "@/shared/interfaces/MarketplaceScraper";
 import { CronJob } from "cron";
 
-export class AmazonScraper {
+export class AmazonScraper implements MarketplaceScraper {
   private apiService;
   private amazonService;
   private argsService;

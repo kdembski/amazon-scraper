@@ -1,15 +1,26 @@
 import { vi } from "vitest";
-import { AmazonScraper } from "@/scrapers/AmazonScraper";
+import { createScraper } from "@/marketplaces";
+import type { AmazonScraper } from "@/scrapers/AmazonScraper";
 import { AmazonService } from "@/services/AmazonService";
 import { ApiService } from "@/shared/backend/ApiService";
 import { CountryService } from "@/shared/backend/CountryService";
+import { ScraperStatusService } from "@/shared/backend/ScraperStatusService";
+import { ScrapingClient } from "@/shared/http/ScrapingClient";
 import { ArgsService } from "@/shared/args/ArgsService";
 import { ProxyService } from "@/shared/http/ProxyService";
 import { FakeAmazon } from "@@tests/support/fake/amazon";
 import { FakeBackend } from "@@tests/support/fake/backend";
 import { resetSingleton } from "@@tests/support/singleton";
 
-const singletons = [ArgsService, ApiService, CountryService, ProxyService, AmazonService];
+const singletons = [
+  ArgsService,
+  ApiService,
+  CountryService,
+  ProxyService,
+  ScrapingClient,
+  ScraperStatusService,
+  AmazonService,
+];
 const argv = process.argv;
 
 const instanceOf = <T>(singleton: { getInstance(): T }) =>
@@ -37,13 +48,13 @@ export function bootScraper(args: string[] = []) {
   process.argv = [argv[0], "index.ts", ...args];
   singletons.forEach(resetSingleton);
 
-  const scraper = new AmazonScraper();
-  return { scraper, queue: AmazonService.getInstance().queueService };
+  const scraper = createScraper() as AmazonScraper;
+  return { scraper, queue: ScrapingClient.getInstance().queueService };
 }
 
 export async function stopWorld({ backend, amazon }: World) {
   // The queue loop reschedules itself through start(), so this ends it
-  const queue = instanceOf(AmazonService)?.queueService;
+  const queue = instanceOf(ScrapingClient)?.queueService;
   if (queue) queue.start = () => {};
 
   const proxyService = instanceOf(ProxyService) as unknown as

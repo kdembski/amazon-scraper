@@ -1,12 +1,12 @@
 import { configDotenv } from "dotenv";
-import { AmazonScraper } from "@/scrapers/AmazonScraper";
+import { createScraper } from "@/marketplaces";
 
 configDotenv();
 
 // Ignore the certificate
 process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = "0";
 
-new AmazonScraper().execute();
+createScraper().execute();
 
 process.on("uncaughtException", (e, o) => {
   console.log("uncaught exception", e, o);

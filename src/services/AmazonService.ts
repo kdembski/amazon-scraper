@@ -1,38 +1,12 @@
-import axios from "axios";
-import UserAgent from "user-agents";
-import { RequestQueueService } from "@/shared/http/RequestQueueService";
-import { ArgsService } from "@/shared/args/ArgsService";
-import { CronJob } from "cron";
-import { ApiService } from "@/shared/backend/ApiService";
-import { ProxyService } from "@/shared/http/ProxyService";
+import { ScrapingClient } from "@/shared/http/ScrapingClient";
 
 export class AmazonService {
   private static instance: AmazonService;
   private baseUrl = "https://www.amazon.";
-  private timeout = 20 * 1000;
-  private apiService;
-  private proxyService;
-  queueService;
+  private scrapingClient;
 
-  private constructor(
-    argsService = ArgsService.getInstance(),
-    apiService = ApiService.getInstance(),
-    proxyService = ProxyService.getInstance(),
-    queueService = new RequestQueueService(
-      argsService.getLimitFlag(),
-      argsService.getRateFlag(),
-      true,
-      () => proxyService.countConnections()
-    )
-  ) {
-    this.queueService = queueService;
-    this.apiService = apiService;
-    this.proxyService = proxyService;
-    queueService.start();
-
-    if (argsService.getTargetFlag().isPdp) {
-      new CronJob("0 50 */1 * * *", () => this.sendScraperStatus()).start();
-    }
+  private constructor(scrapingClient = ScrapingClient.getInstance()) {
+    this.scrapingClient = scrapingClient;
   }
 
   public static getInstance(): AmazonService {
@@ -43,6 +17,10 @@ export class AmazonService {
     return AmazonService.instance;
   }
 
+  get queueService() {
+    return this.scrapingClient.queueService;
+  }
+
   get<T>(
     url: string,
     referer?: string,
@@ -51,38 +29,10 @@ export class AmazonService {
       onError?: (e: any) => void;
     }
   ) {
-    this.queueService.request(async () => {
-      const httpsAgent = this.proxyService.getRandomAgent();
-      const userAgent = new UserAgent({ deviceCategory: "desktop" }).toString();
-
-      return new Promise<void>(async (resolve) => {
-        return axios
-          .get<T>(`${this.baseUrl}${url}`, {
-            httpsAgent,
-            // Hard limit for the whole request; axios `timeout` does not
-            // cover a proxy that hangs on CONNECT
-            signal: AbortSignal.timeout(this.timeout),
-            headers: {
-              "User-Agent": userAgent,
-              Referer: `${this.baseUrl}${referer}`,
-              "Referrer-Policy": "strict-origin-when-cross-origin",
-            },
-          })
-          .then((response) => {
-            callback?.onSuccess?.(response.data);
-          })
-          .catch((e) => {
-            callback?.onError?.(e);
-          })
-          .finally(() => resolve());
-      });
-    });
-  }
-
-  private sendScraperStatus() {
-    this.apiService.post(`scrapers/${process.env.name}/status`, {
-      speed: this.queueService.speed,
-      pending: this.queueService.pending,
-    });
+    this.scrapingClient.get<T>(
+      `${this.baseUrl}${url}`,
+      `${this.baseUrl}${referer}`,
+      callback
+    );
   }
 }
