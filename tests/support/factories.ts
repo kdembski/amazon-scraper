@@ -45,5 +45,7 @@ export const buildPlpPage = (
   pending: false,
   complete: false,
   failed: 0,
+  visited: new Set(),
+  number: 1,
   ...overrides,
 });

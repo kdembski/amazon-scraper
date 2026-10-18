@@ -11,6 +11,8 @@ export class AmazonPlpPageScraper {
   private amazonService;
   private argsService;
   private builder;
+  private queueFullDelay = 1000;
+  private maxPages = 10;
 
   constructor(
     apiService = ApiService.getInstance(),
@@ -27,7 +29,12 @@ export class AmazonPlpPageScraper {
   async execute(page: AmazonPlpAdPage) {
     const count = this.argsService.getCountFlag();
     const queue = this.amazonService.queueService.queue.length;
-    if (queue >= count || page.complete || page.pending) return;
+    if (page.complete || page.pending) return;
+
+    if (queue >= count) {
+      setTimeout(() => this.execute(page), this.queueFullDelay);
+      return;
+    }
 
     return new Promise<AmazonPlpAd[] | undefined>((resolve, reject) => {
       page.resolve = resolve;
@@ -75,17 +82,27 @@ export class AmazonPlpPageScraper {
     }
 
     const { document } = parseHTML(data);
-    const { ads, subcategories } = this.builder.build(document, page.category);
+    const { ads, subcategories, hasNextPage } = this.builder.build(
+      document,
+      page.category
+    );
 
     if (ads.length === 0) {
       page.reject?.("No ads found");
       return;
     }
 
-    subcategories.forEach((sub) => {
-      const subPage = this.buildPage(page.category, sub);
-      this.execute(subPage);
-    });
+    subcategories
+      .filter((sub) => !page.visited.has(sub))
+      .forEach((sub) => {
+        page.visited.add(sub);
+        this.execute(this.buildPage(page.category, sub, page.visited));
+      });
+
+    if (hasNextPage && page.number < this.maxPages) {
+      const { category, subcategory, visited, number } = page;
+      this.execute(this.buildPage(category, subcategory, visited, number + 1));
+    }
 
     page.resolve?.(ads);
   }
@@ -95,19 +112,25 @@ export class AmazonPlpPageScraper {
   }
 
   private getUrl(page: AmazonPlpAdPage) {
-    if (page.subcategory) {
-      return `pl/s?i=${page.category}&rh=${page.subcategory}&s=date-desc-rank`;
-    }
-    return `pl/s?i=${page.category}&s=date-desc-rank`;
+    const subcategory = page.subcategory ? `&rh=${page.subcategory}` : "";
+    const number = page.number > 1 ? `&page=${page.number}` : "";
+    return `pl/s?i=${page.category}${subcategory}&s=date-desc-rank${number}`;
   }
 
-  buildPage(category: string, subcategory?: string) {
+  buildPage(
+    category: string,
+    subcategory?: string,
+    visited = new Set<string>(),
+    number = 1
+  ): AmazonPlpAdPage {
     return {
       category,
       subcategory,
       pending: false,
       complete: false,
       failed: 0,
+      visited,
+      number,
     };
   }
 }

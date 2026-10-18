@@ -16,6 +16,8 @@ export interface AmazonPlpAdPage {
   pending: boolean;
   complete: boolean;
   failed: number;
+  visited: Set<string>;
+  number: number;
   resolve?: (value?: AmazonPlpAd[] | PromiseLike<AmazonPlpAd[]>) => void;
   reject?: (e: any) => void;
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AmazonPlpBuilder } from "@/builders/AmazonPlpBuilder";
-import { toDocument } from "@@tests/support/html";
+import { categoryItem, pagination, toDocument } from "@@tests/support/html";
 
 const builder = new AmazonPlpBuilder();
 const build = (body: string, category = "electronics") =>
@@ -24,7 +24,15 @@ describe("AmazonPlpBuilder", () => {
     expect(build(`<div id="search"></div>`)).toEqual({
       ads: [],
       subcategories: [],
+      hasNextPage: false,
     });
+  });
+
+  it.each([
+    ["an active", true],
+    ["a disabled", false],
+  ])("detects a next page from %s next link", (_name, next) => {
+    expect(build(pagination(next)).hasNextPage).toBe(next);
   });
 
   it("builds ads from list items", () => {
@@ -48,12 +56,14 @@ describe("AmazonPlpBuilder", () => {
     expect(build(body).ads.map((ad) => ad.asin)).toEqual(["B0VALID"]);
   });
 
-  it("builds subcategory ids with an encoded separator", () => {
+  it("builds child category ids with an encoded separator", () => {
     const body = `
       <ul id="filter-n">
-        <li id="n/20788222031"><a>Laptops</a></li>
-        <li id="n/20788223031"><a>Tablets</a></li>
         <li><a>Header without id</a></li>
+        ${categoryItem("n/20788220031")}
+        ${categoryItem("n/20788221031", 1)}
+        ${categoryItem("n/20788222031", 2)}
+        ${categoryItem("n/20788223031", 2)}
       </ul>
     `;
 
@@ -63,8 +73,19 @@ describe("AmazonPlpBuilder", () => {
     ]);
   });
 
+  it("returns no subcategories for a category without children", () => {
+    const body = `
+      <ul id="filter-n">
+        ${categoryItem("n/20788220031")}
+        ${categoryItem("n/20788221031", 1)}
+      </ul>
+    `;
+
+    expect(build(body).subcategories).toEqual([]);
+  });
+
   it("ignores li elements outside the category filter", () => {
-    const body = `<ul id="filter-p"><li id="p_123/abc"></li></ul>`;
+    const body = `<ul id="filter-p">${categoryItem("p_123/abc", 2)}</ul>`;
     expect(build(body).subcategories).toEqual([]);
   });
 });

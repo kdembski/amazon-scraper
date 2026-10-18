@@ -14,10 +14,12 @@ export class AmazonPlpBuilder {
     }, []);
 
     const subcategories = this.buildSubcategories(document);
+    const hasNextPage = !!document.querySelector("a.s-pagination-next");
 
     return {
       ads,
       subcategories,
+      hasNextPage,
     };
   }
 
@@ -38,7 +40,7 @@ export class AmazonPlpBuilder {
 
   private buildSubcategories(document: Document) {
     const list = document.querySelector("ul#filter-n");
-    const items = list?.querySelectorAll("li[id]");
+    const items = list?.querySelectorAll("li[id].s-navigation-indent-2");
 
     if (!items) return [];
     return [...items]
