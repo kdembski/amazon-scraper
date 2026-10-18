@@ -1,15 +1,20 @@
 import axios from "axios";
 import { CronJob } from "cron";
-import { HttpsProxyAgent } from "https-proxy-agent";
+import type net from "node:net";
+import { MeteredProxyAgent } from "@/shared/http/MeteredProxyAgent";
+import { MetricsService } from "@/shared/metrics/MetricsService";
 
 export class ProxyService {
   private static instance: ProxyService;
   private proxies: string[] = [];
-  private agents = new Map<string, HttpsProxyAgent<string>>();
+  private agents = new Map<string, MeteredProxyAgent>();
+  private sockets = new Map<net.Socket, { read: number; written: number }>();
   private isLoading = false;
   private idleTimeout = 15 * 1000;
 
-  private constructor() {
+  private constructor(
+    private metricsService = MetricsService.getInstance()
+  ) {
     new CronJob("0 0 */1 * * *", async () => {
       await this.loadProxies();
     }).start();
@@ -34,7 +39,11 @@ export class ProxyService {
     let agent = this.agents.get(proxy);
 
     if (!agent) {
-      agent = new HttpsProxyAgent(proxy, { keepAlive: true, maxFreeSockets: 1 });
+      agent = new MeteredProxyAgent(
+        proxy,
+        { keepAlive: true, maxFreeSockets: 1 },
+        (socket) => this.track(socket)
+      );
       // HttpsProxyAgent replaces `options`, so a `timeout` passed to the
       // constructor never reaches http.Agent, which reads it from there to
       // close idle sockets
@@ -43,6 +52,26 @@ export class ProxyService {
     }
 
     return agent;
+  }
+
+  private track(socket: net.Socket) {
+    this.sockets.set(socket, { read: 0, written: 0 });
+    this.metricsService.increment("connections");
+  }
+
+  collectTraffic() {
+    let bytesIn = 0;
+    let bytesOut = 0;
+
+    this.sockets.forEach((seen, socket) => {
+      bytesIn += socket.bytesRead - seen.read;
+      bytesOut += socket.bytesWritten - seen.written;
+      seen.read = socket.bytesRead;
+      seen.written = socket.bytesWritten;
+      if (socket.destroyed) this.sockets.delete(socket);
+    });
+
+    return { bytesIn, bytesOut };
   }
 
   countConnections() {

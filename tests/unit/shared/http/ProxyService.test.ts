@@ -1,6 +1,9 @@
 import axios from "axios";
+import { HttpsProxyAgent } from "https-proxy-agent";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MeteredProxyAgent } from "@/shared/http/MeteredProxyAgent";
 import { ProxyService } from "@/shared/http/ProxyService";
+import type { MetricsService } from "@/shared/metrics/MetricsService";
 import { cronJobs } from "@@tests/support/cron";
 import { resetSingleton } from "@@tests/support/singleton";
 
@@ -12,9 +15,16 @@ const RETRY_DELAY = 2 * 60 * 1000;
 
 const list = (...lines: string[]) => ({ data: lines.join("\n") });
 
+const increment = vi.fn();
+
 const setup = () => {
   resetSingleton(ProxyService);
-  return ProxyService.getInstance();
+  const Service = ProxyService as unknown as new (
+    metricsService: MetricsService
+  ) => ProxyService;
+  const service = new Service({ increment } as unknown as MetricsService);
+  (ProxyService as unknown as { instance?: unknown }).instance = service;
+  return service;
 };
 
 // Proxy url of the agent, e.g. http://user:pass@host:port
@@ -26,6 +36,7 @@ describe("ProxyService", () => {
     vi.stubEnv("PROXY_LIST_TOKEN", "token");
     cronJobs.length = 0;
     get.mockReset();
+    increment.mockReset();
   });
 
   afterEach(() => {
@@ -206,6 +217,63 @@ describe("ProxyService", () => {
 
     it("returns 0 without agents", () => {
       expect(setup().countConnections()).toBe(0);
+    });
+  });
+
+  describe("traffic", () => {
+    type FakeSocket = { bytesRead: number; bytesWritten: number; destroyed: boolean };
+
+    const connectSocket = async (service: ProxyService, socket: FakeSocket) => {
+      get.mockResolvedValue(list("1.1.1.1:8080:user:pass"));
+      await service.loadProxies();
+      vi.spyOn(HttpsProxyAgent.prototype, "connect").mockResolvedValue(
+        socket as never
+      );
+      await service.getRandomAgent().connect({} as never, {} as never);
+    };
+
+    it("creates metered agents", async () => {
+      const service = setup();
+      get.mockResolvedValue(list("1.1.1.1:8080:user:pass"));
+      await service.loadProxies();
+
+      expect(service.getRandomAgent()).toBeInstanceOf(MeteredProxyAgent);
+    });
+
+    it("counts a tunnel for every connect", async () => {
+      const service = setup();
+      await connectSocket(service, { bytesRead: 0, bytesWritten: 0, destroyed: false });
+      await service.getRandomAgent().connect({} as never, {} as never);
+
+      expect(increment).toHaveBeenCalledTimes(2);
+      expect(increment).toHaveBeenCalledWith("connections");
+    });
+
+    it("reports the growth since the previous call", async () => {
+      const service = setup();
+      const socket = { bytesRead: 100, bytesWritten: 10, destroyed: false };
+      await connectSocket(service, socket);
+
+      expect(service.collectTraffic()).toEqual({ bytesIn: 100, bytesOut: 10 });
+
+      socket.bytesRead = 250;
+      socket.bytesWritten = 40;
+      expect(service.collectTraffic()).toEqual({ bytesIn: 150, bytesOut: 30 });
+      expect(service.collectTraffic()).toEqual({ bytesIn: 0, bytesOut: 0 });
+    });
+
+    it("counts a destroyed socket one last time and stops tracking it", async () => {
+      const service = setup();
+      const socket = { bytesRead: 100, bytesWritten: 10, destroyed: false };
+      await connectSocket(service, socket);
+      service.collectTraffic();
+
+      socket.bytesRead = 130;
+      socket.destroyed = true;
+      expect(service.collectTraffic()).toEqual({ bytesIn: 30, bytesOut: 0 });
+
+      socket.bytesRead = 500;
+      expect(service.collectTraffic()).toEqual({ bytesIn: 0, bytesOut: 0 });
     });
   });
 });
