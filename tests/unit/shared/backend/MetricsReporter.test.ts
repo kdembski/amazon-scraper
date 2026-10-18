@@ -79,15 +79,19 @@ describe("MetricsReporter", () => {
 
     await reporter.send();
 
-    expect(api.post).toHaveBeenCalledWith("scrapers/amazon-pdp/metrics", {
-      marketplace: "amazon",
-      flow: "pdp",
-      periodStart: "2026-10-18T10:00:00.000Z",
-      metrics: [
-        { metric: "requests", country: "de", outcome: "ok", value: 4 },
-        ...gauges,
-      ],
-    });
+    expect(api.post).toHaveBeenCalledWith(
+      "scrapers/amazon-pdp/metrics",
+      {
+        marketplace: "amazon",
+        flow: "pdp",
+        periodStart: "2026-10-18T10:00:00.000Z",
+        metrics: [
+          { metric: "requests", country: "de", outcome: "ok", value: 4 },
+          ...gauges,
+        ],
+      },
+      { timeout: 30000 }
+    );
   });
 
   it("sends the PLP flow", async () => {

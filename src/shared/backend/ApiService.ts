@@ -1,5 +1,5 @@
 import http from "http";
-import axios from "axios";
+import axios, { AxiosRequestConfig } from "axios";
 
 export class ApiService {
   private static instance: ApiService;
@@ -23,10 +23,10 @@ export class ApiService {
     return (await axios.get<T>(this.url(path), { httpAgent: agent })).data;
   }
 
-  async post<T>(path: string, data: unknown) {
+  async post<T>(path: string, data: unknown, config: AxiosRequestConfig = {}) {
     const agent = new http.Agent({ keepAlive: true });
     return axios
-      .post<T>(this.url(path), data, { httpAgent: agent })
+      .post<T>(this.url(path), data, { ...config, httpAgent: agent })
       .catch((e) => {
         this.handleError(e);
       });

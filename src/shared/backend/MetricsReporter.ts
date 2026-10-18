@@ -15,6 +15,7 @@ export class MetricsReporter {
   private now;
   private marketplace = "";
   private periodStart = new Date();
+  private timeout = 30 * 1000;
 
   private constructor(
     argsService = ArgsService.getInstance(),
@@ -71,7 +72,8 @@ export class MetricsReporter {
             value: this.proxyService.countConnections(),
           },
         ],
-      }
+      },
+      { timeout: this.timeout }
     );
 
     if (response === undefined) {

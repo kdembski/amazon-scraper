@@ -20,7 +20,7 @@ npm run test:integration                   # whole app in-process against fakes
 npm run test:e2e                           # builds dist/ and runs it as a process
 npm run test:e2e:docker                    # same tests against the built Docker image
 npm run test:live                          # real Amazon via real proxies (PROXY_LIST_TOKEN in .env)
-docker compose up -d --build               # production
+docker compose up -d --build --remove-orphans # production
 ```
 
 Tests: `src/a/X.ts` → `tests/unit/a/X.test.ts` (e.g. `tests/unit/marketplaces/amazon/pdp/AmazonAodAdBuilder.test.ts`), one file per source file. Builder tests use minimal HTML fragments (`tests/support/html.ts`), not saved pages; a selector change needs a new test case.
