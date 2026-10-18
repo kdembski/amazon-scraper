@@ -8,7 +8,6 @@ import { resetSingleton } from "@@tests/support/singleton";
 
 vi.mock("cron", async () => (await import("@@tests/support/cron")).cronModule);
 
-const WAIT_DELAY = 2 * 60 * 1000;
 const urls = ["http://u1:p1@1.1.1.1:8080", "http://u2:p2@2.2.2.2:8081"];
 
 const setup = () => {
@@ -73,7 +72,7 @@ describe("ProxyService", () => {
       expect(pool.retain).toHaveBeenCalledWith(urls);
     });
 
-    it("makes a second caller wait while a load is in progress", async () => {
+    it("lets a second caller share the load in progress", async () => {
       const { service, list } = setup();
       let respond!: (urls: string[]) => void;
       list.load.mockReturnValueOnce(new Promise((resolve) => (respond = resolve)));
@@ -86,11 +85,17 @@ describe("ProxyService", () => {
       respond(urls);
       await vi.advanceTimersByTimeAsync(0);
       expect(first).toHaveBeenCalled();
-      expect(second).not.toHaveBeenCalled();
-
-      await vi.advanceTimersByTimeAsync(WAIT_DELAY);
       expect(second).toHaveBeenCalled();
       expect(list.load).toHaveBeenCalledTimes(1);
+    });
+
+    it("loads the list again once the previous load has finished", async () => {
+      const { service, list } = setup();
+
+      await service.loadProxies();
+      await service.loadProxies();
+
+      expect(list.load).toHaveBeenCalledTimes(2);
     });
   });
 

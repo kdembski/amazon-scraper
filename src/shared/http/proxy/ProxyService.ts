@@ -6,8 +6,7 @@ import { ProxyTrafficMeter } from "@/shared/http/proxy/ProxyTrafficMeter";
 export class ProxyService {
   private static instance: ProxyService;
   private proxies: string[] = [];
-  private isLoading = false;
-  private waitDelay = 2 * 60 * 1000;
+  private loading?: Promise<void>;
 
   private constructor(
     private meter = new ProxyTrafficMeter(),
@@ -41,30 +40,16 @@ export class ProxyService {
   }
 
   loadProxies() {
-    return new Promise<void>((resolve) => {
-      if (this.isLoading) {
-        setTimeout(() => {
-          if (this.proxies.length) {
-            resolve();
-            return;
-          }
+    this.loading ??= this.list
+      .load()
+      .then((urls) => {
+        this.proxies = urls;
+        this.pool.retain(urls);
+      })
+      .finally(() => {
+        this.loading = undefined;
+      });
 
-          this.load(resolve);
-        }, this.waitDelay);
-        return;
-      }
-
-      this.isLoading = true;
-      this.load(resolve);
-    });
-  }
-
-  private load(resolve: () => void) {
-    this.list.load().then((urls) => {
-      this.proxies = urls;
-      this.pool.retain(urls);
-      this.isLoading = false;
-      resolve();
-    });
+    return this.loading;
   }
 }
