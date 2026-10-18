@@ -19,7 +19,11 @@ const setup = ({ count = 50 } = {}) => {
   const amazon = fakeAmazonService();
   const api = fakeApiService();
   const args = fakeArgsService({ count });
-  const build = vi.fn(() => ({ ads, subcategories: [] as string[] }));
+  const build = vi.fn(() => ({
+    ads,
+    subcategories: [] as string[],
+    hasNextPage: false,
+  }));
   const builder = { build } as unknown as AmazonPlpBuilder;
   const scraper = new AmazonPlpPageScraper(
     api.service,
@@ -52,7 +56,15 @@ describe("AmazonPlpPageScraper", () => {
         pending: false,
         complete: false,
         failed: 0,
+        visited: new Set(),
+        number: 1,
       });
+    });
+
+    it("shares the visited subcategories of the category", () => {
+      const { scraper } = setup();
+      const visited = new Set(["n%3A1"]);
+      expect(scraper.buildPage("toys", "n%3A2", visited).visited).toBe(visited);
     });
   });
 
@@ -78,6 +90,15 @@ describe("AmazonPlpPageScraper", () => {
       );
     });
 
+    it("requests a further page of the listing", () => {
+      const { amazon, scraper } = setup();
+      scraper.execute(buildPlpPage({ subcategory: "n%3A123", number: 3 }));
+
+      expect(amazon.requests[0].url).toBe(
+        "pl/s?i=electronics&rh=n%3A123&s=date-desc-rank&page=3"
+      );
+    });
+
     it.each([["complete"], ["pending"]] as const)(
       "skips a page that is already %s",
       (state) => {
@@ -87,12 +108,19 @@ describe("AmazonPlpPageScraper", () => {
       }
     );
 
-    it("skips pages while the queue is full", () => {
+    it("waits while the queue is full and requests the page once it drains", async () => {
       const { amazon, scraper } = setup({ count: 2 });
       amazon.queueService.queue.push(vi.fn(), vi.fn());
+      const page = buildPlpPage();
 
-      scraper.execute(buildPlpPage());
+      scraper.execute(page);
+      await vi.advanceTimersByTimeAsync(1000);
       expect(amazon.get).not.toHaveBeenCalled();
+
+      amazon.queueService.queue.length = 0;
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(amazon.get).toHaveBeenCalledTimes(1);
+      expect(page).toMatchObject({ pending: true, failed: 0 });
     });
   });
 
@@ -113,7 +141,7 @@ describe("AmazonPlpPageScraper", () => {
 
     it("scrapes every subcategory", async () => {
       const { amazon, build, scraper } = setup();
-      build.mockReturnValueOnce({ ads, subcategories: ["n%3A1", "n%3A2"] });
+      build.mockReturnValueOnce({ ads, subcategories: ["n%3A1", "n%3A2"], hasNextPage: false });
       scraper.execute(buildPlpPage());
 
       amazon.respond(0, html);
@@ -125,6 +153,62 @@ describe("AmazonPlpPageScraper", () => {
         "pl/s?i=electronics&rh=n%3A2&s=date-desc-rank",
       ]);
     });
+
+    it("scrapes the next page", async () => {
+      const { amazon, build, scraper } = setup();
+      build.mockReturnValueOnce({ ads, subcategories: [], hasNextPage: true });
+      const page = buildPlpPage({ subcategory: "n%3A1" });
+      scraper.execute(page);
+
+      amazon.respond(0, html);
+      await flush();
+
+      expect(amazon.requests.map((request) => request.url)).toEqual([
+        "pl/s?i=electronics&rh=n%3A1&s=date-desc-rank",
+        "pl/s?i=electronics&rh=n%3A1&s=date-desc-rank&page=2",
+      ]);
+    });
+
+    it("stops after 10 pages", async () => {
+      const { amazon, build, scraper } = setup();
+      build.mockReturnValueOnce({ ads, subcategories: [], hasNextPage: true });
+      scraper.execute(buildPlpPage({ number: 10 }));
+
+      amazon.respond(0, html);
+      await flush();
+
+      expect(amazon.requests).toHaveLength(1);
+    });
+
+    it("stops when there is no next page", async () => {
+      const { amazon, scraper } = setup();
+      scraper.execute(buildPlpPage());
+
+      amazon.respond(0, html);
+      await flush();
+
+      expect(amazon.requests).toHaveLength(1);
+    });
+
+    it("scrapes a subcategory only once", async () => {
+      const { amazon, build, scraper } = setup();
+      build
+        .mockReturnValueOnce({ ads, subcategories: ["n%3A1", "n%3A2"], hasNextPage: false })
+        .mockReturnValueOnce({ ads, subcategories: ["n%3A2", "n%3A3"], hasNextPage: false });
+      scraper.execute(buildPlpPage());
+
+      amazon.respond(0, html);
+      await flush();
+      amazon.respond(1, html);
+      await flush();
+
+      expect(amazon.requests.map((request) => request.url)).toEqual([
+        "pl/s?i=electronics&s=date-desc-rank",
+        "pl/s?i=electronics&rh=n%3A1&s=date-desc-rank",
+        "pl/s?i=electronics&rh=n%3A2&s=date-desc-rank",
+        "pl/s?i=electronics&rh=n%3A3&s=date-desc-rank",
+      ]);
+    });
   });
 
   describe("retries", () => {
@@ -133,7 +217,7 @@ describe("AmazonPlpPageScraper", () => {
       [
         "a page without ads",
         (s: ReturnType<typeof setup>) => {
-          s.build.mockReturnValueOnce({ ads: [], subcategories: ["n%3A1"] });
+          s.build.mockReturnValueOnce({ ads: [], subcategories: ["n%3A1"], hasNextPage: false });
           s.amazon.respond(0, html);
         },
       ],

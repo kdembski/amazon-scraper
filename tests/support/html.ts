@@ -67,10 +67,25 @@ export const pdpPage = ({
   `;
 };
 
-// Search listing (/s?i=...) with products and the category filter
+// Entry of the category filter, indent 1 is the current category, 2 its child
+export const categoryItem = (id: string, indent?: 1 | 2) =>
+  `<li id="${id}" class="a-spacing-micro${
+    indent ? ` s-navigation-indent-${indent}` : ""
+  }"><a>${id}</a></li>`;
+
+// Pagination of a search listing, "next" is a link only if there is a next page
+export const pagination = (next: boolean) =>
+  next
+    ? `<a href="/s?page=2" class="s-pagination-item s-pagination-next">Dalej</a>`
+    : `<span class="s-pagination-item s-pagination-next s-pagination-disabled">Dalej</span>`;
+
+// Search listing (/s?i=...) with products and the category filter: the path
+// from the root to the current category, then its children
 export const plpPage = ({
   asins = [] as string[],
+  path = [] as string[],
   subcategories = [] as string[],
+  next = false,
 } = {}) => `
   <div class="s-main-slot">
     ${asins
@@ -85,6 +100,12 @@ export const plpPage = ({
       .join("")}
   </div>
   <ul id="filter-n">
-    ${subcategories.map((id) => `<li id="${id}"><a>${id}</a></li>`).join("")}
+    ${path
+      .map((id, index) =>
+        categoryItem(id, index === path.length - 1 ? 1 : undefined)
+      )
+      .join("")}
+    ${subcategories.map((id) => categoryItem(id, 2)).join("")}
   </ul>
+  ${pagination(next)}
 `;

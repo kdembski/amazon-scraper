@@ -1,3 +1,4 @@
+import _ from "lodash";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { MAX_FAILED_ATTEMPTS } from "@/helpers/retry";
 import { plpPage } from "@@tests/support/html";
@@ -44,9 +45,17 @@ describe("PLP", () => {
 
   it("sends the newest ads of the category and its subcategories", async () => {
     const pages: Record<string, string> = {
-      [root]: plpPage({ asins: ["B0ROOT1", "B0ROOT2"], subcategories: ["n/11", "n/12"] }),
-      [sub("11")]: plpPage({ asins: ["B0SUB11"] }),
-      [sub("12")]: plpPage({ asins: ["B0SUB12"] }),
+      [root]: plpPage({
+        asins: ["B0ROOT1", "B0ROOT2"],
+        path: ["n/10"],
+        subcategories: ["n/11", "n/12"],
+      }),
+      [sub("11")]: plpPage({
+        asins: ["B0SUB11"],
+        path: ["n/10", "n/11"],
+        subcategories: ["n/12"],
+      }),
+      [sub("12")]: plpPage({ asins: ["B0SUB12"], path: ["n/10", "n/12"] }),
     };
     world.amazon.respond(({ url }) => pages[url] ?? { status: 404 });
     scrape();
@@ -61,6 +70,22 @@ describe("PLP", () => {
     expect(world.amazon.requests[0].headers.referer).toMatch(
       /^https:\/\/www\.amazon\.pl\/b\?node=\d+$/
     );
+  });
+
+  it("follows the pagination up to 10 pages", async () => {
+    world.amazon.respond(({ url }) => {
+      const number = Number(url.match(/&page=(\d+)/)?.[1] ?? 1);
+      return plpPage({ asins: [`B0PAGE${number}`], next: true });
+    });
+    scrape();
+
+    const posts = await waitForPosts(10);
+    await sleep(200);
+
+    expect(posts.flat().map((ad) => ad.asin).sort()).toEqual(
+      _.range(1, 11).map((number) => `B0PAGE${number}`).sort()
+    );
+    expect(world.amazon.requests).toHaveLength(10);
   });
 
   it("retries a listing without ads", async () => {
