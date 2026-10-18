@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AmazonAodAdBuilder } from "@/builders/AmazonAodAdBuilder";
 import { captchaPage, toDocument } from "@@tests/support/html";
-import { AmazonAd, Country } from "@/types/amazon.types";
+import { Country } from "@/shared/types/Country";
+import { AmazonAd } from "@/types/amazon.types";
 
 const builder = new AmazonAodAdBuilder();
 const build = (body: string) => builder.build(toDocument(body));

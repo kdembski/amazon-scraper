@@ -5,7 +5,7 @@ import { AmazonAodAdBuilder } from "@/builders/AmazonAodAdBuilder";
 import { AmazonPdpAdBuilder } from "@/builders/AmazonPdpAdBuilder";
 import { AmazonPlpBuilder } from "@/builders/AmazonPlpBuilder";
 import { AmazonService } from "@/services/AmazonService";
-import { ProxyService } from "@/services/ProxyService";
+import { ProxyService } from "@/shared/http/ProxyService";
 import { AmazonAdBuilder, AmazonAdBuildResult } from "@/types/amazon.types";
 import { buildAd, buildCountry } from "@@tests/support/factories";
 

@@ -1,6 +1,6 @@
 import http from "http";
 import axios from "axios";
-import { Country } from "@/types/amazon.types";
+import { Country } from "@/shared/types/Country";
 import { CronJob } from "cron";
 
 export class ApiService {

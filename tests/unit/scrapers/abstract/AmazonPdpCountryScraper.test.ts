@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AmazonPdpCountryScraper } from "@/scrapers/abstract/AmazonPdpCountryScraper";
-import { MAX_FAILED_ATTEMPTS } from "@/helpers/retry";
-import { AmazonAd, AmazonAdPrice, Country } from "@/types/amazon.types";
+import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
+import { Country } from "@/shared/types/Country";
+import { AmazonAd, AmazonAdPrice } from "@/types/amazon.types";
 
 class TestScraper extends AmazonPdpCountryScraper {
   execute = vi.fn();

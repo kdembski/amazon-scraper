@@ -1,4 +1,4 @@
-import { calculateAvg, roundToTwoDecimals } from "@/helpers/number";
+import { calculateAvg, roundToTwoDecimals } from "@/shared/utils/number";
 
 export class RequestQueueService {
   private completedHistory: number[] = [];

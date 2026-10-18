@@ -1,6 +1,6 @@
 import _ from "lodash";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { MAX_FAILED_ATTEMPTS } from "@/helpers/retry";
+import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
 import { plpPage } from "@@tests/support/html";
 import {
   bootScraper,

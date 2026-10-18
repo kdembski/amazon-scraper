@@ -16,7 +16,7 @@ const mocked = {
   put: vi.mocked(axios.put),
   delete: vi.mocked(axios.delete),
 };
-const countries = [{ id: 1, name: "Germany", code: "de", currencyId: 1, active: true }];
+const countries = [{ id: 1, code: "de" }];
 
 const setup = () => {
   resetSingleton(ApiService);

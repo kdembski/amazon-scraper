@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AmazonPlpPageScraper } from "@/scrapers/AmazonPlpPageScraper";
 import type { AmazonPlpBuilder } from "@/builders/AmazonPlpBuilder";
-import { MAX_FAILED_ATTEMPTS } from "@/helpers/retry";
+import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
 import { AmazonPlpAd } from "@/types/amazon.types";
 import { buildPlpPage } from "@@tests/support/factories";
 import {

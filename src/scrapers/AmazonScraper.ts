@@ -3,8 +3,8 @@ import { AmazonPlpScraper } from "@/scrapers/AmazonPlpScraper";
 import { RequestAmazonPdpCountryScraper } from "@/scrapers/RequestAmazonPdpCountryScraper";
 import { AmazonService } from "@/services/AmazonService";
 import { ApiService } from "@/services/ApiService";
-import { ArgsService } from "@/services/ArgsService";
-import { ProxyService } from "@/services/ProxyService";
+import { ArgsService } from "@/shared/args/ArgsService";
+import { ProxyService } from "@/shared/http/ProxyService";
 import { AmazonAd, AmazonAdCategory } from "@/types/amazon.types";
 import { CronJob } from "cron";
 

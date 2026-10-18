@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getRetryDelay } from "@/helpers/retry";
+import { getRetryDelay } from "@/shared/utils/retry";
 
 describe("getRetryDelay", () => {
   const max = () => 1;

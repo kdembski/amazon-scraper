@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ArgsService } from "@/services/ArgsService";
+import { ArgsService } from "@/shared/args/ArgsService";
 
 describe("ArgsService", () => {
   const originalArgv = process.argv;

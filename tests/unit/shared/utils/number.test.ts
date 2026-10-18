@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateAvg, roundToTwoDecimals } from "@/helpers/number";
+import { calculateAvg, roundToTwoDecimals } from "@/shared/utils/number";
 
 describe("calculateAvg", () => {
   it("returns 0 for an empty array", () => {

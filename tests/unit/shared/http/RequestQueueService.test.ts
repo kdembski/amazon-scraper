@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { RequestQueueService } from "@/services/RequestQueueService";
+import { RequestQueueService } from "@/shared/http/RequestQueueService";
 
 const setup = ({ limit = 2, rate = 0, enableLogs = false } = {}) =>
   new RequestQueueService(limit, rate, enableLogs);

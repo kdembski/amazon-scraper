@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RequestAmazonPdpCountryScraper } from "@/scrapers/RequestAmazonPdpCountryScraper";
 import { AmazonPdpPriceHelper } from "@/scrapers/AmazonPdpPriceHelper";
-import { MAX_FAILED_ATTEMPTS } from "@/helpers/retry";
+import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
 import { AmazonAdBuildResult, AmazonAdPrice } from "@/types/amazon.types";
 import { buildAd, buildPrices } from "@@tests/support/factories";
 import {

@@ -1,9 +1,9 @@
 import axios from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AmazonService } from "@/services/AmazonService";
-import type { ArgsService } from "@/services/ArgsService";
-import type { ProxyService } from "@/services/ProxyService";
-import type { RequestQueueService } from "@/services/RequestQueueService";
+import type { ArgsService } from "@/shared/args/ArgsService";
+import type { ProxyService } from "@/shared/http/ProxyService";
+import type { RequestQueueService } from "@/shared/http/RequestQueueService";
 import { cronJobs } from "@@tests/support/cron";
 import { fakeApiService } from "@@tests/support/fakes";
 

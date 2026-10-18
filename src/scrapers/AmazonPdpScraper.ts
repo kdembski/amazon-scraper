@@ -1,5 +1,6 @@
 import { AmazonPdpCountryScraper } from "@/scrapers/abstract/AmazonPdpCountryScraper";
-import { AmazonAd, Country } from "@/types/amazon.types";
+import { Country } from "@/shared/types/Country";
+import { AmazonAd } from "@/types/amazon.types";
 
 export class AmazonPdpScraper {
   private countryScraper;

@@ -1,7 +1,7 @@
 import { vi } from "vitest";
 import type { AmazonService } from "@/services/AmazonService";
 import type { ApiService } from "@/services/ApiService";
-import type { ArgsService } from "@/services/ArgsService";
+import type { ArgsService } from "@/shared/args/ArgsService";
 import type { AmazonAdBuilder, AmazonAdBuildResult } from "@/types/amazon.types";
 
 export function fakeApiService() {

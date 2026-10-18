@@ -1,10 +1,10 @@
 import axios from "axios";
 import UserAgent from "user-agents";
-import { RequestQueueService } from "@/services/RequestQueueService";
-import { ArgsService } from "@/services/ArgsService";
+import { RequestQueueService } from "@/shared/http/RequestQueueService";
+import { ArgsService } from "@/shared/args/ArgsService";
 import { CronJob } from "cron";
 import { ApiService } from "@/services/ApiService";
-import { ProxyService } from "@/services/ProxyService";
+import { ProxyService } from "@/shared/http/ProxyService";
 
 export class AmazonService {
   private static instance: AmazonService;

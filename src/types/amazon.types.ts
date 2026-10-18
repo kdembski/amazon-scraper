@@ -1,3 +1,5 @@
+import { Country } from "@/shared/types/Country";
+
 export interface AmazonAdCategory {
   id: number;
   name: string;
@@ -51,12 +53,4 @@ export interface AmazonAdPrice {
   failed: number;
   resolve?: () => void;
   reject?: (e: any) => void;
-}
-
-export interface Country {
-  id: number;
-  name: string;
-  code: string;
-  currencyId: number;
-  active: boolean;
 }

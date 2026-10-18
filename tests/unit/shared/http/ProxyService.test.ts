@@ -1,6 +1,6 @@
 import axios from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ProxyService } from "@/services/ProxyService";
+import { ProxyService } from "@/shared/http/ProxyService";
 import { cronJobs } from "@@tests/support/cron";
 import { resetSingleton } from "@@tests/support/singleton";
 

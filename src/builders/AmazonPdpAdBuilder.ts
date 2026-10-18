@@ -1,5 +1,6 @@
 import { AmazonPdpAdPriceBuilder } from "@/builders/AmazonPdpAdPriceBuilder";
-import { Country, AmazonAd, AmazonAdBuilder } from "@/types/amazon.types";
+import { Country } from "@/shared/types/Country";
+import { AmazonAd, AmazonAdBuilder } from "@/types/amazon.types";
 
 export class AmazonPdpAdBuilder implements AmazonAdBuilder {
   private priceBuilder;

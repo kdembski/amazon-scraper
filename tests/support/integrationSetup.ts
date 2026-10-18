@@ -5,8 +5,8 @@ import { cronJobs } from "@@tests/support/cron";
 vi.mock("cron", async () => (await import("@@tests/support/cron")).cronModule);
 
 // Retries go out right away, so a country can fail 15 times within a test
-vi.mock("@/helpers/retry", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/helpers/retry")>()),
+vi.mock("@/shared/utils/retry", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/shared/utils/retry")>()),
   getRetryDelay: () => 0,
 }));
 

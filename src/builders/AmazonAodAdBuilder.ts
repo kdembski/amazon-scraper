@@ -2,8 +2,8 @@ import {
   AmazonAd,
   AmazonAdBuilder,
   AmazonAdBuildResult,
-  Country,
 } from "@/types/amazon.types";
+import { Country } from "@/shared/types/Country";
 
 // Builds price data from the "All Offers Display" ajax fragment
 // (/gp/product/ajax/aodAjaxMain). Its pinned offer is the same featured
