@@ -1,15 +1,10 @@
 import http from "http";
 import axios from "axios";
-import { Country } from "@/shared/types/Country";
-import { CronJob } from "cron";
 
 export class ApiService {
   private static instance: ApiService;
-  private countries: Country[] = [];
 
-  private constructor() {
-    new CronJob("0 0 */1 * * *", () => this.loadCountries()).start();
-  }
+  private constructor() {}
 
   public static getInstance(): ApiService {
     if (!ApiService.instance) {
@@ -17,18 +12,6 @@ export class ApiService {
     }
 
     return ApiService.instance;
-  }
-
-  async getCountries() {
-    if (!this.countries.length) {
-      await this.loadCountries();
-    }
-
-    return this.countries;
-  }
-
-  async loadCountries() {
-    this.countries = await this.get<Country[]>("countries");
   }
 
   private url(path: string) {

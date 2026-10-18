@@ -1,11 +1,9 @@
 import http from "http";
 import axios from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiService } from "@/services/ApiService";
-import { cronJobs } from "@@tests/support/cron";
+import { ApiService } from "@/shared/backend/ApiService";
 import { resetSingleton } from "@@tests/support/singleton";
 
-vi.mock("cron", async () => (await import("@@tests/support/cron")).cronModule);
 vi.mock("axios", () => ({
   default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
 }));
@@ -16,7 +14,6 @@ const mocked = {
   put: vi.mocked(axios.put),
   delete: vi.mocked(axios.delete),
 };
-const countries = [{ id: 1, code: "de" }];
 
 const setup = () => {
   resetSingleton(ApiService);
@@ -28,7 +25,6 @@ const withAgent = { httpAgent: expect.any(http.Agent) };
 describe("ApiService", () => {
   beforeEach(() => {
     vi.stubEnv("API_URL", "http://api.test");
-    cronJobs.length = 0;
     Object.values(mocked).forEach((fn) => fn.mockReset());
   });
 
@@ -101,35 +97,4 @@ describe("ApiService", () => {
     });
   });
 
-  describe("countries", () => {
-    it("loads countries on first use", async () => {
-      const service = setup();
-      mocked.get.mockResolvedValue({ data: countries });
-
-      await expect(service.getCountries()).resolves.toEqual(countries);
-    });
-
-    it("serves loaded countries from the cache", async () => {
-      const service = setup();
-      mocked.get.mockResolvedValue({ data: countries });
-      await service.loadCountries();
-      await new Promise((resolve) => setImmediate(resolve));
-
-      await expect(service.getCountries()).resolves.toEqual(countries);
-      expect(mocked.get).toHaveBeenCalledTimes(1);
-      expect(mocked.get).toHaveBeenCalledWith("http://api.test/countries", withAgent);
-    });
-
-    it("reloads countries every hour", async () => {
-      setup();
-      mocked.get.mockResolvedValue({ data: [] });
-
-      expect(cronJobs).toHaveLength(1);
-      expect(cronJobs[0].cronTime).toBe("0 0 */1 * * *");
-      expect(cronJobs[0].start).toHaveBeenCalled();
-
-      await cronJobs[0].onTick();
-      expect(mocked.get).toHaveBeenCalledWith("http://api.test/countries", withAgent);
-    });
-  });
 });

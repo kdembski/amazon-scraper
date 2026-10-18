@@ -1,7 +1,7 @@
 import { AmazonPdpCountryScraper } from "@/scrapers/abstract/AmazonPdpCountryScraper";
 import { AmazonPdpPriceHelper } from "@/scrapers/AmazonPdpPriceHelper";
 import { AmazonService } from "@/services/AmazonService";
-import { ApiService } from "@/services/ApiService";
+import { ApiService } from "@/shared/backend/ApiService";
 import { AmazonAd, AmazonAdBuilder, AmazonAdPrice } from "@/types/amazon.types";
 import { parseHTML } from "linkedom";
 

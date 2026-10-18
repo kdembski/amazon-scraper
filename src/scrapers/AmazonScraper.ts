@@ -2,7 +2,8 @@ import { AmazonPdpScraper } from "@/scrapers/AmazonPdpScraper";
 import { AmazonPlpScraper } from "@/scrapers/AmazonPlpScraper";
 import { RequestAmazonPdpCountryScraper } from "@/scrapers/RequestAmazonPdpCountryScraper";
 import { AmazonService } from "@/services/AmazonService";
-import { ApiService } from "@/services/ApiService";
+import { ApiService } from "@/shared/backend/ApiService";
+import { CountryService } from "@/shared/backend/CountryService";
 import { ArgsService } from "@/shared/args/ArgsService";
 import { ProxyService } from "@/shared/http/ProxyService";
 import { AmazonAd, AmazonAdCategory } from "@/types/amazon.types";
@@ -15,6 +16,7 @@ export class AmazonScraper {
   private pdpScraper;
   private plpScraper;
   private proxyService;
+  private countryService;
   private isLoadingAds = false;
   private categoryRetryDelay = 60 * 1000;
 
@@ -24,7 +26,8 @@ export class AmazonScraper {
     argsService = ArgsService.getInstance(),
     pdpScraper = new AmazonPdpScraper(new RequestAmazonPdpCountryScraper()),
     plpScraper = new AmazonPlpScraper(),
-    proxyService = ProxyService.getInstance()
+    proxyService = ProxyService.getInstance(),
+    countryService = CountryService.getInstance()
   ) {
     this.apiService = apiService;
     this.amazonService = amazonService;
@@ -32,6 +35,7 @@ export class AmazonScraper {
     this.pdpScraper = pdpScraper;
     this.plpScraper = plpScraper;
     this.proxyService = proxyService;
+    this.countryService = countryService;
   }
 
   async execute() {
@@ -73,7 +77,7 @@ export class AmazonScraper {
     this.amazonService.queueService.completed = 0;
 
     try {
-      const countries = await this.apiService.getCountries();
+      const countries = await this.countryService.getCountries();
       const ads = await this.apiService.get<AmazonAd[]>(
         `amazon/ads/scrap?count=${count}`
       );

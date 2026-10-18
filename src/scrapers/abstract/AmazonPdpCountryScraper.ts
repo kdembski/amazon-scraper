@@ -2,7 +2,7 @@ import { AmazonAodAdBuilder } from "@/builders/AmazonAodAdBuilder";
 import { AmazonPdpAdBuilder } from "@/builders/AmazonPdpAdBuilder";
 import { getRetryDelay, MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
 import { AmazonPdpPriceHelper } from "@/scrapers/AmazonPdpPriceHelper";
-import { ApiService } from "@/services/ApiService";
+import { ApiService } from "@/shared/backend/ApiService";
 import { ArgsService } from "@/shared/args/ArgsService";
 import {
   AmazonAd,

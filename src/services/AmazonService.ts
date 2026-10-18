@@ -3,7 +3,7 @@ import UserAgent from "user-agents";
 import { RequestQueueService } from "@/shared/http/RequestQueueService";
 import { ArgsService } from "@/shared/args/ArgsService";
 import { CronJob } from "cron";
-import { ApiService } from "@/services/ApiService";
+import { ApiService } from "@/shared/backend/ApiService";
 import { ProxyService } from "@/shared/http/ProxyService";
 
 export class AmazonService {

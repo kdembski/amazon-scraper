@@ -1,14 +1,15 @@
 import { vi } from "vitest";
 import { AmazonScraper } from "@/scrapers/AmazonScraper";
 import { AmazonService } from "@/services/AmazonService";
-import { ApiService } from "@/services/ApiService";
+import { ApiService } from "@/shared/backend/ApiService";
+import { CountryService } from "@/shared/backend/CountryService";
 import { ArgsService } from "@/shared/args/ArgsService";
 import { ProxyService } from "@/shared/http/ProxyService";
 import { FakeAmazon } from "@@tests/support/fake/amazon";
 import { FakeBackend } from "@@tests/support/fake/backend";
 import { resetSingleton } from "@@tests/support/singleton";
 
-const singletons = [ArgsService, ApiService, ProxyService, AmazonService];
+const singletons = [ArgsService, ApiService, CountryService, ProxyService, AmazonService];
 const argv = process.argv;
 
 const instanceOf = <T>(singleton: { getInstance(): T }) =>

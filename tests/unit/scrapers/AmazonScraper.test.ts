@@ -8,10 +8,12 @@ import {
   fakeAmazonService,
   fakeApiService,
   fakeArgsService,
+  fakeCountryService,
 } from "@@tests/support/fakes";
 
 const setup = ({ count = 50 } = {}) => {
   const api = fakeApiService();
+  const country = fakeCountryService();
   const amazon = fakeAmazonService();
   const args = fakeArgsService({ count });
   const pdpExecute = vi.fn();
@@ -24,10 +26,13 @@ const setup = ({ count = 50 } = {}) => {
     args.service,
     pdpScraper,
     plpScraper,
-    {} as ProxyService
+    {} as ProxyService,
+    country.service
   );
-  return { api, amazon, pdpExecute, plpExecute, scraper };
+  return { api, country, amazon, pdpExecute, plpExecute, scraper };
 };
+
+type Fakes = Pick<ReturnType<typeof setup>, "api" | "country">;
 
 const flush = () => new Promise((resolve) => setImmediate(resolve));
 
@@ -37,10 +42,10 @@ describe("AmazonScraper", () => {
     const ads = [buildAd({ id: 1 }), buildAd({ id: 2 })];
 
     it("scrapes a batch of ads in every country", async () => {
-      const { api, amazon, pdpExecute, scraper } = setup({ count: 50 });
+      const { api, country, amazon, pdpExecute, scraper } = setup({ count: 50 });
       amazon.queueService.completed = 10;
       amazon.queueService.failed = 3;
-      api.getCountries.mockResolvedValue(countries);
+      country.getCountries.mockResolvedValue(countries);
       api.get.mockResolvedValue(ads);
 
       await scraper.scrapPdp();
@@ -54,17 +59,17 @@ describe("AmazonScraper", () => {
     });
 
     it("waits while the queue is longer than a tenth of the batch", async () => {
-      const { api, amazon, scraper } = setup({ count: 50 });
+      const { api, country, amazon, scraper } = setup({ count: 50 });
       amazon.queueService.queue.push(...Array.from({ length: 6 }, () => vi.fn()));
 
       await scraper.scrapPdp();
-      expect(api.getCountries).not.toHaveBeenCalled();
+      expect(country.getCountries).not.toHaveBeenCalled();
       expect(api.get).not.toHaveBeenCalled();
     });
 
     it("does not load a new batch while the previous one is loading", async () => {
-      const { api, scraper } = setup();
-      api.getCountries.mockResolvedValue(countries);
+      const { api, country, scraper } = setup();
+      country.getCountries.mockResolvedValue(countries);
       api.get.mockReturnValue(new Promise(() => {}));
 
       scraper.scrapPdp();
@@ -75,15 +80,15 @@ describe("AmazonScraper", () => {
     });
 
     it.each([
-      ["countries", (api: ReturnType<typeof fakeApiService>) =>
-        api.getCountries.mockRejectedValueOnce(new Error("down"))],
-      ["ads", (api: ReturnType<typeof fakeApiService>) =>
-        api.get.mockRejectedValueOnce(new Error("down"))],
+      ["countries", (fakes: Fakes) =>
+        fakes.country.getCountries.mockRejectedValueOnce(new Error("down"))],
+      ["ads", (fakes: Fakes) =>
+        fakes.api.get.mockRejectedValueOnce(new Error("down"))],
     ])("tries again after loading %s fails", async (_name, failOnce) => {
-      const { api, pdpExecute, scraper } = setup();
-      api.getCountries.mockResolvedValue(countries);
+      const { api, country, pdpExecute, scraper } = setup();
+      country.getCountries.mockResolvedValue(countries);
       api.get.mockResolvedValue(ads);
-      failOnce(api);
+      failOnce({ api, country });
 
       await scraper.scrapPdp().catch(() => {});
       await flush();

@@ -1,7 +1,8 @@
 import { vi } from "vitest";
 import type { AmazonService } from "@/services/AmazonService";
-import type { ApiService } from "@/services/ApiService";
+import type { ApiService } from "@/shared/backend/ApiService";
 import type { ArgsService } from "@/shared/args/ArgsService";
+import type { CountryService } from "@/shared/backend/CountryService";
 import type { AmazonAdBuilder, AmazonAdBuildResult } from "@/types/amazon.types";
 
 export function fakeApiService() {
@@ -9,15 +10,19 @@ export function fakeApiService() {
   const post = vi.fn().mockResolvedValue(undefined);
   const put = vi.fn().mockResolvedValue(undefined);
   const del = vi.fn().mockResolvedValue(undefined);
-  const getCountries = vi.fn().mockResolvedValue([]);
   const service = {
     get,
     post,
     put,
     delete: del,
-    getCountries,
   } as unknown as ApiService;
-  return { service, get, post, put, delete: del, getCountries };
+  return { service, get, post, put, delete: del };
+}
+
+export function fakeCountryService() {
+  const getCountries = vi.fn().mockResolvedValue([]);
+  const service = { getCountries } as unknown as CountryService;
+  return { service, getCountries };
 }
 
 type GetCallback = {

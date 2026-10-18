@@ -1,7 +1,7 @@
 import { AmazonPlpBuilder } from "@/builders/AmazonPlpBuilder";
 import { getRetryDelay, MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
 import { AmazonService } from "@/services/AmazonService";
-import { ApiService } from "@/services/ApiService";
+import { ApiService } from "@/shared/backend/ApiService";
 import { ArgsService } from "@/shared/args/ArgsService";
 import { AmazonPlpAdPage, AmazonPlpAd } from "@/types/amazon.types";
 import { parseHTML } from "linkedom";
