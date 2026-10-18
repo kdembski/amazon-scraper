@@ -135,6 +135,107 @@ describe("ScrapingClient", () => {
       expect(callback.onSuccess).not.toHaveBeenCalled();
     });
 
+    describe("metrics", () => {
+      const setupMetrics = () => {
+        const metrics = { increment: vi.fn() };
+        const queue = {
+          start: vi.fn(),
+          request: vi.fn(),
+        };
+        const requests: Promise<unknown>[] = [];
+        queue.request.mockImplementation((cb: () => Promise<unknown>) => {
+          requests.push(cb());
+        });
+        const service = new Client(
+          {} as ArgsService,
+          { getRandomAgent: vi.fn() },
+          queue,
+          metrics
+        );
+        return { service, metrics, requests };
+      };
+      const url = "https://www.amazon.de/dp/X";
+
+      it("counts a successful request with the country label", async () => {
+        const { service, metrics, requests } = setupMetrics();
+        get.mockResolvedValue({ data: "<html>" });
+
+        service.get(url, undefined, undefined, { country: "de" });
+        await Promise.all(requests);
+
+        expect(metrics.increment).toHaveBeenCalledWith("requests", {
+          country: "de",
+          outcome: "ok",
+        });
+      });
+
+      it("counts the outcome without labels", async () => {
+        const { service, metrics, requests } = setupMetrics();
+        get.mockResolvedValue({ data: "" });
+
+        service.get(url);
+        await Promise.all(requests);
+
+        expect(metrics.increment).toHaveBeenCalledWith("requests", {
+          outcome: "ok",
+        });
+      });
+
+      it.each([
+        [{ response: { status: 503 } }, "http_503"],
+        [{ code: "ERR_CANCELED" }, "timeout"],
+        [new Error("ECONNRESET"), "network"],
+      ])("maps error %j to %s", async (error, outcome) => {
+        const { service, metrics, requests } = setupMetrics();
+        get.mockRejectedValue(error);
+
+        service.get(url, undefined, undefined, { country: "de" });
+        await Promise.all(requests);
+
+        expect(metrics.increment).toHaveBeenCalledWith("requests", {
+          country: "de",
+          outcome,
+        });
+      });
+
+      it("records request_ms with the labels", async () => {
+        const { service, metrics, requests } = setupMetrics();
+        get.mockResolvedValue({ data: "" });
+
+        service.get(url, undefined, undefined, { country: "de" });
+        await Promise.all(requests);
+
+        expect(metrics.increment).toHaveBeenCalledWith(
+          "request_ms",
+          { country: "de" },
+          expect.any(Number)
+        );
+        const value = metrics.increment.mock.calls.find(
+          ([name]) => name === "request_ms"
+        )![2];
+        expect(value).toBeGreaterThanOrEqual(0);
+      });
+
+      it("counts once as ok even when onSuccess throws", async () => {
+        const { service, metrics, requests } = setupMetrics();
+        get.mockResolvedValue({ data: "" });
+        const onError = vi.fn();
+
+        service.get(url, undefined, {
+          onSuccess: () => {
+            throw new Error("boom");
+          },
+          onError,
+        });
+        await Promise.all(requests);
+
+        const counted = metrics.increment.mock.calls.filter(
+          ([name]) => name === "requests"
+        );
+        expect(counted).toEqual([["requests", { outcome: "ok" }]]);
+      });
+    });
+
     it("works without callbacks", async () => {
       const { service, requests } = setup();
       get.mockRejectedValue(new Error("down"));

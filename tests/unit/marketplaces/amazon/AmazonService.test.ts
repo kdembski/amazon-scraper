@@ -23,7 +23,8 @@ describe("AmazonService", () => {
     expect(client.get).toHaveBeenCalledWith(
       "https://www.amazon.de/dp/B0TESTASIN",
       "https://www.amazon.de/s?k=B0TESTASIN",
-      callback
+      callback,
+      { country: "de" }
     );
   });
 
