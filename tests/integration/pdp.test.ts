@@ -226,4 +226,30 @@ describe("PDP", () => {
     const post = await world.backend.waitFor("POST", "scrapers/it/status");
     expect(post.body).toEqual({ speed: 0, pending: 0 });
   });
+
+  it("reports metrics every minute", async () => {
+    world.amazon.respondPerCountry(offers);
+    scrape();
+    await world.backend.waitFor("PUT", "amazon/ads/7");
+
+    const report = cronJobs.find((job) => job.cronTime === "0 * * * * *");
+    report!.onTick();
+
+    const post = await world.backend.waitFor("POST", "scrapers/it/metrics");
+    const { metrics, ...rest } = post.body;
+    expect(rest).toMatchObject({ marketplace: "amazon", flow: "pdp" });
+    const value = (metric: string, country?: string, outcome?: string) =>
+      metrics.find(
+        (m: any) =>
+          m.metric === metric && m.country === country && m.outcome === outcome
+      )?.value;
+    ["de", "fr", "it"].forEach((country) => {
+      expect(value("requests", country, "ok")).toBe(1);
+      expect(value("responses", country, "data")).toBe(1);
+      expect(value("items", country, "data")).toBe(1);
+    });
+    expect(value("connections")).toBeGreaterThanOrEqual(1);
+    expect(value("bytes_in")).toBeGreaterThan(0);
+    expect(value("bytes_out")).toBeGreaterThan(0);
+  });
 });

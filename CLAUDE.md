@@ -36,11 +36,11 @@ Integration (`tests/integration/`) and e2e (`tests/e2e/`) tests share fakes in `
 
 ## Structure
 
-- `src/shared/`: code that knows no shop — `args/` (`ArgsService`), `backend/` (`ApiService`, `CountryService`, `ScraperStatusService`), `http/` (`ProxyService`, `RequestQueueService`, `ScrapingClient`), `interfaces/`, `types/`, `utils/`.
+- `src/shared/`: code that knows no shop — `args/` (`ArgsService`), `backend/` (`ApiService`, `CountryService`, `ScraperStatusService`, `MetricsReporter`), `metrics/` (`MetricsService`), `http/` (`ProxyService`, `RequestQueueService`, `ScrapingClient`), `interfaces/`, `types/`, `utils/`.
 - `src/marketplaces/<name>/`: one folder per shop — scraper implementing `MarketplaceScraper`, a thin service over `ScrapingClient`, `types/`, and one folder per flow (`amazon/pdp/`, `amazon/plp/`) holding its scrapers and builders.
 - `src/shared` imports nothing from `src/marketplaces`.
 - `src/marketplaces.ts` (`createScraper()`) starts `ScraperStatusService` and returns the scraper; `src/index.ts` calls `createScraper().execute()`.
-- Add a shop: a `src/marketplaces/<name>/` folder, a `-m` flag in `ArgsService`, the choice in `createScraper()`, services in `docker-compose.yml`.
+- Add a shop: a `src/marketplaces/<name>/` folder with `MarketplaceScraper.marketplace` set, a `-m` flag in `ArgsService`, the choice in `createScraper()`, services in `docker-compose.yml`.
 
 ## Architecture
 
@@ -53,6 +53,7 @@ Integration (`tests/integration/`) and e2e (`tests/e2e/`) tests share fakes in `
   - 404: country deleted; if ≤2 countries remain, `DELETE amazon/ads/<id>`.
   - All complete: `PUT amazon/ads/<id>` with prices.
 - PLP flow: hourly category from `amazon/ads/categories/scrap` → `AmazonPlpPageScraper` → `AmazonPlpBuilder` → `POST amazon/ads`, recursing into subcategories.
+- `MetricsService` + `MetricsReporter` send counters every minute as `POST scrapers/<name>/metrics` (catalog in `docs/superpowers/specs/2026-10-18-scraper-metrics-design.md`); a marketplace maps its results to the shared `outcome` values.
 - `ApiService`: `get()` throws, `post`/`put`/`delete` only log errors.
 
 ## Connection limits

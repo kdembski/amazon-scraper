@@ -1,6 +1,7 @@
 import _ from "lodash";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
+import { cronJobs } from "@@tests/support/cron";
 import { plpPage } from "@@tests/support/html";
 import {
   bootScraper,
@@ -123,5 +124,21 @@ describe("PLP", () => {
       MAX_FAILED_ATTEMPTS * PRICE_RANGES
     );
     expect(world.backend.find("POST", "amazon/ads")).toHaveLength(0);
+  });
+
+  it("reports metrics every minute", async () => {
+    world.amazon.respond(() => plpPage({ asins: ["B0ROOT1"] }));
+    scrape();
+    await waitForPosts(PRICE_RANGES);
+
+    const report = cronJobs.find((job) => job.cronTime === "0 * * * * *");
+    report!.onTick();
+
+    const post = await world.backend.waitFor("POST", "scrapers/it/metrics");
+    expect(post.body).toMatchObject({ marketplace: "amazon", flow: "plp" });
+    const items = post.body.metrics.find(
+      (m: any) => m.metric === "items" && m.country === "pl" && m.outcome === "data"
+    );
+    expect(items.value).toBeGreaterThanOrEqual(1);
   });
 });

@@ -11,6 +11,7 @@ import { MarketplaceScraper } from "@/shared/interfaces/MarketplaceScraper";
 import { CronJob } from "cron";
 
 export class AmazonScraper implements MarketplaceScraper {
+  readonly marketplace = "amazon";
   private apiService;
   private amazonService;
   private argsService;

@@ -37,6 +37,10 @@ type Fakes = Pick<ReturnType<typeof setup>, "api" | "country">;
 const flush = () => new Promise((resolve) => setImmediate(resolve));
 
 describe("AmazonScraper", () => {
+  it("is the amazon marketplace", () => {
+    expect(setup().scraper.marketplace).toBe("amazon");
+  });
+
   describe("scrapPdp", () => {
     const countries = [buildCountry({ id: 1 }), buildCountry({ id: 2 })];
     const ads = [buildAd({ id: 1 }), buildAd({ id: 2 })];

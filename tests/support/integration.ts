@@ -4,6 +4,8 @@ import type { AmazonScraper } from "@/marketplaces/amazon/AmazonScraper";
 import { AmazonService } from "@/marketplaces/amazon/AmazonService";
 import { ApiService } from "@/shared/backend/ApiService";
 import { CountryService } from "@/shared/backend/CountryService";
+import { MetricsReporter } from "@/shared/backend/MetricsReporter";
+import { MetricsService } from "@/shared/metrics/MetricsService";
 import { ScraperStatusService } from "@/shared/backend/ScraperStatusService";
 import { ScrapingClient } from "@/shared/http/ScrapingClient";
 import { ArgsService } from "@/shared/args/ArgsService";
@@ -20,6 +22,8 @@ const singletons = [
   ScrapingClient,
   ScraperStatusService,
   AmazonService,
+  MetricsService,
+  MetricsReporter,
 ];
 const argv = process.argv;
 
