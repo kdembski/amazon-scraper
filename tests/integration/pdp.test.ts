@@ -108,14 +108,12 @@ describe("PDP", () => {
         ...offers.de,
       ],
     });
-    const { queue } = scrape();
+    scrape();
 
     const put = await world.backend.waitFor("PUT", "amazon/ads/7");
 
     expect(world.amazon.requestsTo("de")).toHaveLength(5);
     expect(put.body.prices[0]).toEqual(price(1, 24.99, "Amazon"));
-    expect(queue.failed).toBe(4);
-    expect(queue.completed).toBe(3);
   });
 
   it("gives up on a country after the attempt limit", async () => {

@@ -189,43 +189,14 @@ describe("RequestQueueService", () => {
     });
   });
 
-  describe("speed", () => {
-    it("is the average of completed requests per second", async () => {
-      const queue = setup();
-
-      queue.completed = 4;
-      await vi.advanceTimersByTimeAsync(1000);
-      expect(queue.speed).toBe(4);
-
-      queue.completed = 6;
-      await vi.advanceTimersByTimeAsync(1000);
-      expect(queue.speed).toBe(3);
-    });
-
-    it("ignores the counter being reset", async () => {
-      const queue = setup();
-
-      queue.completed = 4;
-      await vi.advanceTimersByTimeAsync(1000);
-      queue.completed = 0;
-      await vi.advanceTimersByTimeAsync(1000);
-
-      expect(queue.speed).toBe(2);
-    });
-  });
-
   describe("logs", () => {
     it("logs the state every second when enabled", async () => {
       const log = vi.spyOn(console, "log").mockImplementation(() => {});
-      const queue = setup({ limit: 5, rate: 3, enableLogs: true });
-      queue.failed = 2;
-      queue.completed = 7;
+      setup({ limit: 5, rate: 3, enableLogs: true });
 
       await vi.advanceTimersByTimeAsync(1000);
 
-      expect(log).toHaveBeenCalledWith(
-        "speed: 7.00/s | limit: 5 | rate: 3/s | pending: 0 | queue: 0 | failed: 2 | completed: 7"
-      );
+      expect(log).toHaveBeenCalledWith("rate: 3/s | limit: 5 | pending: 0 | queue: 0");
     });
 
     it("logs open connections after pending when they are counted", async () => {

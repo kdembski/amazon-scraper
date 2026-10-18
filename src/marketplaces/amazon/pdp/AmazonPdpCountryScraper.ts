@@ -59,7 +59,6 @@ export class AmazonPdpCountryScraper {
       .then(() => {
         price.pending = false;
         price.complete = true;
-        this.amazonService.queueService.completed++;
         if (!price.deleted) {
           this.countItem(price, _.isNil(price.value) ? "no_data" : "data");
         }
@@ -68,7 +67,6 @@ export class AmazonPdpCountryScraper {
       .catch(() => {
         price.pending = false;
         price.failed++;
-        this.amazonService.queueService.failed++;
         this.retry(price, ad, prices, resolveAd);
       });
   }

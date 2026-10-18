@@ -81,14 +81,12 @@ export class AmazonPlpPageScraper {
       .then((ads) => {
         page.pending = false;
         page.complete = true;
-        this.amazonService.queueService.completed++;
         this.countItem(page, "data");
         if (ads) this.apiService.post("amazon/ads", ads);
       })
       .catch(() => {
         page.pending = false;
         page.failed++;
-        this.amazonService.queueService.failed++;
         this.retry(page);
       });
   }

@@ -189,7 +189,6 @@ describe("AmazonPlpPageScraper", () => {
       expect(build).toHaveBeenCalledWith(expect.anything(), "electronics");
       expect(api.post).toHaveBeenCalledWith("amazon/ads", ads);
       expect(page).toMatchObject({ pending: false, complete: true });
-      expect(amazon.queueService.completed).toBe(1);
     });
 
     it("scrapes every subcategory in every price range", async () => {
@@ -284,7 +283,6 @@ describe("AmazonPlpPageScraper", () => {
       await flush();
 
       expect(page).toMatchObject({ pending: false, complete: false, failed: 1 });
-      expect(s.amazon.queueService.failed).toBe(1);
       expect(s.api.post).not.toHaveBeenCalled();
       expect(s.amazon.get).toHaveBeenCalledTimes(1);
 

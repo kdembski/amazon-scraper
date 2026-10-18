@@ -1,17 +1,10 @@
-import { calculateAvg, roundToTwoDecimals } from "@/shared/utils/number";
-
 export class RequestQueueService {
-  private completedHistory: number[] = [];
   queue: (() => any)[] = [];
-  speed = 0;
-  completed = 0;
-  failed = 0;
   pending = 0;
   limit;
   rate;
   private tokens;
   private lastRefill = Date.now();
-  private previousCompleted = 0;
   private countConnections;
 
   constructor(
@@ -24,10 +17,6 @@ export class RequestQueueService {
     this.rate = rate;
     this.tokens = rate;
     this.countConnections = countConnections;
-
-    setInterval(() => {
-      this.updateCompletedHistory();
-    }, 1000);
 
     if (enableLogs) {
       setInterval(() => this.logState(), 1000);
@@ -87,34 +76,15 @@ export class RequestQueueService {
     this.lastRefill = now;
   }
 
-  private updateCompletedHistory() {
-    let diff = this.completed - this.previousCompleted;
-    diff = diff < 0 ? 0 : diff;
-
-    const length = this.completedHistory.unshift(diff);
-    this.completedHistory.length = Math.min(length, 24 * 60 * 60);
-
-    this.previousCompleted = this.completed;
-    this.calculateSpeed();
-  }
-
-  private calculateSpeed() {
-    if (!this.completedHistory.length) return;
-    this.speed = calculateAvg(this.completedHistory);
-  }
-
   private logState() {
     const stats = [
-      `speed: ${roundToTwoDecimals(this.speed)}/s`,
-      `limit: ${this.limit}`,
       `rate: ${this.rate || "-"}/s`,
+      `limit: ${this.limit}`,
       `pending: ${this.pending}`,
       ...(this.countConnections
         ? [`connections: ${this.countConnections()}`]
         : []),
       `queue: ${this.queue.length}`,
-      `failed: ${this.failed}`,
-      `completed: ${this.completed}`,
     ];
     const text = stats.join(` | `);
     console.log(text);

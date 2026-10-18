@@ -56,9 +56,6 @@ export class AmazonScraper implements MarketplaceScraper {
   }
 
   async scrapPlp() {
-    this.amazonService.queueService.failed = 0;
-    this.amazonService.queueService.completed = 0;
-
     this.apiService
       .get<AmazonAdCategory>("amazon/ads/categories/scrap")
       .then((category) => this.plpScraper.execute(category.name))
@@ -74,8 +71,6 @@ export class AmazonScraper implements MarketplaceScraper {
     if (this.amazonService.queueService.queue.length > count / 10) return;
 
     this.isLoadingAds = true;
-    this.amazonService.queueService.failed = 0;
-    this.amazonService.queueService.completed = 0;
 
     try {
       const countries = await this.countryService.getCountries();

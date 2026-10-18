@@ -90,7 +90,6 @@ describe("AmazonPdpCountryScraper", () => {
         pending: false,
         complete: true,
       });
-      expect(amazon.queueService.completed).toBe(1);
     });
 
     it("waits for all countries before sending the prices", async () => {
@@ -164,7 +163,6 @@ describe("AmazonPdpCountryScraper", () => {
         complete: false,
         failed: 1,
       });
-      expect(amazon.queueService.failed).toBe(1);
       expect(amazon.get).toHaveBeenCalledTimes(3);
 
       await vi.advanceTimersByTimeAsync(1000);
