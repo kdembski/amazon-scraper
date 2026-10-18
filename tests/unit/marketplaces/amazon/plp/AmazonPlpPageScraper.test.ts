@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AmazonPlpPageScraper } from "@/marketplaces/amazon/plp/AmazonPlpPageScraper";
 import type { AmazonPlpBuilder } from "@/marketplaces/amazon/plp/AmazonPlpBuilder";
+import type { MetricsService } from "@/shared/metrics/MetricsService";
 import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
 import { AmazonPlpAd } from "@/marketplaces/amazon/types/amazon.types";
 import { buildPlpPage } from "@@tests/support/factories";
@@ -24,14 +25,16 @@ const setup = ({ count = 50 } = {}) => {
     subcategories: [] as string[],
     hasNextPage: false,
   }));
+  const increment = vi.fn();
   const builder = { build } as unknown as AmazonPlpBuilder;
   const scraper = new AmazonPlpPageScraper(
     api.service,
     amazon.service,
     args.service,
-    builder
+    builder,
+    { increment } as unknown as MetricsService
   );
-  return { amazon, api, build, scraper };
+  return { amazon, api, build, scraper, increment };
 };
 
 const flush = () => vi.advanceTimersByTimeAsync(0);
@@ -306,6 +309,61 @@ describe("AmazonPlpPageScraper", () => {
       });
       expect(amazon.get).toHaveBeenCalledTimes(MAX_FAILED_ATTEMPTS);
       expect(api.post).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("metrics", () => {
+    const labels = (outcome: string) => ({ country: "pl", outcome });
+
+    it("counts a page with products as data", async () => {
+      const { amazon, scraper, increment } = setup();
+      const done = scraper.execute(buildPlpPage());
+
+      amazon.respond(0, html);
+      await done;
+
+      expect(increment).toHaveBeenCalledWith("responses", labels("data"));
+      expect(increment).toHaveBeenCalledWith("items", labels("data"));
+      expect(increment).toHaveBeenCalledWith("item_attempts", labels("data"), 1);
+    });
+
+    it("counts a page without products as no_data", async () => {
+      const s = setup();
+      s.build.mockReturnValueOnce({ ads: [], subcategories: [], hasNextPage: false });
+      s.scraper.execute(buildPlpPage());
+
+      s.amazon.respond(0, html);
+      await flush();
+
+      expect(s.increment).toHaveBeenCalledWith("responses", labels("no_data"));
+      expect(s.increment).not.toHaveBeenCalledWith("items", expect.anything());
+    });
+
+    it("counts an empty response", async () => {
+      const { amazon, scraper, increment } = setup();
+      scraper.execute(buildPlpPage());
+
+      amazon.respond(0, "");
+      await flush();
+
+      expect(increment).toHaveBeenCalledWith("responses", labels("empty"));
+    });
+
+    it("counts a given up page", async () => {
+      const { amazon, scraper, increment } = setup();
+      scraper.execute(buildPlpPage());
+
+      for (let i = 0; i < MAX_FAILED_ATTEMPTS; i++) {
+        amazon.fail(amazon.requests.length - 1);
+        await vi.runAllTimersAsync();
+      }
+
+      expect(increment).toHaveBeenCalledWith("items", labels("given_up"));
+      expect(increment).toHaveBeenCalledWith(
+        "item_attempts",
+        labels("given_up"),
+        MAX_FAILED_ATTEMPTS
+      );
     });
   });
 });

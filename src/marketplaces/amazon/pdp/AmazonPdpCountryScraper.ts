@@ -7,25 +7,31 @@ import {
   AmazonAdPrice,
 } from "@/marketplaces/amazon/types/amazon.types";
 import { ApiService } from "@/shared/backend/ApiService";
+import { MetricsService } from "@/shared/metrics/MetricsService";
+import { ItemOutcome, ResponseOutcome } from "@/shared/metrics/metrics.types";
 import { getRetryDelay, MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
 import { parseHTML } from "linkedom";
+import _ from "lodash";
 
 export class AmazonPdpCountryScraper {
   private amazonService;
   private apiService;
   private builder;
   private priceHelper;
+  private metricsService;
 
   constructor(
     amazonService = AmazonService.getInstance(),
     apiService = ApiService.getInstance(),
     builder: AmazonAdBuilder = new AmazonAodAdBuilder(),
-    priceHelper = new AmazonPdpPriceHelper()
+    priceHelper = new AmazonPdpPriceHelper(),
+    metricsService = MetricsService.getInstance()
   ) {
     this.amazonService = amazonService;
     this.apiService = apiService;
     this.builder = builder;
     this.priceHelper = priceHelper;
+    this.metricsService = metricsService;
   }
 
   execute(
@@ -54,6 +60,9 @@ export class AmazonPdpCountryScraper {
         price.pending = false;
         price.complete = true;
         this.amazonService.queueService.completed++;
+        if (!price.deleted) {
+          this.countItem(price, _.isNil(price.value) ? "no_data" : "data");
+        }
         this.tryComplete(ad, prices, resolveAd);
       })
       .catch(() => {
@@ -66,6 +75,7 @@ export class AmazonPdpCountryScraper {
 
   private async onSuccess(data: string, price: AmazonAdPrice) {
     if (!data.length) {
+      this.countResponse(price, "empty");
       price.reject?.("Received empty data");
       return;
     }
@@ -74,18 +84,35 @@ export class AmazonPdpCountryScraper {
     const ad = this.builder.build(document);
 
     if (ad.isCaptcha) {
+      this.countResponse(price, "captcha");
       price.reject?.("Captcha occured");
       return;
     }
 
     if (ad.isValid === false) {
+      this.countResponse(price, "invalid");
       price.reject?.("Unexpected response");
       return;
     }
 
+    this.countResponse(price, _.isNil(ad.price) ? "no_data" : "data");
     price.value = ad.price;
     price.dispatchFrom = ad.dispatchFrom;
     price.resolve?.();
+  }
+
+  private countResponse(price: AmazonAdPrice, outcome: ResponseOutcome) {
+    this.metricsService.increment("responses", {
+      country: price.country.code,
+      outcome,
+    });
+  }
+
+  private countItem(price: AmazonAdPrice, outcome: ItemOutcome) {
+    const labels = { country: price.country.code, outcome };
+    const attempts = outcome === "given_up" ? price.failed : price.failed + 1;
+    this.metricsService.increment("items", labels);
+    this.metricsService.increment("item_attempts", labels, attempts);
   }
 
   private onError(
@@ -112,6 +139,7 @@ export class AmazonPdpCountryScraper {
     // Give up on this country, the ad is completed without its price
     if (price.failed >= MAX_FAILED_ATTEMPTS) {
       price.complete = true;
+      this.countItem(price, "given_up");
       this.tryComplete(ad, prices, resolve);
       return;
     }
@@ -143,6 +171,7 @@ export class AmazonPdpCountryScraper {
   ) {
     if (price.adDeleted) return;
     price.deleted = true;
+    this.countItem(price, "deleted");
 
     if (!this.priceHelper.isDeleted(prices)) {
       price.resolve?.();
