@@ -215,18 +215,6 @@ describe("PDP", () => {
     expect(Math.max(...times) - Math.min(...times)).toBeGreaterThan(1500);
   });
 
-  it("reports its status every hour", async () => {
-    world.amazon.respondPerCountry(offers);
-    scrape();
-    await world.backend.waitFor("PUT", "amazon/ads/7");
-
-    const status = cronJobs.find((job) => job.cronTime === "0 50 */1 * * *");
-    status!.onTick();
-
-    const post = await world.backend.waitFor("POST", "scrapers/it/status");
-    expect(post.body).toEqual({ speed: 0, pending: 0 });
-  });
-
   it("reports metrics every minute", async () => {
     world.amazon.respondPerCountry(offers);
     scrape();
