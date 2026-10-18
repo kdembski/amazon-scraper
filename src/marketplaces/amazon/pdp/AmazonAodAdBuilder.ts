@@ -2,7 +2,7 @@ import {
   AmazonAd,
   AmazonAdBuilder,
   AmazonAdBuildResult,
-} from "@/types/amazon.types";
+} from "@/marketplaces/amazon/types/amazon.types";
 import { Country } from "@/shared/types/Country";
 
 // Builds price data from the "All Offers Display" ajax fragment

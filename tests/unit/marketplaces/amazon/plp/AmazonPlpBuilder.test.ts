@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AmazonPlpBuilder } from "@/builders/AmazonPlpBuilder";
+import { AmazonPlpBuilder } from "@/marketplaces/amazon/plp/AmazonPlpBuilder";
 import { categoryItem, pagination, toDocument } from "@@tests/support/html";
 
 const builder = new AmazonPlpBuilder();

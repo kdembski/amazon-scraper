@@ -1,4 +1,4 @@
-import { AmazonPlpAd } from "@/types/amazon.types";
+import { AmazonPlpAd } from "@/marketplaces/amazon/types/amazon.types";
 
 export class AmazonPlpBuilder {
   build(document: Document, category: string) {

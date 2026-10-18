@@ -1,7 +1,7 @@
 import { vi } from "vitest";
 import { createScraper } from "@/marketplaces";
-import type { AmazonScraper } from "@/scrapers/AmazonScraper";
-import { AmazonService } from "@/services/AmazonService";
+import type { AmazonScraper } from "@/marketplaces/amazon/AmazonScraper";
+import { AmazonService } from "@/marketplaces/amazon/AmazonService";
 import { ApiService } from "@/shared/backend/ApiService";
 import { CountryService } from "@/shared/backend/CountryService";
 import { ScraperStatusService } from "@/shared/backend/ScraperStatusService";

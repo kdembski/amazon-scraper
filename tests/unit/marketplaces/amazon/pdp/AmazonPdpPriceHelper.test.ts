@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AmazonPdpPriceHelper } from "@/scrapers/AmazonPdpPriceHelper";
+import { AmazonPdpPriceHelper } from "@/marketplaces/amazon/pdp/AmazonPdpPriceHelper";
 import { buildAd, buildCountry, buildPrice } from "@@tests/support/factories";
 import { fakeApiService } from "@@tests/support/fakes";
 

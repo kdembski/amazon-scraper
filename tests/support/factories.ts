@@ -2,7 +2,7 @@ import {
   AmazonAd,
   AmazonAdPrice,
   AmazonPlpAdPage,
-} from "@/types/amazon.types";
+} from "@/marketplaces/amazon/types/amazon.types";
 import { Country } from "@/shared/types/Country";
 
 export const buildCountry = (overrides: Partial<Country> = {}): Country => ({

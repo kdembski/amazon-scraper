@@ -1,4 +1,4 @@
-import { AmazonScraper } from "@/scrapers/AmazonScraper";
+import { AmazonScraper } from "@/marketplaces/amazon/AmazonScraper";
 import { ScraperStatusService } from "@/shared/backend/ScraperStatusService";
 import { MarketplaceScraper } from "@/shared/interfaces/MarketplaceScraper";
 

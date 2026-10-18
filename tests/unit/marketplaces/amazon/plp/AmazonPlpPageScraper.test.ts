@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AmazonPlpPageScraper } from "@/scrapers/AmazonPlpPageScraper";
-import type { AmazonPlpBuilder } from "@/builders/AmazonPlpBuilder";
+import { AmazonPlpPageScraper } from "@/marketplaces/amazon/plp/AmazonPlpPageScraper";
+import type { AmazonPlpBuilder } from "@/marketplaces/amazon/plp/AmazonPlpBuilder";
 import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
-import { AmazonPlpAd } from "@/types/amazon.types";
+import { AmazonPlpAd } from "@/marketplaces/amazon/types/amazon.types";
 import { buildPlpPage } from "@@tests/support/factories";
 import {
   fakeAmazonService,

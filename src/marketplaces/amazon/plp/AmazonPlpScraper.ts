@@ -1,4 +1,4 @@
-import { AmazonPlpPageScraper } from "@/scrapers/AmazonPlpPageScraper";
+import { AmazonPlpPageScraper } from "@/marketplaces/amazon/plp/AmazonPlpPageScraper";
 
 export class AmazonPlpScraper {
   private pageScraper;

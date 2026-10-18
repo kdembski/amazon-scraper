@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AmazonPdpAdPriceBuilder } from "@/builders/AmazonPdpAdPriceBuilder";
+import { AmazonPdpAdPriceBuilder } from "@/marketplaces/amazon/pdp/AmazonPdpAdPriceBuilder";
 import { aPrice, toDocument } from "@@tests/support/html";
 
 const builder = new AmazonPdpAdPriceBuilder();

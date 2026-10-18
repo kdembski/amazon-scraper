@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { RequestAmazonPdpCountryScraper } from "@/scrapers/RequestAmazonPdpCountryScraper";
-import { AmazonPdpPriceHelper } from "@/scrapers/AmazonPdpPriceHelper";
+import { AmazonPdpCountryScraper } from "@/marketplaces/amazon/pdp/AmazonPdpCountryScraper";
+import { ArgsService } from "@/shared/args/ArgsService";
+import { AmazonPdpPriceHelper } from "@/marketplaces/amazon/pdp/AmazonPdpPriceHelper";
 import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
-import { AmazonAdBuildResult, AmazonAdPrice } from "@/types/amazon.types";
+import { AmazonAdBuildResult, AmazonAdPrice } from "@/marketplaces/amazon/types/amazon.types";
 import { buildAd, buildPrices } from "@@tests/support/factories";
 import {
   fakeAdBuilder,
@@ -17,7 +18,7 @@ const setup = (result: AmazonAdBuildResult = { price: 10 }) => {
   const amazon = fakeAmazonService();
   const api = fakeApiService();
   const builder = fakeAdBuilder(result);
-  const scraper = new RequestAmazonPdpCountryScraper(
+  const scraper = new AmazonPdpCountryScraper(
     amazon.service,
     api.service,
     builder.builder,
@@ -35,7 +36,7 @@ const setup = (result: AmazonAdBuildResult = { price: 10 }) => {
 // Settles the promise chains started by the callbacks
 const flush = () => vi.advanceTimersByTimeAsync(0);
 
-describe("RequestAmazonPdpCountryScraper", () => {
+describe("AmazonPdpCountryScraper", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.spyOn(Math, "random").mockReturnValue(1);
@@ -271,6 +272,58 @@ describe("RequestAmazonPdpCountryScraper", () => {
       expect(api.delete).toHaveBeenCalledTimes(1);
       expect(resolveAd).toHaveBeenCalledTimes(1);
       expect(amazon.get).toHaveBeenCalledTimes(5);
+    });
+  });
+
+  describe("retry backoff", () => {
+    it("retries after an exponential backoff delay", async () => {
+      const { amazon, run } = setup();
+      const prices = buildPrices(1);
+      prices[0].failed = 2;
+      run(prices);
+
+      amazon.fail(0);
+      await flush();
+      await vi.advanceTimersByTimeAsync(3999);
+      expect(amazon.get).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect(amazon.get).toHaveBeenCalledTimes(2);
+    });
+
+    it("waits for other countries before completing the ad", async () => {
+      const { amazon, api, resolveAd, run } = setup();
+      const prices = buildPrices(2);
+      prices[0].failed = MAX_FAILED_ATTEMPTS - 1;
+      run(prices);
+
+      amazon.fail(0);
+      await vi.runAllTimersAsync();
+
+      expect(prices[0].complete).toBe(true);
+      expect(api.put).not.toHaveBeenCalled();
+      expect(resolveAd).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("builder", () => {
+    it.each([
+      [true, "c1/gp/product/ajax/aodAjaxMain/?asin=B0TESTASIN&pc=dp"],
+      [false, "c1/dp/B0TESTASIN"],
+    ])("with isAod %s requests %s", (isAod, url) => {
+      vi.spyOn(ArgsService, "getInstance").mockReturnValue({
+        getSourceFlag: () => ({ isAod }),
+      } as unknown as ArgsService);
+      const amazon = fakeAmazonService();
+      const scraper = new AmazonPdpCountryScraper(
+        amazon.service,
+        fakeApiService().service
+      );
+      const prices = buildPrices(1);
+
+      scraper.execute(prices[0], buildAd(), prices, vi.fn());
+
+      expect(amazon.requests[0].url).toBe(url);
     });
   });
 });

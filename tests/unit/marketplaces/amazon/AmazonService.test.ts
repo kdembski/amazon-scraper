@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { AmazonService } from "@/services/AmazonService";
+import { AmazonService } from "@/marketplaces/amazon/AmazonService";
 import type { ScrapingClient } from "@/shared/http/ScrapingClient";
 
 const setup = () => {

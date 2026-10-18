@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AmazonScraper } from "@/scrapers/AmazonScraper";
-import type { AmazonPdpScraper } from "@/scrapers/AmazonPdpScraper";
-import type { AmazonPlpScraper } from "@/scrapers/AmazonPlpScraper";
+import { AmazonScraper } from "@/marketplaces/amazon/AmazonScraper";
+import type { AmazonPdpScraper } from "@/marketplaces/amazon/pdp/AmazonPdpScraper";
+import type { AmazonPlpScraper } from "@/marketplaces/amazon/plp/AmazonPlpScraper";
 import type { ProxyService } from "@/shared/http/ProxyService";
 import { buildAd, buildCountry } from "@@tests/support/factories";
 import {

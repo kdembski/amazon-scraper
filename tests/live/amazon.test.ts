@@ -1,12 +1,12 @@
 import { configDotenv } from "dotenv";
 import { parseHTML } from "linkedom";
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { AmazonAodAdBuilder } from "@/builders/AmazonAodAdBuilder";
-import { AmazonPdpAdBuilder } from "@/builders/AmazonPdpAdBuilder";
-import { AmazonPlpBuilder } from "@/builders/AmazonPlpBuilder";
-import { AmazonService } from "@/services/AmazonService";
+import { AmazonAodAdBuilder } from "@/marketplaces/amazon/pdp/AmazonAodAdBuilder";
+import { AmazonPdpAdBuilder } from "@/marketplaces/amazon/pdp/AmazonPdpAdBuilder";
+import { AmazonPlpBuilder } from "@/marketplaces/amazon/plp/AmazonPlpBuilder";
+import { AmazonService } from "@/marketplaces/amazon/AmazonService";
 import { ProxyService } from "@/shared/http/ProxyService";
-import { AmazonAdBuilder, AmazonAdBuildResult } from "@/types/amazon.types";
+import { AmazonAdBuilder, AmazonAdBuildResult } from "@/marketplaces/amazon/types/amazon.types";
 import { buildAd, buildCountry } from "@@tests/support/factories";
 
 // Real Amazon through the real webshare proxies (PROXY_LIST_TOKEN from .env).

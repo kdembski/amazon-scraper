@@ -1,5 +1,5 @@
 import { ApiService } from "@/shared/backend/ApiService";
-import { AmazonAd, AmazonAdPrice } from "@/types/amazon.types";
+import { AmazonAd, AmazonAdPrice } from "@/marketplaces/amazon/types/amazon.types";
 
 export class AmazonPdpPriceHelper {
   private apiService;

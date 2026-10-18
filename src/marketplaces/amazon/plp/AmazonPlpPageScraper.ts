@@ -1,9 +1,9 @@
-import { AmazonPlpBuilder } from "@/builders/AmazonPlpBuilder";
+import { AmazonPlpBuilder } from "@/marketplaces/amazon/plp/AmazonPlpBuilder";
 import { getRetryDelay, MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
-import { AmazonService } from "@/services/AmazonService";
+import { AmazonService } from "@/marketplaces/amazon/AmazonService";
 import { ApiService } from "@/shared/backend/ApiService";
 import { ArgsService } from "@/shared/args/ArgsService";
-import { AmazonPlpAdPage, AmazonPlpAd } from "@/types/amazon.types";
+import { AmazonPlpAdPage, AmazonPlpAd } from "@/marketplaces/amazon/types/amazon.types";
 import { parseHTML } from "linkedom";
 import _ from "lodash";
 

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { AmazonPdpScraper } from "@/scrapers/AmazonPdpScraper";
-import type { AmazonPdpCountryScraper } from "@/scrapers/abstract/AmazonPdpCountryScraper";
+import { AmazonPdpScraper } from "@/marketplaces/amazon/pdp/AmazonPdpScraper";
+import type { AmazonPdpCountryScraper } from "@/marketplaces/amazon/pdp/AmazonPdpCountryScraper";
 import { buildAd, buildCountry } from "@@tests/support/factories";
 
 const setup = () => {

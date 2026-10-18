@@ -1,9 +1,9 @@
 import { vi } from "vitest";
-import type { AmazonService } from "@/services/AmazonService";
+import type { AmazonService } from "@/marketplaces/amazon/AmazonService";
 import type { ApiService } from "@/shared/backend/ApiService";
 import type { ArgsService } from "@/shared/args/ArgsService";
 import type { CountryService } from "@/shared/backend/CountryService";
-import type { AmazonAdBuilder, AmazonAdBuildResult } from "@/types/amazon.types";
+import type { AmazonAdBuilder, AmazonAdBuildResult } from "@/marketplaces/amazon/types/amazon.types";
 
 export function fakeApiService() {
   const get = vi.fn();
