@@ -14,7 +14,7 @@ describe("PLP process", () => {
     scraper = await spawnScraper(["-t", "plp", "-c", "100"], ({ backend, amazon }) => {
       backend.on("GET", "amazon/ads/categories/scrap", { id: 1, name: "electronics" });
       amazon.respond(({ url }) =>
-        url === "pl/s?i=electronics&s=date-desc-rank"
+        url === "pl/s?i=electronics&rh=p_36%3A-1999&s=date-desc-rank"
           ? plpPage({ asins: ["B0ROOT1"] })
           : { status: 404 }
       );

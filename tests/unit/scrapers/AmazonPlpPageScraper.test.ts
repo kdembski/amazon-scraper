@@ -36,6 +36,23 @@ const setup = ({ count = 50 } = {}) => {
 
 const flush = () => vi.advanceTimersByTimeAsync(0);
 
+const priceRanges = [
+  "-1999",
+  "2000-4999",
+  "5000-9999",
+  "10000-19999",
+  "20000-49999",
+  "50000-99999",
+  "100000-",
+];
+const inPriceRanges = (subcategory?: string) =>
+  priceRanges.map(
+    (price) =>
+      `pl/s?i=electronics&rh=${
+        subcategory ? `${subcategory}%2C` : ""
+      }p_36%3A${price}&s=date-desc-rank`
+  );
+
 describe("AmazonPlpPageScraper", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -68,6 +85,26 @@ describe("AmazonPlpPageScraper", () => {
     });
   });
 
+  describe("executeCategory", () => {
+    it("scrapes the category in every price range", () => {
+      const { amazon, scraper } = setup();
+      scraper.executeCategory("electronics");
+
+      expect(amazon.requests.map((request) => request.url)).toEqual(
+        inPriceRanges()
+      );
+    });
+
+    it("scrapes a subcategory in every price range", () => {
+      const { amazon, scraper } = setup();
+      scraper.executeCategory("electronics", "n%3A1");
+
+      expect(amazon.requests.map((request) => request.url)).toEqual(
+        inPriceRanges("n%3A1")
+      );
+    });
+  });
+
   describe("execute", () => {
     it("requests the category listing sorted by newest", () => {
       const { amazon, scraper } = setup();
@@ -97,6 +134,19 @@ describe("AmazonPlpPageScraper", () => {
       expect(amazon.requests[0].url).toBe(
         "pl/s?i=electronics&rh=n%3A123&s=date-desc-rank&page=3"
       );
+    });
+
+    it.each([
+      [undefined, "pl/s?i=electronics&rh=p_36%3A2000-4999&s=date-desc-rank"],
+      [
+        "n%3A123",
+        "pl/s?i=electronics&rh=n%3A123%2Cp_36%3A2000-4999&s=date-desc-rank",
+      ],
+    ])("requests a listing in a price range of %s", (subcategory, url) => {
+      const { amazon, scraper } = setup();
+      scraper.execute(buildPlpPage({ subcategory, price: "2000-4999" }));
+
+      expect(amazon.requests[0].url).toBe(url);
     });
 
     it.each([["complete"], ["pending"]] as const)(
@@ -139,7 +189,7 @@ describe("AmazonPlpPageScraper", () => {
       expect(amazon.queueService.completed).toBe(1);
     });
 
-    it("scrapes every subcategory", async () => {
+    it("scrapes every subcategory in every price range", async () => {
       const { amazon, build, scraper } = setup();
       build.mockReturnValueOnce({ ads, subcategories: ["n%3A1", "n%3A2"], hasNextPage: false });
       scraper.execute(buildPlpPage());
@@ -149,23 +199,23 @@ describe("AmazonPlpPageScraper", () => {
 
       expect(amazon.requests.map((request) => request.url)).toEqual([
         "pl/s?i=electronics&s=date-desc-rank",
-        "pl/s?i=electronics&rh=n%3A1&s=date-desc-rank",
-        "pl/s?i=electronics&rh=n%3A2&s=date-desc-rank",
+        ...inPriceRanges("n%3A1"),
+        ...inPriceRanges("n%3A2"),
       ]);
     });
 
-    it("scrapes the next page", async () => {
+    it("scrapes the next page in the same price range", async () => {
       const { amazon, build, scraper } = setup();
       build.mockReturnValueOnce({ ads, subcategories: [], hasNextPage: true });
-      const page = buildPlpPage({ subcategory: "n%3A1" });
+      const page = buildPlpPage({ subcategory: "n%3A1", price: "2000-4999" });
       scraper.execute(page);
 
       amazon.respond(0, html);
       await flush();
 
       expect(amazon.requests.map((request) => request.url)).toEqual([
-        "pl/s?i=electronics&rh=n%3A1&s=date-desc-rank",
-        "pl/s?i=electronics&rh=n%3A1&s=date-desc-rank&page=2",
+        "pl/s?i=electronics&rh=n%3A1%2Cp_36%3A2000-4999&s=date-desc-rank",
+        "pl/s?i=electronics&rh=n%3A1%2Cp_36%3A2000-4999&s=date-desc-rank&page=2",
       ]);
     });
 
@@ -204,9 +254,9 @@ describe("AmazonPlpPageScraper", () => {
 
       expect(amazon.requests.map((request) => request.url)).toEqual([
         "pl/s?i=electronics&s=date-desc-rank",
-        "pl/s?i=electronics&rh=n%3A1&s=date-desc-rank",
-        "pl/s?i=electronics&rh=n%3A2&s=date-desc-rank",
-        "pl/s?i=electronics&rh=n%3A3&s=date-desc-rank",
+        ...inPriceRanges("n%3A1"),
+        ...inPriceRanges("n%3A2"),
+        ...inPriceRanges("n%3A3"),
       ]);
     });
   });
