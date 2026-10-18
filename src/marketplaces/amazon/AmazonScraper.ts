@@ -61,7 +61,6 @@ export class AmazonScraper implements MarketplaceScraper {
     this.apiService
       .get<AmazonAdCategory>("amazon/ads/categories/scrap")
       .then((category) => this.plpScraper.execute(category.name))
-      // Wait before asking again, so a backend outage is not flooded
       .catch(() => {
         setTimeout(() => this.scrapPlp(), this.categoryRetryDelay);
       });

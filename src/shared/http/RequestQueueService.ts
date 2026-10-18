@@ -8,12 +8,10 @@ export class RequestQueueService {
   failed = 0;
   pending = 0;
   limit;
-  // Max requests started per second, 0 means unlimited
   rate;
   private tokens;
   private lastRefill = Date.now();
   private previousCompleted = 0;
-  // Open connections shown in the logs, omitted when not set
   private countConnections;
 
   constructor(
@@ -58,7 +56,6 @@ export class RequestQueueService {
     if (!this.queue.length || !this.canStart()) return;
     const next = this.queue.shift()!;
 
-    // Nobody awaits a queued request, so its error would be unhandled
     await this.run(next).catch((e) => console.error(e));
   }
 

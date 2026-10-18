@@ -28,10 +28,7 @@ export class ProxyService {
     return this.toUrl(proxy);
   }
 
-  // One agent per proxy, so keep-alive connections (proxy tunnel + TLS
-  // session) are reused instead of being set up for every request. Idle
-  // connections are capped and closed after a while, otherwise they pile up
-  // for every proxy x country pair and fill the router's NAT table
+
   getRandomAgent() {
     const proxy = this.getRandomProxy();
     let agent = this.agents.get(proxy);
@@ -48,7 +45,6 @@ export class ProxyService {
     return agent;
   }
 
-  // Open sockets of all proxy agents, in use and idle
   countConnections() {
     let count = 0;
 

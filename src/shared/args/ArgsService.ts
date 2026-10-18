@@ -26,7 +26,7 @@ export class ArgsService {
     return parseInt(value);
   }
 
-  // Max requests to Amazon started per second, 0 means unlimited
+  // Max requests per second, 0 means unlimited
   getRateFlag() {
     const value = this.getFlagValue("-r") || this.getFlagValue("--rate");
 

@@ -5,9 +5,6 @@ import {
 } from "@/marketplaces/amazon/types/amazon.types";
 import { Country } from "@/shared/types/Country";
 
-// Builds price data from the "All Offers Display" ajax fragment
-// (/gp/product/ajax/aodAjaxMain). Its pinned offer is the same featured
-// offer that the product page shows in the buy box, at ~3% of the transfer.
 export class AmazonAodAdBuilder implements AmazonAdBuilder {
   build(document: Document): AmazonAdBuildResult {
     const form = document.querySelector("form");
@@ -75,7 +72,6 @@ export class AmazonAodAdBuilder implements AmazonAdBuilder {
     return this.parse(price);
   }
 
-  // Equivalent of the "Ships from" row in the product page buy box
   private getDispatchFrom(pinned: Element) {
     const row = pinned.querySelector("#aod-offer-shipsFrom");
     const value =
