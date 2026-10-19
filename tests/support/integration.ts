@@ -4,10 +4,12 @@ import type { AmazonScraper } from "@/marketplaces/amazon/AmazonScraper";
 import { AmazonService } from "@/marketplaces/amazon/AmazonService";
 import { ApiService } from "@/shared/backend/ApiService";
 import { CountryService } from "@/shared/backend/CountryService";
-import { ScraperStatusService } from "@/shared/backend/ScraperStatusService";
+import { MetricsReporter } from "@/shared/backend/MetricsReporter";
+import { MetricsService } from "@/shared/metrics/MetricsService";
 import { ScrapingClient } from "@/shared/http/ScrapingClient";
 import { ArgsService } from "@/shared/args/ArgsService";
-import { ProxyService } from "@/shared/http/ProxyService";
+import type { ProxyAgentPool } from "@/shared/http/proxy/ProxyAgentPool";
+import { ProxyService } from "@/shared/http/proxy/ProxyService";
 import { FakeAmazon } from "@@tests/support/fake/amazon";
 import { FakeBackend } from "@@tests/support/fake/backend";
 import { resetSingleton } from "@@tests/support/singleton";
@@ -18,8 +20,9 @@ const singletons = [
   CountryService,
   ProxyService,
   ScrapingClient,
-  ScraperStatusService,
   AmazonService,
+  MetricsService,
+  MetricsReporter,
 ];
 const argv = process.argv;
 
@@ -58,9 +61,9 @@ export async function stopWorld({ backend, amazon }: World) {
   if (queue) queue.start = () => {};
 
   const proxyService = instanceOf(ProxyService) as unknown as
-    | { agents: Map<string, { destroy(): void }> }
+    | { pool: ProxyAgentPool }
     | undefined;
-  proxyService?.agents.forEach((agent) => agent.destroy());
+  proxyService?.pool.retain([]);
 
   await Promise.all([backend.stop(), amazon.stop()]);
   singletons.forEach(resetSingleton);

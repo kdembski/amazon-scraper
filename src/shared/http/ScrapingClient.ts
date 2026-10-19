@@ -1,13 +1,16 @@
 import axios from "axios";
 import UserAgent from "user-agents";
 import { ArgsService } from "@/shared/args/ArgsService";
-import { ProxyService } from "@/shared/http/ProxyService";
+import { ProxyService } from "@/shared/http/proxy/ProxyService";
 import { RequestQueueService } from "@/shared/http/RequestQueueService";
+import { MetricsService } from "@/shared/metrics/MetricsService";
+import type { MetricLabels, RequestOutcome } from "@/shared/metrics/metrics.types";
 
 export class ScrapingClient {
   private static instance: ScrapingClient;
   private timeout = 20 * 1000;
   private proxyService;
+  private metricsService;
   queueService;
 
   private constructor(
@@ -18,8 +21,10 @@ export class ScrapingClient {
       argsService.getRateFlag(),
       true,
       () => proxyService.countConnections()
-    )
+    ),
+    metricsService = MetricsService.getInstance()
   ) {
+    this.metricsService = metricsService;
     this.queueService = queueService;
     this.proxyService = proxyService;
     queueService.start();
@@ -39,11 +44,25 @@ export class ScrapingClient {
     callback?: {
       onSuccess?: (data: T) => void;
       onError?: (e: any) => void;
-    }
+    },
+    labels: MetricLabels = {}
   ) {
     this.queueService.request(async () => {
       const httpsAgent = this.proxyService.getRandomAgent();
       const userAgent = new UserAgent({ deviceCategory: "desktop" }).toString();
+
+      const startedAt = Date.now();
+      let recorded = false;
+      const record = (outcome: RequestOutcome) => {
+        if (recorded) return;
+        recorded = true;
+        this.metricsService.increment("requests", { ...labels, outcome });
+        this.metricsService.increment(
+          "request_ms",
+          labels,
+          Date.now() - startedAt
+        );
+      };
 
       return new Promise<void>(async (resolve) => {
         return axios
@@ -59,9 +78,17 @@ export class ScrapingClient {
             },
           })
           .then((response) => {
+            record("ok");
             callback?.onSuccess?.(response.data);
           })
           .catch((e) => {
+            record(
+              e?.response?.status
+                ? `http_${e.response.status}`
+                : e?.code === "ERR_CANCELED"
+                  ? "timeout"
+                  : "network"
+            );
             callback?.onError?.(e);
           })
           .finally(() => resolve());

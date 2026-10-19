@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
-import { ProxyService } from "@/shared/http/ProxyService";
+import { ProxyService } from "@/shared/http/proxy/ProxyService";
 import { cronJobs } from "@@tests/support/cron";
 import { buildAd, buildCountry } from "@@tests/support/factories";
 import { aodPage, captchaPage } from "@@tests/support/html";
@@ -108,14 +108,12 @@ describe("PDP", () => {
         ...offers.de,
       ],
     });
-    const { queue } = scrape();
+    scrape();
 
     const put = await world.backend.waitFor("PUT", "amazon/ads/7");
 
     expect(world.amazon.requestsTo("de")).toHaveLength(5);
     expect(put.body.prices[0]).toEqual(price(1, 24.99, "Amazon"));
-    expect(queue.failed).toBe(4);
-    expect(queue.completed).toBe(3);
   });
 
   it("gives up on a country after the attempt limit", async () => {
@@ -215,15 +213,29 @@ describe("PDP", () => {
     expect(Math.max(...times) - Math.min(...times)).toBeGreaterThan(1500);
   });
 
-  it("reports its status every hour", async () => {
+  it("reports metrics every minute", async () => {
     world.amazon.respondPerCountry(offers);
     scrape();
     await world.backend.waitFor("PUT", "amazon/ads/7");
 
-    const status = cronJobs.find((job) => job.cronTime === "0 50 */1 * * *");
-    status!.onTick();
+    const report = cronJobs.find((job) => job.cronTime === "0 * * * * *");
+    report!.onTick();
 
-    const post = await world.backend.waitFor("POST", "scrapers/it/status");
-    expect(post.body).toEqual({ speed: 0, pending: 0 });
+    const post = await world.backend.waitFor("POST", "scrapers/it/metrics");
+    const { metrics, ...rest } = post.body;
+    expect(rest).toMatchObject({ marketplace: "amazon", flow: "pdp" });
+    const value = (metric: string, country?: string, outcome?: string) =>
+      metrics.find(
+        (m: any) =>
+          m.metric === metric && m.country === country && m.outcome === outcome
+      )?.value;
+    ["de", "fr", "it"].forEach((country) => {
+      expect(value("requests", country, "ok")).toBe(1);
+      expect(value("responses", country, "data")).toBe(1);
+      expect(value("items", country, "data")).toBe(1);
+    });
+    expect(value("connections")).toBeGreaterThanOrEqual(1);
+    expect(value("bytes_in")).toBeGreaterThan(0);
+    expect(value("bytes_out")).toBeGreaterThan(0);
   });
 });

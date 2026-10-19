@@ -3,6 +3,7 @@ import { AmazonPdpCountryScraper } from "@/marketplaces/amazon/pdp/AmazonPdpCoun
 import { AmazonPdpPriceHelper } from "@/marketplaces/amazon/pdp/AmazonPdpPriceHelper";
 import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
 import { AmazonAdBuildResult, AmazonAdPrice } from "@/marketplaces/amazon/types/amazon.types";
+import type { MetricsService } from "@/shared/metrics/MetricsService";
 import { buildAd, buildPrices } from "@@tests/support/factories";
 import {
   fakeAdBuilder,
@@ -17,11 +18,14 @@ const setup = (result: AmazonAdBuildResult = { price: 10 }) => {
   const amazon = fakeAmazonService();
   const api = fakeApiService();
   const builder = fakeAdBuilder(result);
+  const increment = vi.fn();
+  const metrics = { increment } as unknown as MetricsService;
   const scraper = new AmazonPdpCountryScraper(
     amazon.service,
     api.service,
     builder.builder,
-    new AmazonPdpPriceHelper(api.service)
+    new AmazonPdpPriceHelper(api.service),
+    metrics
   );
   const ad = buildAd({ id: 7 });
   const resolveAd = vi.fn();
@@ -29,7 +33,7 @@ const setup = (result: AmazonAdBuildResult = { price: 10 }) => {
   const run = (prices: AmazonAdPrice[]) =>
     prices.forEach((price) => scraper.execute(price, ad, prices, resolveAd));
 
-  return { amazon, api, builder, scraper, ad, resolveAd, run };
+  return { amazon, api, builder, scraper, ad, resolveAd, run, increment };
 };
 
 // Settles the promise chains started by the callbacks
@@ -86,7 +90,6 @@ describe("AmazonPdpCountryScraper", () => {
         pending: false,
         complete: true,
       });
-      expect(amazon.queueService.completed).toBe(1);
     });
 
     it("waits for all countries before sending the prices", async () => {
@@ -160,7 +163,6 @@ describe("AmazonPdpCountryScraper", () => {
         complete: false,
         failed: 1,
       });
-      expect(amazon.queueService.failed).toBe(1);
       expect(amazon.get).toHaveBeenCalledTimes(3);
 
       await vi.advanceTimersByTimeAsync(1000);
@@ -302,6 +304,119 @@ describe("AmazonPdpCountryScraper", () => {
       expect(prices[0].complete).toBe(true);
       expect(api.put).not.toHaveBeenCalled();
       expect(resolveAd).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("metrics", () => {
+    const calls = (increment: ReturnType<typeof vi.fn>, metric: string) =>
+      increment.mock.calls.filter((call) => call[0] === metric);
+
+    it("counts a response with a price as data", async () => {
+      const { amazon, run, increment } = setup({ price: 10 });
+      const prices = buildPrices(3);
+      run(prices);
+      const labels = { country: prices[0].country.code, outcome: "data" };
+
+      amazon.respond(0, html);
+      await flush();
+
+      expect(increment).toHaveBeenCalledWith("responses", labels);
+      expect(increment).toHaveBeenCalledWith("items", labels);
+      expect(increment).toHaveBeenCalledWith("item_attempts", labels, 1);
+    });
+
+    it("counts a response without a price as no_data", async () => {
+      const { amazon, run, increment } = setup({ isCaptcha: false, isValid: true });
+      const prices = buildPrices(3);
+      run(prices);
+      const labels = { country: prices[0].country.code, outcome: "no_data" };
+
+      amazon.respond(0, html);
+      await flush();
+
+      expect(increment).toHaveBeenCalledWith("responses", labels);
+      expect(increment).toHaveBeenCalledWith("items", labels);
+      expect(increment).toHaveBeenCalledWith("item_attempts", labels, 1);
+    });
+
+    it.each([
+      ["captcha", { isCaptcha: true }, html],
+      ["invalid", { isCaptcha: false, isValid: false }, html],
+      ["empty", { price: 10 }, ""],
+    ])("counts a %s response without an item", async (outcome, result, data) => {
+      const { amazon, run, increment } = setup(result);
+      const prices = buildPrices(3);
+      run(prices);
+
+      amazon.respond(0, data);
+      await flush();
+
+      expect(increment).toHaveBeenCalledWith("responses", {
+        country: prices[0].country.code,
+        outcome,
+      });
+      expect(calls(increment, "items")).toHaveLength(0);
+      expect(calls(increment, "item_attempts")).toHaveLength(0);
+    });
+
+    it("counts the attempts of a country that succeeded after failures", async () => {
+      const { amazon, run, increment } = setup({ price: 10 });
+      const prices = buildPrices(3);
+      run(prices);
+
+      amazon.fail(0);
+      await flush();
+      await vi.advanceTimersByTimeAsync(1000);
+      amazon.fail(amazon.requests.length - 1);
+      await flush();
+      await vi.advanceTimersByTimeAsync(2000);
+      amazon.respond(amazon.requests.length - 1, html);
+      await flush();
+
+      expect(increment).toHaveBeenCalledWith(
+        "item_attempts",
+        { country: prices[0].country.code, outcome: "data" },
+        3
+      );
+    });
+
+    it("counts a deleted item only for the country that got the 404", async () => {
+      const { amazon, run, increment } = setup({ price: 10 });
+      const prices = buildPrices(5);
+      run(prices);
+
+      [0, 1, 2].forEach((i) => amazon.fail(i, notFound));
+      await vi.runAllTimersAsync();
+
+      const items = calls(increment, "items");
+      expect(items.map((call) => call[1])).toEqual(
+        [0, 1, 2].map((i) => ({
+          country: prices[i].country.code,
+          outcome: "deleted",
+        }))
+      );
+      expect(calls(increment, "item_attempts")).toHaveLength(3);
+    });
+
+    it("counts a given up country with the failed attempts", async () => {
+      const { amazon, run, increment } = setup({ price: 10 });
+      const prices = buildPrices(3);
+      run(prices);
+
+      amazon.fail(0);
+      for (let i = 1; i < MAX_FAILED_ATTEMPTS; i++) {
+        await vi.runAllTimersAsync();
+        amazon.fail(amazon.requests.length - 1);
+      }
+      await vi.runAllTimersAsync();
+
+      const labels = { country: prices[0].country.code, outcome: "given_up" };
+      expect(increment).toHaveBeenCalledWith("items", labels);
+      expect(increment).toHaveBeenCalledWith(
+        "item_attempts",
+        labels,
+        MAX_FAILED_ATTEMPTS
+      );
     });
   });
 

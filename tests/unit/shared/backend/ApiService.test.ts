@@ -97,4 +97,29 @@ describe("ApiService", () => {
     });
   });
 
+  describe("post config", () => {
+    it("forwards the extra config together with the agent", async () => {
+      const service = setup();
+      mocked.post.mockResolvedValue({ data: "ok" });
+
+      await service.post("amazon/ads", { a: 1 }, { timeout: 5000 });
+      expect(mocked.post).toHaveBeenCalledWith(
+        "http://api.test/amazon/ads",
+        { a: 1 },
+        { ...withAgent, timeout: 5000 }
+      );
+    });
+
+    it("calls axios with only the agent without config", async () => {
+      const service = setup();
+      mocked.post.mockResolvedValue({ data: "ok" });
+
+      await service.post("amazon/ads", { a: 1 });
+      expect(mocked.post).toHaveBeenCalledWith(
+        "http://api.test/amazon/ads",
+        { a: 1 },
+        withAgent
+      );
+    });
+  });
 });

@@ -32,7 +32,8 @@ export class AmazonService {
     this.scrapingClient.get<T>(
       `${this.baseUrl}${url}`,
       `${this.baseUrl}${referer}`,
-      callback
+      callback,
+      { country: url.split("/")[0] }
     );
   }
 }

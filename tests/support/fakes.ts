@@ -34,7 +34,7 @@ type GetCallback = {
 export function fakeAmazonService() {
   const requests: { url: string; referer?: string; callback: GetCallback }[] =
     [];
-  const queueService = { completed: 0, failed: 0, queue: [] as Function[] };
+  const queueService = { queue: [] as Function[] };
   const get = vi.fn((url: string, referer?: string, callback?: GetCallback) => {
     requests.push({ url, referer, callback: callback ?? {} });
   });

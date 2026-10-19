@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { AmazonScraper } from "@/marketplaces/amazon/AmazonScraper";
 import type { AmazonPdpScraper } from "@/marketplaces/amazon/pdp/AmazonPdpScraper";
 import type { AmazonPlpScraper } from "@/marketplaces/amazon/plp/AmazonPlpScraper";
-import type { ProxyService } from "@/shared/http/ProxyService";
+import type { ProxyService } from "@/shared/http/proxy/ProxyService";
 import { buildAd, buildCountry } from "@@tests/support/factories";
 import {
   fakeAmazonService,
@@ -37,14 +37,16 @@ type Fakes = Pick<ReturnType<typeof setup>, "api" | "country">;
 const flush = () => new Promise((resolve) => setImmediate(resolve));
 
 describe("AmazonScraper", () => {
+  it("is the amazon marketplace", () => {
+    expect(setup().scraper.marketplace).toBe("amazon");
+  });
+
   describe("scrapPdp", () => {
     const countries = [buildCountry({ id: 1 }), buildCountry({ id: 2 })];
     const ads = [buildAd({ id: 1 }), buildAd({ id: 2 })];
 
     it("scrapes a batch of ads in every country", async () => {
       const { api, country, amazon, pdpExecute, scraper } = setup({ count: 50 });
-      amazon.queueService.completed = 10;
-      amazon.queueService.failed = 3;
       country.getCountries.mockResolvedValue(countries);
       api.get.mockResolvedValue(ads);
 
@@ -54,8 +56,6 @@ describe("AmazonScraper", () => {
       expect(api.get).toHaveBeenCalledWith("amazon/ads/scrap?count=50");
       expect(pdpExecute).toHaveBeenCalledWith(ads[0], countries);
       expect(pdpExecute).toHaveBeenCalledWith(ads[1], countries);
-      expect(amazon.queueService.completed).toBe(0);
-      expect(amazon.queueService.failed).toBe(0);
     });
 
     it("waits while the queue is longer than a tenth of the batch", async () => {
@@ -106,7 +106,6 @@ describe("AmazonScraper", () => {
 
     it("scrapes the category from the backend", async () => {
       const { api, amazon, plpExecute, scraper } = setup();
-      amazon.queueService.completed = 4;
       api.get.mockResolvedValue({ id: 1, name: "electronics" });
 
       await scraper.scrapPlp();
@@ -114,7 +113,6 @@ describe("AmazonScraper", () => {
 
       expect(api.get).toHaveBeenCalledWith("amazon/ads/categories/scrap");
       expect(plpExecute).toHaveBeenCalledWith("electronics");
-      expect(amazon.queueService.completed).toBe(0);
     });
 
     it("asks for the category again a minute after loading fails", async () => {

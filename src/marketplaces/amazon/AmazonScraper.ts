@@ -5,12 +5,13 @@ import { AmazonService } from "@/marketplaces/amazon/AmazonService";
 import { ApiService } from "@/shared/backend/ApiService";
 import { CountryService } from "@/shared/backend/CountryService";
 import { ArgsService } from "@/shared/args/ArgsService";
-import { ProxyService } from "@/shared/http/ProxyService";
+import { ProxyService } from "@/shared/http/proxy/ProxyService";
 import { AmazonAd, AmazonAdCategory } from "@/marketplaces/amazon/types/amazon.types";
 import { MarketplaceScraper } from "@/shared/interfaces/MarketplaceScraper";
 import { CronJob } from "cron";
 
 export class AmazonScraper implements MarketplaceScraper {
+  readonly marketplace = "amazon";
   private apiService;
   private amazonService;
   private argsService;
@@ -55,9 +56,6 @@ export class AmazonScraper implements MarketplaceScraper {
   }
 
   async scrapPlp() {
-    this.amazonService.queueService.failed = 0;
-    this.amazonService.queueService.completed = 0;
-
     this.apiService
       .get<AmazonAdCategory>("amazon/ads/categories/scrap")
       .then((category) => this.plpScraper.execute(category.name))
@@ -73,8 +71,6 @@ export class AmazonScraper implements MarketplaceScraper {
     if (this.amazonService.queueService.queue.length > count / 10) return;
 
     this.isLoadingAds = true;
-    this.amazonService.queueService.failed = 0;
-    this.amazonService.queueService.completed = 0;
 
     try {
       const countries = await this.countryService.getCountries();

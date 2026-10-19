@@ -20,7 +20,7 @@ npm run test:integration                   # whole app in-process against fakes
 npm run test:e2e                           # builds dist/ and runs it as a process
 npm run test:e2e:docker                    # same tests against the built Docker image
 npm run test:live                          # real Amazon via real proxies (PROXY_LIST_TOKEN in .env)
-docker compose up -d --build               # production
+docker compose up -d --build --remove-orphans # production
 ```
 
 Tests: `src/a/X.ts` → `tests/unit/a/X.test.ts` (e.g. `tests/unit/marketplaces/amazon/pdp/AmazonAodAdBuilder.test.ts`), one file per source file. Builder tests use minimal HTML fragments (`tests/support/html.ts`), not saved pages; a selector change needs a new test case.
@@ -36,23 +36,24 @@ Integration (`tests/integration/`) and e2e (`tests/e2e/`) tests share fakes in `
 
 ## Structure
 
-- `src/shared/`: code that knows no shop — `args/` (`ArgsService`), `backend/` (`ApiService`, `CountryService`, `ScraperStatusService`), `http/` (`ProxyService`, `RequestQueueService`, `ScrapingClient`), `interfaces/`, `types/`, `utils/`.
+- `src/shared/`: code that knows no shop — `args/` (`ArgsService`), `backend/` (`ApiService`, `CountryService`, `MetricsReporter`), `metrics/` (`MetricsService`), `http/` (`RequestQueueService`, `ScrapingClient`; `proxy/`: `ProxyService` over `ProxyList`, `ProxyAgentPool`, `ProxyTrafficMeter`), `interfaces/`, `types/`, `utils/`.
 - `src/marketplaces/<name>/`: one folder per shop — scraper implementing `MarketplaceScraper`, a thin service over `ScrapingClient`, `types/`, and one folder per flow (`amazon/pdp/`, `amazon/plp/`) holding its scrapers and builders.
 - `src/shared` imports nothing from `src/marketplaces`.
-- `src/marketplaces.ts` (`createScraper()`) starts `ScraperStatusService` and returns the scraper; `src/index.ts` calls `createScraper().execute()`.
-- Add a shop: a `src/marketplaces/<name>/` folder, a `-m` flag in `ArgsService`, the choice in `createScraper()`, services in `docker-compose.yml`.
+- `src/marketplaces.ts` (`createScraper()`) starts `MetricsReporter` and returns the scraper; `src/index.ts` calls `createScraper().execute()`.
+- Add a shop: a `src/marketplaces/<name>/` folder with `MarketplaceScraper.marketplace` set, a `-m` flag in `ArgsService`, the choice in `createScraper()`, services in `docker-compose.yml`.
 
 ## Architecture
 
 - `ScrapingClient.get(url, referer, callbacks)` is the only path to shops; results go only to callbacks. `url` and `referer` are full URLs. Random proxy and desktop User-Agent, hard 20 s `AbortSignal` timeout, one keep-alive agent per proxy.
 - `AmazonService.get(url, referer, callbacks)` prefixes `https://www.amazon.` to `url` and `referer` (`de/dp/...`) and delegates to `ScrapingClient`; `AmazonService.queueService` is the `ScrapingClient` queue.
-- `RequestQueueService`: custom concurrency limiter plus token bucket for `-r`, one per process. Its `completed`/`failed` counters are incremented by the scrapers.
-- `CountryService`: countries from `GET countries`, cached, reloaded hourly. `ScraperStatusService`: in PDP mode posts `{ speed, pending }` to `scrapers/<name>/status` hourly.
+- `RequestQueueService`: custom concurrency limiter plus token bucket for `-r`, one per process. Logs `rate | limit | pending | connections | queue` every second.
+- `CountryService`: countries from `GET countries`, cached, reloaded hourly.
 - PDP flow: `AmazonScraper` fetches `amazon/ads/scrap` when the queue is low → `AmazonPdpScraper` creates one `AmazonAdPrice` per country (manual state machine) → `AmazonPdpCountryScraper` + `AmazonPdpPriceHelper`.
   - Captcha, empty or invalid response, network error: retry with exponential backoff; after 15 failures the country finishes without a price.
   - 404: country deleted; if ≤2 countries remain, `DELETE amazon/ads/<id>`.
   - All complete: `PUT amazon/ads/<id>` with prices.
 - PLP flow: hourly category from `amazon/ads/categories/scrap` → `AmazonPlpPageScraper` → `AmazonPlpBuilder` → `POST amazon/ads`, recursing into subcategories.
+- `MetricsService` + `MetricsReporter` send counters every minute as `POST scrapers/<name>/metrics` (catalog in `docs/superpowers/specs/2026-10-18-scraper-metrics-design.md`); a marketplace maps its results to the shared `outcome` values.
 - `ApiService`: `get()` throws, `post`/`put`/`delete` only log errors.
 
 ## Connection limits

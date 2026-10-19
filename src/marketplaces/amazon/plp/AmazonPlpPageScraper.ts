@@ -3,6 +3,8 @@ import { getRetryDelay, MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
 import { AmazonService } from "@/marketplaces/amazon/AmazonService";
 import { ApiService } from "@/shared/backend/ApiService";
 import { ArgsService } from "@/shared/args/ArgsService";
+import { MetricsService } from "@/shared/metrics/MetricsService";
+import { ItemOutcome, ResponseOutcome } from "@/shared/metrics/metrics.types";
 import { AmazonPlpAdPage, AmazonPlpAd } from "@/marketplaces/amazon/types/amazon.types";
 import { parseHTML } from "linkedom";
 import _ from "lodash";
@@ -12,6 +14,7 @@ export class AmazonPlpPageScraper {
   private amazonService;
   private argsService;
   private builder;
+  private metricsService;
   private queueFullDelay = 1000;
   private maxPages = 10;
   // Amazon price filter (p_36) in grosze
@@ -29,12 +32,14 @@ export class AmazonPlpPageScraper {
     apiService = ApiService.getInstance(),
     amazonService = AmazonService.getInstance(),
     argsService = ArgsService.getInstance(),
-    builder = new AmazonPlpBuilder()
+    builder = new AmazonPlpBuilder(),
+    metricsService = MetricsService.getInstance()
   ) {
     this.apiService = apiService;
     this.amazonService = amazonService;
     this.argsService = argsService;
     this.builder = builder;
+    this.metricsService = metricsService;
   }
 
   executeCategory(
@@ -76,13 +81,12 @@ export class AmazonPlpPageScraper {
       .then((ads) => {
         page.pending = false;
         page.complete = true;
-        this.amazonService.queueService.completed++;
+        this.countItem(page, "data");
         if (ads) this.apiService.post("amazon/ads", ads);
       })
       .catch(() => {
         page.pending = false;
         page.failed++;
-        this.amazonService.queueService.failed++;
         this.retry(page);
       });
   }
@@ -90,6 +94,7 @@ export class AmazonPlpPageScraper {
   private retry(page: AmazonPlpAdPage) {
     if (page.failed >= MAX_FAILED_ATTEMPTS) {
       page.complete = true;
+      this.countItem(page, "given_up");
       return;
     }
 
@@ -98,6 +103,7 @@ export class AmazonPlpPageScraper {
 
   private async onSuccess(data: string, page: AmazonPlpAdPage) {
     if (!data.length) {
+      this.countResponse("empty");
       page.reject?.("Received empty data");
       return;
     }
@@ -109,9 +115,12 @@ export class AmazonPlpPageScraper {
     );
 
     if (ads.length === 0) {
+      this.countResponse("no_data");
       page.reject?.("No ads found");
       return;
     }
+
+    this.countResponse("data");
 
     subcategories
       .filter((sub) => !page.visited.has(sub))
@@ -128,6 +137,17 @@ export class AmazonPlpPageScraper {
     }
 
     page.resolve?.(ads);
+  }
+
+  private countResponse(outcome: ResponseOutcome) {
+    this.metricsService.increment("responses", { country: "pl", outcome });
+  }
+
+  private countItem(page: AmazonPlpAdPage, outcome: ItemOutcome) {
+    const labels = { country: "pl", outcome };
+    const attempts = outcome === "given_up" ? page.failed : page.failed + 1;
+    this.metricsService.increment("items", labels);
+    this.metricsService.increment("item_attempts", labels, attempts);
   }
 
   private onError(page: AmazonPlpAdPage) {
