@@ -16,16 +16,27 @@ export class AmazonPlpPageScraper {
   private builder;
   private metricsService;
   private queueFullDelay = 1000;
-  private maxPages = 10;
   // Amazon price filter (p_36) in grosze
   private priceRanges = [
-    "-1999",
-    "2000-4999",
-    "5000-9999",
-    "10000-19999",
-    "20000-49999",
-    "50000-99999",
-    "100000-",
+    "-999",
+    "1000-1999",
+    "2000-2999",
+    "3000-3999",
+    "4000-4999",
+    "5000-7499",
+    "7500-9999",
+    "10000-14999",
+    "15000-19999",
+    "20000-29999",
+    "30000-39999",
+    "40000-49999",
+    "50000-74999",
+    "75000-99999",
+    "100000-149999",
+    "150000-199999",
+    "200000-299999",
+    "300000-499999",
+    "500000-",
   ];
 
   constructor(
@@ -44,11 +55,14 @@ export class AmazonPlpPageScraper {
 
   executeCategory(
     category: string,
+    allPages: boolean,
     subcategory?: string,
     visited = new Set<string>()
   ) {
     this.priceRanges.forEach((price) => {
-      this.execute(this.buildPage(category, subcategory, visited, 1, price));
+      this.execute(
+        this.buildPage(category, allPages, subcategory, visited, 1, price)
+      );
     });
   }
 
@@ -126,13 +140,13 @@ export class AmazonPlpPageScraper {
       .filter((sub) => !page.visited.has(sub))
       .forEach((sub) => {
         page.visited.add(sub);
-        this.executeCategory(page.category, sub, page.visited);
+        this.executeCategory(page.category, page.allPages, sub, page.visited);
       });
 
-    if (hasNextPage && page.number < this.maxPages) {
-      const { category, subcategory, visited, number, price } = page;
+    if (page.allPages && hasNextPage) {
+      const { category, allPages, subcategory, visited, number, price } = page;
       this.execute(
-        this.buildPage(category, subcategory, visited, number + 1, price)
+        this.buildPage(category, allPages, subcategory, visited, number + 1, price)
       );
     }
 
@@ -164,6 +178,7 @@ export class AmazonPlpPageScraper {
 
   buildPage(
     category: string,
+    allPages = false,
     subcategory?: string,
     visited = new Set<string>(),
     number = 1,
@@ -171,6 +186,7 @@ export class AmazonPlpPageScraper {
   ): AmazonPlpAdPage {
     return {
       category,
+      allPages,
       subcategory,
       pending: false,
       complete: false,

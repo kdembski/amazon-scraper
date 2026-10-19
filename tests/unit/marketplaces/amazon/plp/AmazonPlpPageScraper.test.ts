@@ -40,13 +40,25 @@ const setup = ({ count = 50 } = {}) => {
 const flush = () => vi.advanceTimersByTimeAsync(0);
 
 const priceRanges = [
-  "-1999",
-  "2000-4999",
-  "5000-9999",
-  "10000-19999",
-  "20000-49999",
-  "50000-99999",
-  "100000-",
+  "-999",
+  "1000-1999",
+  "2000-2999",
+  "3000-3999",
+  "4000-4999",
+  "5000-7499",
+  "7500-9999",
+  "10000-14999",
+  "15000-19999",
+  "20000-29999",
+  "30000-39999",
+  "40000-49999",
+  "50000-74999",
+  "75000-99999",
+  "100000-149999",
+  "150000-199999",
+  "200000-299999",
+  "300000-499999",
+  "500000-",
 ];
 const inPriceRanges = (subcategory?: string) =>
   priceRanges.map(
@@ -70,8 +82,9 @@ describe("AmazonPlpPageScraper", () => {
   describe("buildPage", () => {
     it("builds a fresh page", () => {
       const { scraper } = setup();
-      expect(scraper.buildPage("toys", "n%3A123")).toEqual({
+      expect(scraper.buildPage("toys", false, "n%3A123")).toEqual({
         category: "toys",
+        allPages: false,
         subcategory: "n%3A123",
         pending: false,
         complete: false,
@@ -84,14 +97,14 @@ describe("AmazonPlpPageScraper", () => {
     it("shares the visited subcategories of the category", () => {
       const { scraper } = setup();
       const visited = new Set(["n%3A1"]);
-      expect(scraper.buildPage("toys", "n%3A2", visited).visited).toBe(visited);
+      expect(scraper.buildPage("toys", false, "n%3A2", visited).visited).toBe(visited);
     });
   });
 
   describe("executeCategory", () => {
     it("scrapes the category in every price range", () => {
       const { amazon, scraper } = setup();
-      scraper.executeCategory("electronics");
+      scraper.executeCategory("electronics", false);
 
       expect(amazon.requests.map((request) => request.url)).toEqual(
         inPriceRanges()
@@ -100,7 +113,7 @@ describe("AmazonPlpPageScraper", () => {
 
     it("scrapes a subcategory in every price range", () => {
       const { amazon, scraper } = setup();
-      scraper.executeCategory("electronics", "n%3A1");
+      scraper.executeCategory("electronics", false, "n%3A1");
 
       expect(amazon.requests.map((request) => request.url)).toEqual(
         inPriceRanges("n%3A1")
@@ -209,7 +222,11 @@ describe("AmazonPlpPageScraper", () => {
     it("scrapes the next page in the same price range", async () => {
       const { amazon, build, scraper } = setup();
       build.mockReturnValueOnce({ ads, subcategories: [], hasNextPage: true });
-      const page = buildPlpPage({ subcategory: "n%3A1", price: "2000-4999" });
+      const page = buildPlpPage({
+        allPages: true,
+        subcategory: "n%3A1",
+        price: "2000-4999",
+      });
       scraper.execute(page);
 
       amazon.respond(0, html);
@@ -221,15 +238,30 @@ describe("AmazonPlpPageScraper", () => {
       ]);
     });
 
-    it("stops after 10 pages", async () => {
+    it("scrapes only the first page when not all pages are wanted", async () => {
       const { amazon, build, scraper } = setup();
       build.mockReturnValueOnce({ ads, subcategories: [], hasNextPage: true });
-      scraper.execute(buildPlpPage({ number: 10 }));
+      scraper.execute(buildPlpPage());
 
       amazon.respond(0, html);
       await flush();
 
       expect(amazon.requests).toHaveLength(1);
+    });
+
+    it("passes all pages on to the subcategories", async () => {
+      const { amazon, build, scraper } = setup();
+      build
+        .mockReturnValueOnce({ ads, subcategories: ["n%3A1"], hasNextPage: false })
+        .mockReturnValueOnce({ ads, subcategories: [], hasNextPage: true });
+      scraper.execute(buildPlpPage({ allPages: true }));
+
+      amazon.respond(0, html);
+      await flush();
+      amazon.respond(1, html);
+      await flush();
+
+      expect(amazon.requests.at(-1)?.url).toBe(`${inPriceRanges("n%3A1")[0]}&page=2`);
     });
 
     it("stops when there is no next page", async () => {

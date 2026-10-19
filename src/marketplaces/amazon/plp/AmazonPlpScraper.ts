@@ -1,4 +1,5 @@
 import { AmazonPlpPageScraper } from "@/marketplaces/amazon/plp/AmazonPlpPageScraper";
+import { AmazonAdCategory } from "@/marketplaces/amazon/types/amazon.types";
 
 export class AmazonPlpScraper {
   private pageScraper;
@@ -7,7 +8,7 @@ export class AmazonPlpScraper {
     this.pageScraper = pageScraper;
   }
 
-  execute(category: string) {
-    this.pageScraper.executeCategory(category);
+  execute(category: AmazonAdCategory) {
+    this.pageScraper.executeCategory(category.name, !category.scrapedAt);
   }
 }

@@ -39,6 +39,7 @@ export const buildPlpPage = (
   overrides: Partial<AmazonPlpAdPage> = {}
 ): AmazonPlpAdPage => ({
   category: "electronics",
+  allPages: false,
   pending: false,
   complete: false,
   failed: 0,
