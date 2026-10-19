@@ -58,7 +58,7 @@ export class AmazonScraper implements MarketplaceScraper {
   async scrapPlp() {
     this.apiService
       .get<AmazonAdCategory>("amazon/ads/categories/scrap")
-      .then((category) => this.plpScraper.execute(category.name))
+      .then((category) => this.plpScraper.execute(category))
       .catch(() => {
         setTimeout(() => this.scrapPlp(), this.categoryRetryDelay);
       });

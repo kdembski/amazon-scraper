@@ -112,7 +112,7 @@ describe("AmazonScraper", () => {
       await flush();
 
       expect(api.get).toHaveBeenCalledWith("amazon/ads/categories/scrap");
-      expect(plpExecute).toHaveBeenCalledWith("electronics");
+      expect(plpExecute).toHaveBeenCalledWith({ id: 1, name: "electronics" });
     });
 
     it("asks for the category again a minute after loading fails", async () => {
@@ -131,7 +131,7 @@ describe("AmazonScraper", () => {
 
       await vi.advanceTimersByTimeAsync(1000);
       expect(api.get).toHaveBeenCalledTimes(2);
-      expect(plpExecute).toHaveBeenCalledWith("electronics");
+      expect(plpExecute).toHaveBeenCalledWith({ id: 1, name: "electronics" });
     });
   });
 });

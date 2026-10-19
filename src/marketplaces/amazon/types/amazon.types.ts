@@ -3,6 +3,7 @@ import { Country } from "@/shared/types/Country";
 export interface AmazonAdCategory {
   id: number;
   name: string;
+  scrapedAt: string | null;
 }
 
 export interface AmazonPlpAd {
@@ -14,6 +15,7 @@ export interface AmazonPlpAd {
 
 export interface AmazonPlpAdPage {
   category: string;
+  allPages: boolean;
   subcategory?: string;
   pending: boolean;
   complete: boolean;

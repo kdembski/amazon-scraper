@@ -11,7 +11,7 @@ import {
   World,
 } from "@@tests/support/integration";
 
-const PRICE_RANGES = 7;
+const PRICE_RANGES = 19;
 
 // Subcategory, price range and page number of a requested listing
 const parse = (url: string) => ({
@@ -35,6 +35,7 @@ describe("PLP", () => {
     world.backend.on("GET", "amazon/ads/categories/scrap", {
       id: 1,
       name: "electronics",
+      scrapedAt: null,
     });
   });
 
@@ -82,20 +83,39 @@ describe("PLP", () => {
     );
   });
 
-  it("follows the pagination up to 10 pages in every price range", async () => {
+  const paginated = () =>
     world.amazon.respond(({ url }) => {
       const { price, number } = parse(url);
-      return plpPage({ asins: [`B0${price}P${number}`], next: true });
+      return plpPage({ asins: [`B0${price}P${number}`], next: number < 3 });
     });
+
+  it("follows the pagination to the last page in every price range of a category never scraped", async () => {
+    paginated();
     scrape();
 
-    const posts = await waitForPosts(10 * PRICE_RANGES);
+    const posts = await waitForPosts(3 * PRICE_RANGES);
     await sleep(200);
 
     expect(_.uniq(posts.flat().map((ad) => ad.asin))).toHaveLength(
-      10 * PRICE_RANGES
+      3 * PRICE_RANGES
     );
-    expect(world.amazon.requests).toHaveLength(10 * PRICE_RANGES);
+    expect(world.amazon.requests).toHaveLength(3 * PRICE_RANGES);
+  });
+
+  it("scrapes only the first page in every price range of a category scraped before", async () => {
+    world.backend.on("GET", "amazon/ads/categories/scrap", {
+      id: 1,
+      name: "electronics",
+      scrapedAt: "2026-10-18T10:00:00.000Z",
+    });
+    paginated();
+    scrape();
+
+    await waitForPosts(PRICE_RANGES);
+    await sleep(200);
+
+    expect(world.amazon.requests).toHaveLength(PRICE_RANGES);
+    expect(world.amazon.requests.every(({ url }) => parse(url).number === 1)).toBe(true);
   });
 
   it("retries a listing without ads", async () => {

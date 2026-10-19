@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Node.js/TypeScript (ESM) worker that scrapes Amazon through rotating proxies. No own state: it fetches work from a backend (`API_URL`) and sends results back. Two modes:
 
 - **PDP** (default): price and shipper for a batch of ASINs in every country from the backend. Source: AOD AJAX fragment (`gp/product/ajax/aodAjaxMain/?asin=<asin>&pc=dp`, ~9 KB).
-- **PLP**: category listings on `amazon.pl`, newest first, first page only, recursing into subcategories; found products go to the backend.
+- **PLP**: category listings on `amazon.pl`, newest first, in every price range, recursing into subcategories; all pages when the category was never scraped (`scrapedAt` null), otherwise first page only; found products go to the backend.
 
 ## Commands
 
