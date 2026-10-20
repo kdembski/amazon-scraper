@@ -6,7 +6,7 @@ import { AmazonPlpBuilder } from "@/marketplaces/amazon/plp/AmazonPlpBuilder";
 import { AmazonService } from "@/marketplaces/amazon/AmazonService";
 import { ProxyService } from "@/shared/http/proxy/ProxyService";
 import { AmazonAdBuilder, AmazonAdBuildResult } from "@/marketplaces/amazon/types/amazon.types";
-import { buildAd, buildCountry } from "@@tests/support/factories";
+import { buildAd, buildAmazonCountry } from "@@tests/support/factories";
 
 // Real Amazon through the real webshare proxies (PROXY_LIST_TOKEN from .env).
 // Catches layout changes that break the builders silently: it checks that
@@ -84,7 +84,7 @@ const scrapeAll = (builder: AmazonAdBuilder, codes: string[]) =>
     asins.flatMap((asin) =>
       codes.map(async (code): Promise<Result> => {
         const ad = buildAd({ asin });
-        const { url, referer } = builder.buildUrl(buildCountry({ code }), ad);
+        const { url, referer } = builder.buildUrl(buildAmazonCountry({ tld: code }), ad);
         const result = await scrape(url, referer, (d) => builder.build(d));
         return { code, asin, ...result };
       })

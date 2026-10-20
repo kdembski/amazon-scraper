@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
 import { ProxyService } from "@/shared/http/proxy/ProxyService";
 import { cronJobs } from "@@tests/support/cron";
-import { buildAd, buildCountry } from "@@tests/support/factories";
+import { buildAd, buildAmazonCountry } from "@@tests/support/factories";
 import { aodPage, captchaPage } from "@@tests/support/html";
 import {
   bootScraper,
@@ -13,13 +13,13 @@ import {
 } from "@@tests/support/integration";
 
 const countries = [
-  buildCountry({ id: 1, code: "de" }),
-  buildCountry({ id: 2, code: "fr" }),
-  buildCountry({ id: 3, code: "it" }),
+  buildAmazonCountry({ countryId: 1, tld: "de" }),
+  buildAmazonCountry({ countryId: 2, tld: "fr" }),
+  buildAmazonCountry({ countryId: 3, tld: "it" }),
 ];
 const ad = buildAd({ id: 7, asin: "B0TESTASIN" });
 const sixCountries = ["de", "fr", "it", "es", "nl", "se"].map((code, i) =>
-  buildCountry({ id: i + 1, code })
+  buildAmazonCountry({ countryId: i + 1, tld: code })
 );
 
 const offers = {
@@ -41,7 +41,7 @@ describe("PDP", () => {
   beforeEach(async () => {
     world = await startWorld();
     world.backend
-      .on("GET", "countries", countries)
+      .on("GET", "amazon/countries/scrap", countries)
       .onSequence("GET", "amazon/ads/scrap", [{ body: [ad] }, { body: [] }]);
   });
 
@@ -127,9 +127,9 @@ describe("PDP", () => {
   });
 
   it("leaves out a country where the product does not exist", async () => {
-    world.backend.on("GET", "countries", [
+    world.backend.on("GET", "amazon/countries/scrap", [
       ...countries,
-      buildCountry({ id: 4, code: "es" }),
+      buildAmazonCountry({ countryId: 4, tld: "es" }),
     ]);
     world.amazon.respondPerCountry({
       ...offers,
@@ -171,7 +171,7 @@ describe("PDP", () => {
     const put = await world.backend.waitFor("PUT", "amazon/ads/8");
 
     expect(put.body.prices.map((p: any) => p.value)).toEqual([9.99, 9.99, 9.99]);
-    expect(world.backend.find("GET", "countries")).toHaveLength(1);
+    expect(world.backend.find("GET", "amazon/countries/scrap")).toHaveLength(1);
   });
 
   it("loads the batch again after the backend fails", async () => {
@@ -191,7 +191,7 @@ describe("PDP", () => {
   });
 
   it("keeps at most -l requests in flight", async () => {
-    world.backend.on("GET", "countries", sixCountries);
+    world.backend.on("GET", "amazon/countries/scrap", sixCountries);
     world.amazon.respond(() => ({ body: aodPage({ price: "1,00" }), delay: 100 }));
     scrape(["-c", "10", "-l", "2"]);
 
@@ -202,7 +202,7 @@ describe("PDP", () => {
   });
 
   it("starts at most -r requests per second", async () => {
-    world.backend.on("GET", "countries", sixCountries);
+    world.backend.on("GET", "amazon/countries/scrap", sixCountries);
     world.amazon.respond(() => aodPage({ price: "1,00" }));
     scrape(["-c", "10", "-r", "2"]);
 

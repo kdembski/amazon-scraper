@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { buildAd, buildCountry } from "@@tests/support/factories";
+import { buildAd, buildAmazonCountry } from "@@tests/support/factories";
 import { aodPage } from "@@tests/support/html";
 import { Process, spawnScraper } from "@@tests/support/e2e";
 
 const countries = [
-  buildCountry({ id: 1, code: "de" }),
-  buildCountry({ id: 2, code: "fr" }),
+  buildAmazonCountry({ countryId: 1, tld: "de" }),
+  buildAmazonCountry({ countryId: 2, tld: "fr" }),
 ];
 const ad = buildAd({ id: 7, asin: "B0TESTASIN" });
 
@@ -20,7 +20,7 @@ describe("PDP process", () => {
   it("scrapes a batch and sends the prices to the backend", async () => {
     scraper = await spawnScraper(["-c", "10", "-l", "5"], ({ backend, amazon }) => {
       backend
-        .on("GET", "countries", countries)
+        .on("GET", "amazon/countries/scrap", countries)
         .onSequence("GET", "amazon/ads/scrap", [{ body: [ad] }, { body: [] }]);
       amazon.respondPerCountry({
         de: [aodPage({ price: "24,99", shipsFrom: "Amazon" })],
@@ -42,7 +42,7 @@ describe("PDP process", () => {
   it("deletes an ad that no longer exists", async () => {
     scraper = await spawnScraper(["-c", "10"], ({ backend, amazon }) => {
       backend
-        .on("GET", "countries", countries)
+        .on("GET", "amazon/countries/scrap", countries)
         .onSequence("GET", "amazon/ads/scrap", [{ body: [ad] }, { body: [] }]);
       amazon.respond(() => ({ status: 404 }));
     });
@@ -54,7 +54,7 @@ describe("PDP process", () => {
   it("keeps running and loads the batch again after the backend fails", async () => {
     scraper = await spawnScraper(["-c", "10"], ({ backend, amazon }) => {
       backend
-        .on("GET", "countries", countries)
+        .on("GET", "amazon/countries/scrap", countries)
         .onSequence("GET", "amazon/ads/scrap", [
           { status: 500 },
           { body: [ad] },

@@ -3,7 +3,7 @@ import {
   AmazonAdBuilder,
   AmazonAdBuildResult,
 } from "@/marketplaces/amazon/types/amazon.types";
-import { Country } from "@/shared/types/Country";
+import { AmazonCountry } from "@/marketplaces/amazon/types/amazon.types";
 
 export class AmazonAodAdBuilder implements AmazonAdBuilder {
   build(document: Document): AmazonAdBuildResult {
@@ -33,9 +33,9 @@ export class AmazonAodAdBuilder implements AmazonAdBuilder {
     };
   }
 
-  buildUrl(country: Country, ad: AmazonAd) {
-    const url = `${country.code}/gp/product/ajax/aodAjaxMain/?asin=${ad.asin}&pc=dp`;
-    const referer = `${country.code}/dp/${ad.asin}`;
+  buildUrl(country: AmazonCountry, ad: AmazonAd) {
+    const url = `${country.tld}/gp/product/ajax/aodAjaxMain/?asin=${ad.asin}&pc=dp`;
+    const referer = `${country.tld}/dp/${ad.asin}`;
 
     return {
       url,

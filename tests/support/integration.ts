@@ -3,7 +3,7 @@ import { createScraper } from "@/marketplaces";
 import type { AmazonScraper } from "@/marketplaces/amazon/AmazonScraper";
 import { AmazonService } from "@/marketplaces/amazon/AmazonService";
 import { ApiService } from "@/shared/backend/ApiService";
-import { CountryService } from "@/shared/backend/CountryService";
+import { AmazonCountryService } from "@/marketplaces/amazon/AmazonCountryService";
 import { MetricsReporter } from "@/shared/backend/MetricsReporter";
 import { MetricsService } from "@/shared/metrics/MetricsService";
 import { ScrapingClient } from "@/shared/http/ScrapingClient";
@@ -17,7 +17,7 @@ import { resetSingleton } from "@@tests/support/singleton";
 const singletons = [
   ArgsService,
   ApiService,
-  CountryService,
+  AmazonCountryService,
   ProxyService,
   ScrapingClient,
   AmazonService,

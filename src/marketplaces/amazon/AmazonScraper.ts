@@ -3,7 +3,7 @@ import { AmazonPlpScraper } from "@/marketplaces/amazon/plp/AmazonPlpScraper";
 import { AmazonPdpCountryScraper } from "@/marketplaces/amazon/pdp/AmazonPdpCountryScraper";
 import { AmazonService } from "@/marketplaces/amazon/AmazonService";
 import { ApiService } from "@/shared/backend/ApiService";
-import { CountryService } from "@/shared/backend/CountryService";
+import { AmazonCountryService } from "@/marketplaces/amazon/AmazonCountryService";
 import { ArgsService } from "@/shared/args/ArgsService";
 import { ProxyService } from "@/shared/http/proxy/ProxyService";
 import { AmazonAd, AmazonAdCategory } from "@/marketplaces/amazon/types/amazon.types";
@@ -29,7 +29,7 @@ export class AmazonScraper implements MarketplaceScraper {
     pdpScraper = new AmazonPdpScraper(new AmazonPdpCountryScraper()),
     plpScraper = new AmazonPlpScraper(),
     proxyService = ProxyService.getInstance(),
-    countryService = CountryService.getInstance()
+    countryService = AmazonCountryService.getInstance()
   ) {
     this.apiService = apiService;
     this.amazonService = amazonService;

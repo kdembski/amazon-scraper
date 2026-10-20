@@ -1,4 +1,7 @@
-import { Country } from "@/shared/types/Country";
+export interface AmazonCountry {
+  countryId: number;
+  tld: string;
+}
 
 export interface AmazonAdCategory {
   id: number;
@@ -41,11 +44,11 @@ export interface AmazonAdBuildResult {
 
 export interface AmazonAdBuilder {
   build(document: Document): AmazonAdBuildResult;
-  buildUrl(country: Country, ad: AmazonAd): { url: string; referer: string };
+  buildUrl(country: AmazonCountry, ad: AmazonAd): { url: string; referer: string };
 }
 
 export interface AmazonAdPrice {
-  country: Country;
+  country: AmazonCountry;
   value?: number;
   dispatchFrom?: string;
   pending: boolean;

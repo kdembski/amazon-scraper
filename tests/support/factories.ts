@@ -3,11 +3,11 @@ import {
   AmazonAdPrice,
   AmazonPlpAdPage,
 } from "@/marketplaces/amazon/types/amazon.types";
-import { Country } from "@/shared/types/Country";
+import { AmazonCountry } from "@/marketplaces/amazon/types/amazon.types";
 
-export const buildCountry = (overrides: Partial<Country> = {}): Country => ({
-  id: 1,
-  code: "de",
+export const buildAmazonCountry = (overrides: Partial<AmazonCountry> = {}): AmazonCountry => ({
+  countryId: 1,
+  tld: "de",
   ...overrides,
 });
 
@@ -20,7 +20,7 @@ export const buildAd = (overrides: Partial<AmazonAd> = {}): AmazonAd => ({
 export const buildPrice = (
   overrides: Partial<AmazonAdPrice> = {}
 ): AmazonAdPrice => ({
-  country: buildCountry(),
+  country: buildAmazonCountry(),
   pending: false,
   complete: false,
   deleted: false,
@@ -29,10 +29,10 @@ export const buildPrice = (
   ...overrides,
 });
 
-// One price per country, with ids and codes 1..count
+// One price per country, with countryIds and tlds 1..count
 export const buildPrices = (count: number) =>
   Array.from({ length: count }, (_, i) =>
-    buildPrice({ country: buildCountry({ id: i + 1, code: `c${i + 1}` }) })
+    buildPrice({ country: buildAmazonCountry({ countryId: i + 1, tld: `c${i + 1}` }) })
   );
 
 export const buildPlpPage = (

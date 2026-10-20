@@ -36,7 +36,7 @@ Integration (`tests/integration/`) and e2e (`tests/e2e/`) tests share fakes in `
 
 ## Structure
 
-- `src/shared/`: code that knows no shop — `args/` (`ArgsService`), `backend/` (`ApiService`, `CountryService`, `MetricsReporter`), `metrics/` (`MetricsService`), `http/` (`RequestQueueService`, `ScrapingClient`; `proxy/`: `ProxyService` over `ProxyList`, `ProxyAgentPool`, `ProxyTrafficMeter`), `interfaces/`, `types/`, `utils/`.
+- `src/shared/`: code that knows no shop — `args/` (`ArgsService`), `backend/` (`ApiService`, `MetricsReporter`), `metrics/` (`MetricsService`), `http/` (`RequestQueueService`, `ScrapingClient`; `proxy/`: `ProxyService` over `ProxyList`, `ProxyAgentPool`, `ProxyTrafficMeter`), `interfaces/`, `utils/`.
 - `src/marketplaces/<name>/`: one folder per shop — scraper implementing `MarketplaceScraper`, a thin service over `ScrapingClient`, `types/`, and one folder per flow (`amazon/pdp/`, `amazon/plp/`) holding its scrapers and builders.
 - `src/shared` imports nothing from `src/marketplaces`.
 - `src/marketplaces.ts` (`createScraper()`) starts `MetricsReporter` and returns the scraper; `src/index.ts` calls `createScraper().execute()`.
@@ -47,7 +47,7 @@ Integration (`tests/integration/`) and e2e (`tests/e2e/`) tests share fakes in `
 - `ScrapingClient.get(url, referer, callbacks)` is the only path to shops; results go only to callbacks. `url` and `referer` are full URLs. Random proxy and desktop User-Agent, hard 20 s `AbortSignal` timeout, one keep-alive agent per proxy.
 - `AmazonService.get(url, referer, callbacks)` prefixes `https://www.amazon.` to `url` and `referer` (`de/dp/...`) and delegates to `ScrapingClient`; `AmazonService.queueService` is the `ScrapingClient` queue.
 - `RequestQueueService`: custom concurrency limiter plus token bucket for `-r`, one per process. Logs `rate | limit | pending | connections | queue` every second.
-- `CountryService`: countries from `GET countries`, cached, reloaded hourly.
+- `AmazonCountryService`: countries to scrape (`countryId`, `tld`) from `GET amazon/countries/scrap`, cached, reloaded hourly; URLs use `www.amazon.<tld>`.
 - PDP flow: `AmazonScraper` fetches `amazon/ads/scrap` when the queue is low → `AmazonPdpScraper` creates one `AmazonAdPrice` per country (manual state machine) → `AmazonPdpCountryScraper` + `AmazonPdpPriceHelper`.
   - Captcha, empty or invalid response, network error: retry with exponential backoff; after 15 failures the country finishes without a price.
   - 404: country deleted; if ≤2 countries remain, `DELETE amazon/ads/<id>`.

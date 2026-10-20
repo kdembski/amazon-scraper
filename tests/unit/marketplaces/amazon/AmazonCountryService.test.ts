@@ -1,31 +1,31 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { CountryService } from "@/shared/backend/CountryService";
+import { AmazonCountryService } from "@/marketplaces/amazon/AmazonCountryService";
 import { cronJobs } from "@@tests/support/cron";
 import { fakeApiService } from "@@tests/support/fakes";
 import { resetSingleton } from "@@tests/support/singleton";
 
 vi.mock("cron", async () => (await import("@@tests/support/cron")).cronModule);
 
-const countries = [{ id: 1, code: "de" }];
+const countries = [{ countryId: 1, tld: "de" }];
 
 const setup = () => {
   const api = fakeApiService();
   // The constructor is private, it is only called through getInstance()
-  const Service = CountryService as unknown as new (
+  const Service = AmazonCountryService as unknown as new (
     ...deps: unknown[]
-  ) => CountryService;
+  ) => AmazonCountryService;
   return { api, service: new Service(api.service) };
 };
 
-describe("CountryService", () => {
+describe("AmazonCountryService", () => {
   beforeEach(() => {
     cronJobs.length = 0;
   });
 
   it("is a singleton", () => {
-    resetSingleton(CountryService);
-    expect(CountryService.getInstance()).toBe(CountryService.getInstance());
-    resetSingleton(CountryService);
+    resetSingleton(AmazonCountryService);
+    expect(AmazonCountryService.getInstance()).toBe(AmazonCountryService.getInstance());
+    resetSingleton(AmazonCountryService);
   });
 
   it("loads countries on first use", async () => {
@@ -33,7 +33,7 @@ describe("CountryService", () => {
     api.get.mockResolvedValue(countries);
 
     await expect(service.getCountries()).resolves.toEqual(countries);
-    expect(api.get).toHaveBeenCalledWith("countries");
+    expect(api.get).toHaveBeenCalledWith("amazon/countries/scrap");
   });
 
   it("serves loaded countries from the cache", async () => {
@@ -54,6 +54,6 @@ describe("CountryService", () => {
     expect(cronJobs[0].start).toHaveBeenCalled();
 
     await cronJobs[0].onTick();
-    expect(api.get).toHaveBeenCalledWith("countries");
+    expect(api.get).toHaveBeenCalledWith("amazon/countries/scrap");
   });
 });

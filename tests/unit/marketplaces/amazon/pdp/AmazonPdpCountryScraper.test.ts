@@ -315,7 +315,7 @@ describe("AmazonPdpCountryScraper", () => {
       const { amazon, run, increment } = setup({ price: 10 });
       const prices = buildPrices(3);
       run(prices);
-      const labels = { country: prices[0].country.code, outcome: "data" };
+      const labels = { country: prices[0].country.tld, outcome: "data" };
 
       amazon.respond(0, html);
       await flush();
@@ -329,7 +329,7 @@ describe("AmazonPdpCountryScraper", () => {
       const { amazon, run, increment } = setup({ isCaptcha: false, isValid: true });
       const prices = buildPrices(3);
       run(prices);
-      const labels = { country: prices[0].country.code, outcome: "no_data" };
+      const labels = { country: prices[0].country.tld, outcome: "no_data" };
 
       amazon.respond(0, html);
       await flush();
@@ -352,7 +352,7 @@ describe("AmazonPdpCountryScraper", () => {
       await flush();
 
       expect(increment).toHaveBeenCalledWith("responses", {
-        country: prices[0].country.code,
+        country: prices[0].country.tld,
         outcome,
       });
       expect(calls(increment, "items")).toHaveLength(0);
@@ -375,7 +375,7 @@ describe("AmazonPdpCountryScraper", () => {
 
       expect(increment).toHaveBeenCalledWith(
         "item_attempts",
-        { country: prices[0].country.code, outcome: "data" },
+        { country: prices[0].country.tld, outcome: "data" },
         3
       );
     });
@@ -391,7 +391,7 @@ describe("AmazonPdpCountryScraper", () => {
       const items = calls(increment, "items");
       expect(items.map((call) => call[1])).toEqual(
         [0, 1, 2].map((i) => ({
-          country: prices[i].country.code,
+          country: prices[i].country.tld,
           outcome: "deleted",
         }))
       );
@@ -410,7 +410,7 @@ describe("AmazonPdpCountryScraper", () => {
       }
       await vi.runAllTimersAsync();
 
-      const labels = { country: prices[0].country.code, outcome: "given_up" };
+      const labels = { country: prices[0].country.tld, outcome: "given_up" };
       expect(increment).toHaveBeenCalledWith("items", labels);
       expect(increment).toHaveBeenCalledWith(
         "item_attempts",

@@ -3,17 +3,17 @@ import { AmazonScraper } from "@/marketplaces/amazon/AmazonScraper";
 import type { AmazonPdpScraper } from "@/marketplaces/amazon/pdp/AmazonPdpScraper";
 import type { AmazonPlpScraper } from "@/marketplaces/amazon/plp/AmazonPlpScraper";
 import type { ProxyService } from "@/shared/http/proxy/ProxyService";
-import { buildAd, buildCountry } from "@@tests/support/factories";
+import { buildAd, buildAmazonCountry } from "@@tests/support/factories";
 import {
   fakeAmazonService,
   fakeApiService,
   fakeArgsService,
-  fakeCountryService,
+  fakeAmazonCountryService,
 } from "@@tests/support/fakes";
 
 const setup = ({ count = 50 } = {}) => {
   const api = fakeApiService();
-  const country = fakeCountryService();
+  const country = fakeAmazonCountryService();
   const amazon = fakeAmazonService();
   const args = fakeArgsService({ count });
   const pdpExecute = vi.fn();
@@ -42,7 +42,7 @@ describe("AmazonScraper", () => {
   });
 
   describe("scrapPdp", () => {
-    const countries = [buildCountry({ id: 1 }), buildCountry({ id: 2 })];
+    const countries = [buildAmazonCountry({ countryId: 1 }), buildAmazonCountry({ countryId: 2 })];
     const ads = [buildAd({ id: 1 }), buildAd({ id: 2 })];
 
     it("scrapes a batch of ads in every country", async () => {

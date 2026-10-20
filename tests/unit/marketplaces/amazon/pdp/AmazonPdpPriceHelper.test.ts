@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AmazonPdpPriceHelper } from "@/marketplaces/amazon/pdp/AmazonPdpPriceHelper";
-import { buildAd, buildCountry, buildPrice } from "@@tests/support/factories";
+import { buildAd, buildAmazonCountry, buildPrice } from "@@tests/support/factories";
 import { fakeApiService } from "@@tests/support/fakes";
 
 const setup = () => {
@@ -60,12 +60,12 @@ describe("AmazonPdpPriceHelper", () => {
       const { api, helper } = setup();
       const prices = [
         buildPrice({
-          country: buildCountry({ id: 1 }),
+          country: buildAmazonCountry({ countryId: 1 }),
           value: 19.99,
           dispatchFrom: "Amazon",
         }),
-        buildPrice({ country: buildCountry({ id: 2 }) }),
-        buildPrice({ country: buildCountry({ id: 3 }), value: 21.5 }),
+        buildPrice({ country: buildAmazonCountry({ countryId: 2 }) }),
+        buildPrice({ country: buildAmazonCountry({ countryId: 3 }), value: 21.5 }),
       ];
 
       helper.sendCompletedPrices(prices, ad);

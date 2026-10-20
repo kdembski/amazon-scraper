@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AmazonAodAdBuilder } from "@/marketplaces/amazon/pdp/AmazonAodAdBuilder";
 import { captchaPage, toDocument } from "@@tests/support/html";
-import { Country } from "@/shared/types/Country";
+import { AmazonCountry } from "@/marketplaces/amazon/types/amazon.types";
 import { AmazonAd } from "@/marketplaces/amazon/types/amazon.types";
 
 const builder = new AmazonAodAdBuilder();
@@ -129,12 +129,12 @@ describe("AmazonAodAdBuilder", () => {
   });
 
   it("builds the aod ajax url with the product page as referer", () => {
-    const country = { code: "fr" } as Country;
+    const country = { countryId: 7, tld: "com.be" } as AmazonCountry;
     const ad = { id: 1, asin: "B0TESTASIN" } as AmazonAd;
 
     expect(builder.buildUrl(country, ad)).toEqual({
-      url: "fr/gp/product/ajax/aodAjaxMain/?asin=B0TESTASIN&pc=dp",
-      referer: "fr/dp/B0TESTASIN",
+      url: "com.be/gp/product/ajax/aodAjaxMain/?asin=B0TESTASIN&pc=dp",
+      referer: "com.be/dp/B0TESTASIN",
     });
   });
 });
