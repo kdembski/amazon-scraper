@@ -48,28 +48,27 @@ export class AmazonAodAdBuilder implements AmazonAdBuilder {
       priceBox.querySelector(".apex-pricetopay-value") ??
       priceBox.querySelector(".a-price");
 
-    const whole = this.cleanUpPrice(
+    // The whole part ends with the marketplace's decimal separator ("12," or "12.")
+    const whole = this.getDigits(
       container?.querySelector(".a-price-whole")?.textContent
     );
-    const fraction = this.cleanUpPrice(
+    const fraction = this.getDigits(
       container?.querySelector(".a-price-fraction")?.textContent
     );
 
     if (whole && fraction) {
-      return this.parse(`${whole}${fraction}`);
+      return this.parse(`${whole}.${fraction}`);
     }
 
     // .a-offscreen is usually empty in this fragment, so the accessibility
     // label goes first
-    const price =
-      this.cleanUpPrice(
+    return (
+      this.parseLabel(
         priceBox.querySelector(".apex-pricetopay-accessibility-label")
           ?.textContent
-      ) ||
-      this.cleanUpPrice(container?.querySelector(".a-offscreen")?.textContent);
-
-    if (!price) return;
-    return this.parse(price);
+      ) ??
+      this.parseLabel(container?.querySelector(".a-offscreen")?.textContent)
+    );
   }
 
   private getDispatchFrom(pinned: Element) {
@@ -88,8 +87,19 @@ export class AmazonAodAdBuilder implements AmazonAdBuilder {
     return dispatchFrom || undefined;
   }
 
-  private cleanUpPrice(price: string | null | undefined) {
-    return price?.replace(/[^\d,]/g, "").replace(",", ".");
+  private getDigits(text: string | null | undefined) {
+    return text?.replace(/\D/g, "");
+  }
+
+  // "19,99 €", "€1,299.00", "1.299 €": a separator followed by one or two
+  // digits at the end is the decimal one, any other separates thousands
+  private parseLabel(label: string | null | undefined) {
+    const price = label?.replace(/[^\d.,]/g, "") ?? "";
+    const [, whole, fraction = "0"] = price.match(/^(.*?)(?:[.,](\d{1,2}))?$/)!;
+    const digits = this.getDigits(whole);
+
+    if (!digits) return;
+    return this.parse(`${digits}.${fraction}`);
   }
 
   private parse(value: string) {

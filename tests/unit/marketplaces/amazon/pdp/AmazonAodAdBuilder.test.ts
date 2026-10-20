@@ -90,6 +90,34 @@ describe("AmazonAodAdBuilder", () => {
     expect(build(body).price).toBe(9.49);
   });
 
+  it.each([
+    ["12", "99", 12.99],
+    ["1,299", "00", 1299],
+  ])(
+    "reads whole %s and fraction %s with a dot as the decimal separator",
+    (whole, fraction, expected) => {
+      const body = aodPage(`
+        <span class="a-price">
+          <span class="a-price-whole">${whole}<span class="a-price-decimal">.</span></span><span class="a-price-fraction">${fraction}</span>
+        </span>
+      `);
+      expect(build(body).price).toBe(expected);
+    }
+  );
+
+  it.each([
+    ["€12.99", 12.99],
+    ["€1,299.00", 1299],
+    ["1.299 €", 1299],
+    ["1.299,5 €", 1299.5],
+  ])("reads the accessibility label %s", (label, expected) => {
+    const body = aodPage(`
+      ${priceToPay({ fraction: "" })}
+      <span class="apex-pricetopay-accessibility-label">${label}</span>
+    `);
+    expect(build(body).price).toBe(expected);
+  });
+
   it("falls back to the accessibility label when the fraction is missing", () => {
     const body = aodPage(`
       ${priceToPay({ fraction: "" })}
