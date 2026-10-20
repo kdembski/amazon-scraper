@@ -1,5 +1,5 @@
 // Failed attempts after which a country / listing page is given up
-export const MAX_FAILED_ATTEMPTS = 15;
+export const MAX_FAILED_ATTEMPTS = 6;
 
 const BASE_DELAY = 1000;
 const MAX_DELAY = 60 * 1000;
