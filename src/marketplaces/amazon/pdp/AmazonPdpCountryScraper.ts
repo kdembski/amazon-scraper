@@ -101,13 +101,13 @@ export class AmazonPdpCountryScraper {
 
   private countResponse(price: AmazonAdPrice, outcome: ResponseOutcome) {
     this.metricsService.increment("responses", {
-      country: price.country.code,
+      country: price.country.tld,
       outcome,
     });
   }
 
   private countItem(price: AmazonAdPrice, outcome: ItemOutcome) {
-    const labels = { country: price.country.code, outcome };
+    const labels = { country: price.country.tld, outcome };
     const attempts = outcome === "given_up" ? price.failed : price.failed + 1;
     this.metricsService.increment("items", labels);
     this.metricsService.increment("item_attempts", labels, attempts);

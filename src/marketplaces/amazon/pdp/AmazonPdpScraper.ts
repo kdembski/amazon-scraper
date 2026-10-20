@@ -1,5 +1,5 @@
 import { AmazonPdpCountryScraper } from "@/marketplaces/amazon/pdp/AmazonPdpCountryScraper";
-import { Country } from "@/shared/types/Country";
+import { AmazonCountry } from "@/marketplaces/amazon/types/amazon.types";
 import { AmazonAd } from "@/marketplaces/amazon/types/amazon.types";
 
 export class AmazonPdpScraper {
@@ -9,7 +9,7 @@ export class AmazonPdpScraper {
     this.countryScraper = countryScraper;
   }
 
-  execute(ad: AmazonAd, countries: Country[]) {
+  execute(ad: AmazonAd, countries: AmazonCountry[]) {
     const prices = countries.map((country) => ({
       country,
       pending: false,

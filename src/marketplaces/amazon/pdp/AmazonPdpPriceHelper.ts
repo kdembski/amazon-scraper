@@ -22,7 +22,7 @@ export class AmazonPdpPriceHelper {
       ?.filter((price) => !!price.value)
       .map((price) => ({
         adId: ad.id,
-        countryId: price.country.id,
+        countryId: price.country.countryId,
         value: price.value,
         dispatchFrom: price.dispatchFrom,
       }));

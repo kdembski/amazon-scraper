@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { AmazonPdpScraper } from "@/marketplaces/amazon/pdp/AmazonPdpScraper";
 import type { AmazonPdpCountryScraper } from "@/marketplaces/amazon/pdp/AmazonPdpCountryScraper";
-import { buildAd, buildCountry } from "@@tests/support/factories";
+import { buildAd, buildAmazonCountry } from "@@tests/support/factories";
 
 const setup = () => {
   const execute = vi.fn();
@@ -12,8 +12,8 @@ const setup = () => {
 describe("AmazonPdpScraper", () => {
   const ad = buildAd();
   const countries = [
-    buildCountry({ id: 1, code: "de" }),
-    buildCountry({ id: 2, code: "fr" }),
+    buildAmazonCountry({ countryId: 1, tld: "de" }),
+    buildAmazonCountry({ countryId: 2, tld: "fr" }),
   ];
 
   it("starts every country with a fresh price state", () => {

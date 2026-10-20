@@ -2,7 +2,7 @@ import { vi } from "vitest";
 import type { AmazonService } from "@/marketplaces/amazon/AmazonService";
 import type { ApiService } from "@/shared/backend/ApiService";
 import type { ArgsService } from "@/shared/args/ArgsService";
-import type { CountryService } from "@/shared/backend/CountryService";
+import type { AmazonCountryService } from "@/marketplaces/amazon/AmazonCountryService";
 import type { AmazonAdBuilder, AmazonAdBuildResult } from "@/marketplaces/amazon/types/amazon.types";
 
 export function fakeApiService() {
@@ -19,9 +19,9 @@ export function fakeApiService() {
   return { service, get, post, put, delete: del };
 }
 
-export function fakeCountryService() {
+export function fakeAmazonCountryService() {
   const getCountries = vi.fn().mockResolvedValue([]);
-  const service = { getCountries } as unknown as CountryService;
+  const service = { getCountries } as unknown as AmazonCountryService;
   return { service, getCountries };
 }
 
@@ -56,9 +56,9 @@ export function fakeArgsService({ count = 50 } = {}) {
 
 export function fakeAdBuilder(result: AmazonAdBuildResult = {}) {
   const build = vi.fn(() => result);
-  const buildUrl = vi.fn((country: { code: string }, ad: { asin: string }) => ({
-    url: `${country.code}/dp/${ad.asin}`,
-    referer: `${country.code}/ref`,
+  const buildUrl = vi.fn((country: { tld: string }, ad: { asin: string }) => ({
+    url: `${country.tld}/dp/${ad.asin}`,
+    referer: `${country.tld}/ref`,
   }));
   const builder: AmazonAdBuilder = { build, buildUrl };
   return { builder, build, buildUrl };
