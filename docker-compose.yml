@@ -6,7 +6,7 @@ services:
     env_file: .env
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    command: ["-c", "5000", "-l", "1000", "-r", "500"]
+    command: ["-c", "5000", "-l", "800", "-r", "400"]
     environment:
       NODE_OPTIONS: --max-old-space-size=32768
       name: amazon-pdp
