@@ -2,7 +2,7 @@ import _ from "lodash";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
 import { cronJobs } from "@@tests/support/cron";
-import { plpPage } from "@@tests/support/html";
+import { newReleasesPage, plpPage } from "@@tests/support/html";
 import {
   bootScraper,
   sleep,
@@ -43,6 +43,17 @@ describe("PLP", () => {
 
   const scrape = () => bootScraper(["-t", "plp", "-c", "100"]).scraper.execute();
 
+  const isNewReleases = (url: string) => url.startsWith("pl/gp/new-releases/");
+
+  // Answers the search listings, the new releases ranking is empty
+  const respondSearch = (responder: Parameters<World["amazon"]["respond"]>[0]) =>
+    world.amazon.respond((request) =>
+      isNewReleases(request.url) ? newReleasesPage() : responder(request)
+    );
+
+  const searches = () =>
+    world.amazon.requests.filter(({ url }) => !isNewReleases(url));
+
   const waitForPosts = async (count: number) => {
     await world.backend.waitFor("POST", "amazon/ads");
     await expect
@@ -65,7 +76,7 @@ describe("PLP", () => {
       }),
       "12": plpPage({ asins: ["B0SUB12"], path: ["n/10", "n/12"] }),
     };
-    world.amazon.respond(({ url }) => pages[parse(url).node] ?? { status: 404 });
+    respondSearch(({ url }) => pages[parse(url).node] ?? { status: 404 });
     scrape();
 
     const posts = await waitForPosts(3 * PRICE_RANGES);
@@ -74,17 +85,17 @@ describe("PLP", () => {
     expect(posts).toContainEqual([ad("B0ROOT1"), ad("B0ROOT2")]);
     expect(posts).toContainEqual([ad("B0SUB11")]);
     expect(posts).toContainEqual([ad("B0SUB12")]);
-    const requests = world.amazon.requests.map(({ url }) => parse(url));
+    const requests = searches().map(({ url }) => parse(url));
     expect(requests).toHaveLength(3 * PRICE_RANGES);
     expect(_.uniqWith(requests, _.isEqual)).toHaveLength(3 * PRICE_RANGES);
     expect(requests.every((request) => request.price)).toBe(true);
-    expect(world.amazon.requests[0].headers.referer).toMatch(
+    expect(searches()[0].headers.referer).toMatch(
       /^https:\/\/www\.amazon\.pl\/b\?node=\d+$/
     );
   });
 
   const paginated = () =>
-    world.amazon.respond(({ url }) => {
+    respondSearch(({ url }) => {
       const { price, number } = parse(url);
       return plpPage({ asins: [`B0${price}P${number}`], next: number < 3 });
     });
@@ -99,7 +110,7 @@ describe("PLP", () => {
     expect(_.uniq(posts.flat().map((ad) => ad.asin))).toHaveLength(
       3 * PRICE_RANGES
     );
-    expect(world.amazon.requests).toHaveLength(3 * PRICE_RANGES);
+    expect(searches()).toHaveLength(3 * PRICE_RANGES);
   });
 
   it("scrapes only the first page in every price range of a category scraped before", async () => {
@@ -114,13 +125,13 @@ describe("PLP", () => {
     await waitForPosts(PRICE_RANGES);
     await sleep(200);
 
-    expect(world.amazon.requests).toHaveLength(PRICE_RANGES);
-    expect(world.amazon.requests.every(({ url }) => parse(url).number === 1)).toBe(true);
+    expect(searches()).toHaveLength(PRICE_RANGES);
+    expect(searches().every(({ url }) => parse(url).number === 1)).toBe(true);
   });
 
   it("retries a listing without ads", async () => {
     let attempts = 0;
-    world.amazon.respond(() =>
+    respondSearch(() =>
       attempts++ === 0 ? plpPage() : plpPage({ asins: ["B0ROOT1"] })
     );
     scrape();
@@ -128,26 +139,50 @@ describe("PLP", () => {
     const posts = await waitForPosts(PRICE_RANGES);
 
     expect(posts).toEqual(_.times(PRICE_RANGES, () => [ad("B0ROOT1")]));
-    expect(world.amazon.requests).toHaveLength(PRICE_RANGES + 1);
+    expect(searches()).toHaveLength(PRICE_RANGES + 1);
   });
 
   it("gives up on a listing after the attempt limit", async () => {
-    world.amazon.respond(() => ({ status: 503 }));
+    respondSearch(() => ({ status: 503 }));
     scrape();
 
     await expect
-      .poll(() => world.amazon.requests.length)
+      .poll(() => searches().length)
       .toBe(MAX_FAILED_ATTEMPTS * PRICE_RANGES);
     await sleep(200);
 
-    expect(world.amazon.requests).toHaveLength(
+    expect(searches()).toHaveLength(
       MAX_FAILED_ATTEMPTS * PRICE_RANGES
     );
     expect(world.backend.find("POST", "amazon/ads")).toHaveLength(0);
   });
 
+  it("sends the new releases of the category tree before searching the listings", async () => {
+    const pages: Record<string, string> = {
+      "pl/gp/new-releases/electronics": newReleasesPage({ asins: ["B0NEW1"], nodes: ["7"], next: true }),
+      "pl/gp/new-releases/electronics?pg=2": newReleasesPage({ asins: ["B0NEW2"] }),
+      "pl/gp/new-releases/electronics/7": newReleasesPage({ asins: ["B0NEW1", "B0NEW7"], nodes: ["7"] }),
+    };
+    world.amazon.respond(({ url }) => pages[url] ?? plpPage());
+    scrape();
+
+    await expect.poll(() => searches().length).toBeGreaterThan(0);
+
+    const newReleases = world.amazon.requests.filter(({ url }) => isNewReleases(url));
+    expect(newReleases.map(({ url }) => url).sort()).toEqual(Object.keys(pages).sort());
+    expect(_.last(newReleases)!.at).toBeLessThanOrEqual(searches()[0].at);
+    const posted = world.backend.find("POST", "amazon/ads").flatMap((post) => post.body);
+    expect(posted.map((ad: { asin: string }) => ad.asin).sort()).toEqual(["B0NEW1", "B0NEW2", "B0NEW7"]);
+    expect(posted[0]).toEqual({
+      asin: "B0NEW1",
+      name: "Product B0NEW1",
+      image: "https://images-eu.ssl-images-amazon.com/images/I/B0NEW1.jpg",
+      categoryName: "electronics",
+    });
+  });
+
   it("reports metrics every minute", async () => {
-    world.amazon.respond(() => plpPage({ asins: ["B0ROOT1"] }));
+    respondSearch(() => plpPage({ asins: ["B0ROOT1"] }));
     scrape();
     await waitForPosts(PRICE_RANGES);
 

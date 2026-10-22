@@ -92,3 +92,34 @@ export const plpPage = ({
   </ul>
   ${pagination(next)}
 `;
+
+// New releases ranking (gp/new-releases/<category>[/<node>]): products, the
+// browse tree with links to the given nodes and a link to page 2 if next
+export const newReleasesPage = ({
+  category = "electronics",
+  asins = [] as string[],
+  nodes = [] as string[],
+  next = false,
+} = {}) => `
+  <ul class="_p13n-zg-nav-tree-all_style_zg-browse-group__88fbz">
+    ${nodes
+      .map(
+        (node) =>
+          `<li><a href="/gp/new-releases/${category}/${node}/ref=zg_bsnr_nav_${category}_1">${node}</a></li>`
+      )
+      .join("")}
+  </ul>
+  ${asins
+    .map(
+      (asin) => `
+        <div id="gridItemRoot">
+          <div data-asin="${asin}">
+            <img src="https://images-eu.ssl-images-amazon.com/images/I/${asin}.jpg" />
+            <a href="/dp/${asin}"><span><div class="_cDEzb_p13n-sc-css-line-clamp-3_g3dy1"> Product ${asin} </div></span></a>
+          </div>
+        </div>
+      `
+    )
+    .join("")}
+  ${next ? `<a href="/gp/new-releases/${category}/ref=zg_bsnr_pg_2_${category}?ie=UTF8&pg=2">2</a>` : ""}
+`;

@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Node.js/TypeScript (ESM) worker that scrapes Amazon through rotating proxies. No own state: it fetches work from a backend (`API_URL`) and sends results back. Two modes:
 
 - **PDP** (default): price and shipper for a batch of ASINs in every country from the backend. Source: AOD AJAX fragment (`gp/product/ajax/aodAjaxMain/?asin=<asin>&pc=dp`, ~9 KB).
-- **PLP**: category listings on `amazon.pl`, newest first, in every price range, recursing into subcategories; all pages when the category was never scraped (`scrapedAt` null), otherwise first page only; found products go to the backend.
+- **PLP**: first the new releases ranking of the category on `amazon.pl` (`gp/new-releases/<category>`, every node of its browse tree, pages 1 and 2, each ASIN sent once per run), then category listings, newest first, in every price range, recursing into subcategories; all listing pages when the category was never scraped (`scrapedAt` null), otherwise first page only; found products go to the backend.
 
 ## Commands
 
@@ -52,7 +52,7 @@ Integration (`tests/integration/`) and e2e (`tests/e2e/`) tests share fakes in `
   - Captcha, empty or invalid response, network error: retry with exponential backoff; after 15 failures the country finishes without a price.
   - 404: country deleted; if ≤2 countries remain, `DELETE amazon/ads/<id>`.
   - All complete: `PUT amazon/ads/<id>` with prices.
-- PLP flow: hourly category from `amazon/ads/categories/scrap` → `AmazonPlpPageScraper` → `AmazonPlpBuilder` → `POST amazon/ads`, recursing into subcategories.
+- PLP flow: hourly category from `amazon/ads/categories/scrap` → `AmazonPlpScraper` awaits `AmazonNewReleasesScraper` (`AmazonNewReleasesBuilder`; a page without the browse tree is retried; metrics `new_releases_pages`, `new_releases_ads`), then starts `AmazonPlpPageScraper` → `AmazonPlpBuilder` → `POST amazon/ads`, recursing into subcategories.
 - `MetricsService` + `MetricsReporter` send counters every minute as `POST scrapers/<name>/metrics` (catalog in `docs/superpowers/specs/2026-10-18-scraper-metrics-design.md`); a marketplace maps its results to the shared `outcome` values.
 - `ApiService`: `get()` throws, `post`/`put`/`delete` only log errors.
 
