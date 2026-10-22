@@ -26,8 +26,11 @@ export class ProxyService {
     return ProxyService.instance;
   }
 
-  getRandomAgent() {
-    const url = this.proxies[Math.floor(Math.random() * this.proxies.length)];
+  // Random proxy, preferring one with an idle connection to the host
+  getAgent(host: string) {
+    const idle = this.proxies.filter((url) => this.pool.hasFreeSocket(url, host));
+    const urls = idle.length ? idle : this.proxies;
+    const url = urls[Math.floor(Math.random() * urls.length)];
     return this.pool.get(url);
   }
 

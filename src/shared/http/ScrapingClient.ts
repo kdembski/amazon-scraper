@@ -48,7 +48,7 @@ export class ScrapingClient {
     labels: MetricLabels = {}
   ) {
     this.queueService.request(async () => {
-      const httpsAgent = this.proxyService.getRandomAgent();
+      const httpsAgent = this.proxyService.getAgent(new URL(url).hostname);
       const userAgent = new UserAgent({ deviceCategory: "desktop" }).toString();
 
       const startedAt = Date.now();

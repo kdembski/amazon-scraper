@@ -17,7 +17,7 @@ const Client = ScrapingClient as unknown as new (
 const setup = () => {
   const agent = { name: "agent" };
   const proxy = {
-    getRandomAgent: vi.fn(() => agent),
+    getAgent: vi.fn(() => agent),
   } as unknown as ProxyService;
   const requests: Promise<unknown>[] = [];
   const queue = {
@@ -32,7 +32,7 @@ const setup = () => {
     queue as unknown as RequestQueueService
   );
 
-  return { service, agent, queue, requests };
+  return { service, agent, proxy, queue, requests };
 };
 
 describe("ScrapingClient", () => {
@@ -67,7 +67,7 @@ describe("ScrapingClient", () => {
 
   describe("get", () => {
     it("requests the url through the queue with a proxy agent", async () => {
-      const { service, agent, queue, requests } = setup();
+      const { service, agent, proxy, queue, requests } = setup();
       get.mockResolvedValue({ data: "<html>" });
 
       service.get(
@@ -77,6 +77,7 @@ describe("ScrapingClient", () => {
       await Promise.all(requests);
 
       expect(queue.request).toHaveBeenCalledTimes(1);
+      expect(proxy.getAgent).toHaveBeenCalledWith("www.amazon.de");
       expect(get).toHaveBeenCalledWith("https://www.amazon.de/dp/B0TESTASIN", {
         httpsAgent: agent,
         signal: expect.any(AbortSignal),
@@ -148,7 +149,7 @@ describe("ScrapingClient", () => {
         });
         const service = new Client(
           {} as ArgsService,
-          { getRandomAgent: vi.fn() },
+          { getAgent: vi.fn() },
           queue,
           metrics
         );

@@ -54,6 +54,22 @@ describe("ProxyAgentPool", () => {
     });
   });
 
+  describe("hasFreeSocket", () => {
+    type Pool = Record<string, unknown[]>;
+
+    it("tells whether the proxy has an idle connection to the host", () => {
+      const pool = new ProxyAgentPool(vi.fn());
+      const freeSockets = pool.get(first).freeSockets as unknown as Pool;
+      freeSockets["www.amazon.de:443:::::"] = [{}];
+      freeSockets["www.amazon.fr:443:::::"] = [];
+
+      expect(pool.hasFreeSocket(first, "www.amazon.de")).toBe(true);
+      expect(pool.hasFreeSocket(first, "www.amazon.fr")).toBe(false);
+      expect(pool.hasFreeSocket(first, "www.amazon.d")).toBe(false);
+      expect(pool.hasFreeSocket(second, "www.amazon.de")).toBe(false);
+    });
+  });
+
   describe("retain", () => {
     it("destroys agents of proxies that are not kept", () => {
       const pool = new ProxyAgentPool(vi.fn());
