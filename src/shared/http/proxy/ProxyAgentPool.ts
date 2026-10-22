@@ -26,6 +26,15 @@ export class ProxyAgentPool {
     return agent;
   }
 
+  // Socket names start with `<host>:<port>:`
+  hasFreeSocket(url: string, host: string) {
+    const freeSockets = this.agents.get(url)?.freeSockets ?? {};
+
+    return Object.entries(freeSockets).some(
+      ([name, sockets]) => name.startsWith(`${host}:`) && !!sockets?.length
+    );
+  }
+
   retain(urls: string[]) {
     const kept = new Set(urls);
 

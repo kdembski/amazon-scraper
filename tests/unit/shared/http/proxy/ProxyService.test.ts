@@ -15,6 +15,7 @@ const setup = () => {
   const pool = {
     get: vi.fn((url: string) => ({ url })),
     retain: vi.fn(),
+    hasFreeSocket: vi.fn((_url: string, _host: string) => false),
     countConnections: vi.fn(() => 7),
   };
   const list = { load: vi.fn().mockResolvedValue(urls) };
@@ -99,16 +100,30 @@ describe("ProxyService", () => {
     });
   });
 
-  it("returns the pool agent of a random loaded proxy", async () => {
-    const { service, pool } = setup();
-    await service.loadProxies();
+  describe("getAgent", () => {
+    it("returns the pool agent of a random loaded proxy without idle connections", async () => {
+      const { service, pool } = setup();
+      await service.loadProxies();
 
-    vi.spyOn(Math, "random").mockReturnValue(0);
-    expect(service.getRandomAgent()).toEqual({ url: urls[0] });
+      vi.spyOn(Math, "random").mockReturnValue(0);
+      expect(service.getAgent("www.amazon.de")).toEqual({ url: urls[0] });
 
-    vi.spyOn(Math, "random").mockReturnValue(0.99);
-    expect(service.getRandomAgent()).toEqual({ url: urls[1] });
-    expect(pool.get).toHaveBeenCalledTimes(2);
+      vi.spyOn(Math, "random").mockReturnValue(0.99);
+      expect(service.getAgent("www.amazon.de")).toEqual({ url: urls[1] });
+      expect(pool.get).toHaveBeenCalledTimes(2);
+    });
+
+    it("picks only among proxies with an idle connection to the host", async () => {
+      const { service, pool } = setup();
+      await service.loadProxies();
+      pool.hasFreeSocket.mockImplementation(
+        (url: string, host: string) => url === urls[1] && host === "www.amazon.de"
+      );
+
+      vi.spyOn(Math, "random").mockReturnValue(0);
+      expect(service.getAgent("www.amazon.de")).toEqual({ url: urls[1] });
+      expect(service.getAgent("www.amazon.fr")).toEqual({ url: urls[0] });
+    });
   });
 
   it("counts connections of the pool", () => {
