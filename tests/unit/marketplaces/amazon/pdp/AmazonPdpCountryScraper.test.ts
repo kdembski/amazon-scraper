@@ -77,13 +77,14 @@ describe("AmazonPdpCountryScraper", () => {
 
   describe("on success", () => {
     it("stores the price and dispatchFrom of the country", async () => {
-      const { amazon, run } = setup({ price: 24.99, dispatchFrom: "Amazon" });
+      const { amazon, builder, run } = setup({ price: 24.99, dispatchFrom: "Amazon" });
       const prices = buildPrices(3);
       run(prices);
 
       amazon.respond(0, html);
       await flush();
 
+      expect(builder.trimHtml).toHaveBeenCalledWith(html);
       expect(prices[0]).toMatchObject({
         value: 24.99,
         dispatchFrom: "Amazon",

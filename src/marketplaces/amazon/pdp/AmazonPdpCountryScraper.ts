@@ -78,7 +78,7 @@ export class AmazonPdpCountryScraper {
       return;
     }
 
-    const { document } = parseHTML(data);
+    const { document } = parseHTML(this.builder.trimHtml(data));
     const ad = this.builder.build(document);
 
     if (ad.isCaptcha) {
