@@ -50,16 +50,19 @@ describe("AmazonPdpCountryScraper", () => {
     vi.restoreAllMocks();
   });
 
-  it("requests the url built for the country", () => {
+  it("requests the url built for the country through its proxy type", () => {
     const { amazon, builder, ad, run } = setup();
     const prices = buildPrices(1);
+    prices[0].country.proxyType = "isp";
     run(prices);
 
     expect(builder.buildUrl).toHaveBeenCalledWith(prices[0].country, ad);
-    expect(amazon.get).toHaveBeenCalledWith("c1/dp/B0TESTASIN", "c1/ref", {
-      onSuccess: expect.any(Function),
-      onError: expect.any(Function),
-    });
+    expect(amazon.get).toHaveBeenCalledWith(
+      "c1/dp/B0TESTASIN",
+      "c1/ref",
+      { onSuccess: expect.any(Function), onError: expect.any(Function) },
+      "isp"
+    );
     expect(prices[0].pending).toBe(true);
   });
 

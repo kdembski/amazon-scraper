@@ -66,18 +66,21 @@ describe("ScrapingClient", () => {
   });
 
   describe("get", () => {
-    it("requests the url through the queue with a proxy agent", async () => {
+    it("requests the url through the queue with a proxy agent of the proxy type", async () => {
       const { service, agent, proxy, queue, requests } = setup();
       get.mockResolvedValue({ data: "<html>" });
 
       service.get(
         "https://www.amazon.de/dp/B0TESTASIN",
-        "https://www.amazon.de/s?k=B0TESTASIN"
+        "https://www.amazon.de/s?k=B0TESTASIN",
+        undefined,
+        {},
+        "isp"
       );
       await Promise.all(requests);
 
       expect(queue.request).toHaveBeenCalledTimes(1);
-      expect(proxy.getAgent).toHaveBeenCalledWith("www.amazon.de");
+      expect(proxy.getAgent).toHaveBeenCalledWith("www.amazon.de", "isp");
       expect(get).toHaveBeenCalledWith("https://www.amazon.de/dp/B0TESTASIN", {
         httpsAgent: agent,
         signal: expect.any(AbortSignal),

@@ -51,10 +51,15 @@ export class AmazonPdpCountryScraper {
       const { url, referer } = this.builder.buildUrl(price.country, ad);
       price.pending = true;
 
-      this.amazonService.get<string>(url, referer, {
-        onSuccess: (res) => this.onSuccess(res, price),
-        onError: (e) => this.onError(e, price, ad, prices, resolveAd),
-      });
+      this.amazonService.get<string>(
+        url,
+        referer,
+        {
+          onSuccess: (res) => this.onSuccess(res, price),
+          onError: (e) => this.onError(e, price, ad, prices, resolveAd),
+        },
+        price.country.proxyType
+      );
     })
       .then(() => {
         price.pending = false;
