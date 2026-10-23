@@ -44,7 +44,7 @@ Integration (`tests/integration/`) and e2e (`tests/e2e/`) tests share fakes in `
 
 ## Architecture
 
-- `ScrapingClient.get(url, referer, callbacks)` is the only path to shops; results go only to callbacks. `url` and `referer` are full URLs. Random proxy (only among proxies with an idle connection to the host, if any) and desktop User-Agent, hard 20 s `AbortSignal` timeout, one keep-alive agent per proxy.
+- `ScrapingClient.get(url, referer, callbacks)` is the only path to shops; results go only to callbacks. `url` and `referer` are full URLs. Random proxy (the first of up to 20 random picks with an idle connection to the host, else any) and a desktop User-Agent from a pool of 500 generated at start, hard 20 s `AbortSignal` timeout, one keep-alive agent per proxy.
 - `AmazonService.get(url, referer, callbacks)` prefixes `https://www.amazon.` to `url` and `referer` (`de/dp/...`) and delegates to `ScrapingClient`; `AmazonService.queueService` is the `ScrapingClient` queue.
 - `RequestQueueService`: custom concurrency limiter plus token bucket for `-r`, one per process. A finished request starts the next queued one at once; a 1 ms tick starts up to 10 more (needed when the token bucket refills). Logs `rate | limit | pending | connections | queue` every second.
 - `AmazonCountryService`: countries to scrape (`countryId`, `tld`) from `GET amazon/countries/scrap`, cached, reloaded hourly; URLs use `www.amazon.<tld>`.

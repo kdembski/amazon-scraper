@@ -6,6 +6,14 @@ import {
 import { AmazonCountry } from "@/marketplaces/amazon/types/amazon.types";
 
 export class AmazonAodAdBuilder implements AmazonAdBuilder {
+  // Cuts the filters and the other offers that follow the pinned offer
+  trimHtml(html: string) {
+    const filter = html.indexOf('id="aod-filter"');
+    if (filter === -1) return html;
+
+    return html.slice(0, html.lastIndexOf("<", filter));
+  }
+
   build(document: Document): AmazonAdBuildResult {
     const form = document.querySelector("form");
     const isCaptcha =

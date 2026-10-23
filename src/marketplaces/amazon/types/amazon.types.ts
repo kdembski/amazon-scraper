@@ -43,6 +43,7 @@ export interface AmazonAdBuildResult {
 }
 
 export interface AmazonAdBuilder {
+  trimHtml(html: string): string;
   build(document: Document): AmazonAdBuildResult;
   buildUrl(country: AmazonCountry, ad: AmazonAd): { url: string; referer: string };
 }

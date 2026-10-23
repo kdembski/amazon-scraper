@@ -60,6 +60,7 @@ export function fakeAdBuilder(result: AmazonAdBuildResult = {}) {
     url: `${country.tld}/dp/${ad.asin}`,
     referer: `${country.tld}/ref`,
   }));
-  const builder: AmazonAdBuilder = { build, buildUrl };
-  return { builder, build, buildUrl };
+  const trimHtml = vi.fn((html: string) => html);
+  const builder: AmazonAdBuilder = { trimHtml, build, buildUrl };
+  return { builder, trimHtml, build, buildUrl };
 }

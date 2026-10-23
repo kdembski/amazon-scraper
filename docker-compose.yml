@@ -1,15 +1,28 @@
+x-amazon-pdp: &amazon-pdp
+  image: amazon-scraper
+  build: .
+  restart: unless-stopped
+  env_file: .env
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  command: ["-c", "5000", "-l", "200", "-r", "150"]
+
 services:
-  amazon-pdp:
-    image: amazon-scraper
-    build: .
-    restart: unless-stopped
-    env_file: .env
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    command: ["-c", "5000", "-l", "600", "-r", "350"]
+  amazon-pdp-1:
+    <<: *amazon-pdp
     environment:
-      NODE_OPTIONS: --max-old-space-size=32768
-      name: amazon-pdp
+      NODE_OPTIONS: --max-old-space-size=8192
+      name: amazon-pdp-1
+  amazon-pdp-2:
+    <<: *amazon-pdp
+    environment:
+      NODE_OPTIONS: --max-old-space-size=8192
+      name: amazon-pdp-2
+  amazon-pdp-3:
+    <<: *amazon-pdp
+    environment:
+      NODE_OPTIONS: --max-old-space-size=8192
+      name: amazon-pdp-3
   amazon-plp:
     image: amazon-scraper
     build: .

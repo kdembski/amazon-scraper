@@ -45,6 +45,22 @@ describe("AmazonAodAdBuilder", () => {
     vi.restoreAllMocks();
   });
 
+  describe("trimHtml", () => {
+    it("cuts everything from the filters on", () => {
+      const html = `<div id="aod-container">${aodPage(priceToPay())}<div class="x" id="aod-filter"></div><div id="aod-offer-list"></div>`;
+
+      const trimmed = builder.trimHtml(html);
+
+      expect(trimmed).not.toContain("aod-filter");
+      expect(trimmed).not.toContain("aod-offer-list");
+      expect(builder.build(toDocument(trimmed)).price).toBe(24.99);
+    });
+
+    it("keeps html without the filters", () => {
+      expect(builder.trimHtml(captchaPage)).toBe(captchaPage);
+    });
+  });
+
   it("detects a captcha page", () => {
     expect(build(captchaPage)).toEqual({ isCaptcha: true });
   });
