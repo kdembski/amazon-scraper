@@ -5,7 +5,7 @@ x-amazon-pdp: &amazon-pdp
   env_file: .env
   extra_hosts:
     - "host.docker.internal:host-gateway"
-  command: ["-c", "5000", "-l", "200", "-r", "150"]
+  command: ["-c", "5000", "-l", "150", "-r", "150"]
 
 services:
   amazon-pdp-1:
