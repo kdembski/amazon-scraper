@@ -36,7 +36,7 @@ Integration (`tests/integration/`) and e2e (`tests/e2e/`) tests share fakes in `
 
 ## Structure
 
-- `src/shared/`: code that knows no shop — `args/` (`ArgsService`), `backend/` (`ApiService`, `MetricsReporter`), `metrics/` (`MetricsService`), `http/` (`RequestQueueService`, `ScrapingClient`; `proxy/`: `ProxyService` over `ProxyList`, `ProxyAgentPool`, `ProxyTrafficMeter`), `interfaces/`, `utils/`.
+- `src/shared/`: code that knows no shop — `args/` (`ArgsService`), `backend/` (`ApiService`, `MetricsReporter`), `metrics/` (`MetricsService`), `http/` (`RequestQueueService`, `ThrottledQueue`, `ScrapingClient`; `proxy/`: `ProxyService` over `ProxyList`, `ProxyAgentPool`, `ProxyTrafficMeter`), `interfaces/`, `utils/`.
 - `src/marketplaces/<name>/`: one folder per shop — scraper implementing `MarketplaceScraper`, a thin service over `ScrapingClient`, `types/`, and one folder per flow (`amazon/pdp/`, `amazon/plp/`) holding its scrapers and builders.
 - `src/shared` imports nothing from `src/marketplaces`.
 - `src/marketplaces.ts` (`createScraper()`) starts `MetricsReporter` and returns the scraper; `src/index.ts` calls `createScraper().execute()`.
@@ -54,7 +54,7 @@ Integration (`tests/integration/`) and e2e (`tests/e2e/`) tests share fakes in `
   - All complete: `PUT amazon/ads/<id>` with prices.
 - PLP flow: hourly category from `amazon/ads/categories/scrap` → `AmazonPlpScraper` awaits `AmazonNewReleasesScraper` (`AmazonNewReleasesBuilder`; a page without the browse tree is retried; metrics `new_releases_pages`, `new_releases_ads`), then starts `AmazonPlpPageScraper` → `AmazonPlpBuilder` → `POST amazon/ads`, recursing into subcategories.
 - `MetricsService` + `MetricsReporter` send counters every minute as `POST scrapers/<name>/metrics` (catalog in `docs/superpowers/specs/2026-10-18-scraper-metrics-design.md`); a marketplace maps its results to the shared `outcome` values. Gauges `event_loop_delay_mean_ms`/`event_loop_delay_max_ms` come from `monitorEventLoopDelay` (10 ms sampling interval subtracted), reset after each send.
-- `ApiService`: `get()` throws, `post`/`put`/`delete` only log errors.
+- `ApiService`: `get()` throws, `post`/`put`/`delete` only log errors. `put`/`delete` go through a `ThrottledQueue(5, 25)` (max 5 at once, starts spaced 40 ms apart, per process) so batch ends do not flood the backend. Use `ThrottledQueue` for backend calls and `RequestQueueService` only for shop requests.
 
 ## Connection limits
 
