@@ -49,10 +49,11 @@ export class ScrapingClient {
       onSuccess?: (data: T) => void;
       onError?: (e: any) => void;
     },
-    labels: MetricLabels = {}
+    labels: MetricLabels = {},
+    proxyType?: string
   ) {
     this.queueService.request(async () => {
-      const httpsAgent = this.proxyService.getAgent(new URL(url).hostname);
+      const httpsAgent = this.proxyService.getAgent(new URL(url).hostname, proxyType);
       const userAgent = _.sample(this.userAgents);
 
       const startedAt = Date.now();

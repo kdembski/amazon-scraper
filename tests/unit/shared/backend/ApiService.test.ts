@@ -97,6 +97,25 @@ describe("ApiService", () => {
     });
   });
 
+  describe.each([
+    ["put", (s: ApiService) => s.put("amazon/ads/1", {})],
+    ["delete", (s: ApiService) => s.delete("amazon/ads/1")],
+  ] as const)("%s throttling", (method, call) => {
+    it("sends at most 25 requests per second", async () => {
+      vi.useFakeTimers();
+      const service = setup();
+      mocked[method].mockResolvedValue({ data: "ok" });
+
+      call(service);
+      call(service);
+      expect(mocked[method]).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(40);
+      expect(mocked[method]).toHaveBeenCalledTimes(2);
+      vi.useRealTimers();
+    });
+  });
+
   describe("post config", () => {
     it("forwards the extra config together with the agent", async () => {
       const service = setup();

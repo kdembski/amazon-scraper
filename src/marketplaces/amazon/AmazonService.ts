@@ -27,13 +27,15 @@ export class AmazonService {
     callback?: {
       onSuccess?: (data: T) => void;
       onError?: (e: any) => void;
-    }
+    },
+    proxyType?: string
   ) {
     this.scrapingClient.get<T>(
       `${this.baseUrl}${url}`,
       `${this.baseUrl}${referer}`,
       callback,
-      { country: url.split("/")[0] }
+      { country: url.split("/")[0] },
+      proxyType
     );
   }
 }

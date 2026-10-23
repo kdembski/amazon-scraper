@@ -19,7 +19,7 @@ npm run test:unit                          # vitest
 npm run test:integration                   # whole app in-process against fakes
 npm run test:e2e                           # builds dist/ and runs it as a process
 npm run test:e2e:docker                    # same tests against the built Docker image
-npm run test:live                          # real Amazon via real proxies (PROXY_LIST_TOKEN in .env)
+npm run test:live                          # real Amazon via real proxies (PROXY_API_KEY, PROXY_LIST_TOKEN in .env)
 docker compose up -d --build --remove-orphans # production
 ```
 
@@ -29,14 +29,14 @@ Integration (`tests/integration/`) and e2e (`tests/e2e/`) tests share fakes in `
 
 ## Configuration
 
-- Env: `API_URL`, `PROXY_LIST_TOKEN` (webshare.io), `PROXY_LIST_URL` (overrides the webshare list URL, used by e2e), `name` (set in docker-compose.yml, used in `scrapers/<name>/...`; `undefined` locally).
+- Env: `API_URL`, `PROXY_API_KEY` (webshare.io API, reads the plans), `PROXY_LIST_TOKEN` (webshare.io list download), `PROXY_LIST_URL` (one list as the `datacenter` pool instead of webshare, used by e2e), `name` (set in docker-compose.yml, used in `scrapers/<name>/...`; `undefined` locally).
 - Flags (`ArgsService`): `-t pdp|plp`, `-l` concurrency limit (default 10), `-r` max requests/s per process (default 0 = unlimited), `-c` batch size in PDP / max queue length in PLP (default 50).
 - Flags configure the scraper as a whole, never one marketplace: every flag must take effect in every mode (`-t`) and every marketplace. Do not add a flag that is ignored in some mode or marketplace; put marketplace-specific behaviour in the marketplace code.
 - `uncaughtException`/`unhandledRejection` only log, so the process never crashes and Docker never restarts it. TLS verification is disabled globally.
 
 ## Structure
 
-- `src/shared/`: code that knows no shop — `args/` (`ArgsService`), `backend/` (`ApiService`, `MetricsReporter`), `metrics/` (`MetricsService`), `http/` (`RequestQueueService`, `ScrapingClient`; `proxy/`: `ProxyService` over `ProxyList`, `ProxyAgentPool`, `ProxyTrafficMeter`), `interfaces/`, `utils/`.
+- `src/shared/`: code that knows no shop — `args/` (`ArgsService`), `backend/` (`ApiService`, `MetricsReporter`), `metrics/` (`MetricsService`), `http/` (`RequestQueueService`, `ThrottledQueue`, `ScrapingClient`; `proxy/`: `ProxyService` over `ProxyList`, `ProxyAgentPool`, `ProxyTrafficMeter`), `interfaces/`, `utils/`.
 - `src/marketplaces/<name>/`: one folder per shop — scraper implementing `MarketplaceScraper`, a thin service over `ScrapingClient`, `types/`, and one folder per flow (`amazon/pdp/`, `amazon/plp/`) holding its scrapers and builders.
 - `src/shared` imports nothing from `src/marketplaces`.
 - `src/marketplaces.ts` (`createScraper()`) starts `MetricsReporter` and returns the scraper; `src/index.ts` calls `createScraper().execute()`.
@@ -44,17 +44,18 @@ Integration (`tests/integration/`) and e2e (`tests/e2e/`) tests share fakes in `
 
 ## Architecture
 
-- `ScrapingClient.get(url, referer, callbacks)` is the only path to shops; results go only to callbacks. `url` and `referer` are full URLs. Random proxy (the first of up to 20 random picks with an idle connection to the host, else any) and a desktop User-Agent from a pool of 500 generated at start, hard 20 s `AbortSignal` timeout, one keep-alive agent per proxy.
+- `ScrapingClient.get(url, referer, callbacks, labels, proxyType)` is the only path to shops; results go only to callbacks. `url` and `referer` are full URLs. Random proxy of the `proxyType` pool (the first of up to 20 random picks with an idle connection to the host, else any) and a desktop User-Agent from a pool of 500 generated at start, hard 20 s `AbortSignal` timeout, one keep-alive agent per proxy.
+- `ProxyService` pools: `ProxyList` reads the active webshare plans (`GET subscription/plan/`) and downloads each plan's list (`?plan_id=`); `proxy_subtype` `default` is the `datacenter` pool, other subtypes keep their name (`isp`). An unknown or empty pool falls back to `datacenter`. Reloaded hourly.
 - `AmazonService.get(url, referer, callbacks)` prefixes `https://www.amazon.` to `url` and `referer` (`de/dp/...`) and delegates to `ScrapingClient`; `AmazonService.queueService` is the `ScrapingClient` queue.
 - `RequestQueueService`: custom concurrency limiter plus token bucket for `-r`, one per process. A finished request starts the next queued one at once; a 1 ms tick starts up to 10 more (needed when the token bucket refills). Logs `rate | limit | pending | connections | queue` every second.
-- `AmazonCountryService`: countries to scrape (`countryId`, `tld`) from `GET amazon/countries/scrap`, cached, reloaded hourly; URLs use `www.amazon.<tld>`.
+- `AmazonCountryService`: countries to scrape (`countryId`, `tld`, `proxyType`) from `GET amazon/countries/scrap`, cached, reloaded hourly; URLs use `www.amazon.<tld>`. PDP requests go through the country's `proxyType` pool, PLP through `datacenter`.
 - PDP flow: `AmazonScraper` fetches `amazon/ads/scrap` when the queue is low → `AmazonPdpScraper` creates one `AmazonAdPrice` per country (manual state machine) → `AmazonPdpCountryScraper` + `AmazonPdpPriceHelper`.
   - Captcha, empty or invalid response, network error: retry with exponential backoff; after 15 failures the country finishes without a price.
   - 404: country deleted; if ≤2 countries remain, `DELETE amazon/ads/<id>`.
   - All complete: `PUT amazon/ads/<id>` with prices.
 - PLP flow: hourly category from `amazon/ads/categories/scrap` → `AmazonPlpScraper` awaits `AmazonNewReleasesScraper` (`AmazonNewReleasesBuilder`; a page without the browse tree is retried; metrics `new_releases_pages`, `new_releases_ads`), then starts `AmazonPlpPageScraper` → `AmazonPlpBuilder` → `POST amazon/ads`, recursing into subcategories.
 - `MetricsService` + `MetricsReporter` send counters every minute as `POST scrapers/<name>/metrics` (catalog in `docs/superpowers/specs/2026-10-18-scraper-metrics-design.md`); a marketplace maps its results to the shared `outcome` values. Gauges `event_loop_delay_mean_ms`/`event_loop_delay_max_ms` come from `monitorEventLoopDelay` (10 ms sampling interval subtracted), reset after each send.
-- `ApiService`: `get()` throws, `post`/`put`/`delete` only log errors.
+- `ApiService`: `get()` throws, `post`/`put`/`delete` only log errors. `put`/`delete` go through a `ThrottledQueue(5, 25)` (max 5 at once, starts spaced 40 ms apart, per process) so batch ends do not flood the backend. Use `ThrottledQueue` for backend calls and `RequestQueueService` only for shop requests.
 
 ## Connection limits
 

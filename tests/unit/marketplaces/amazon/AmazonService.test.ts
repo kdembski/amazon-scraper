@@ -14,17 +14,18 @@ const setup = () => {
 };
 
 describe("AmazonService", () => {
-  it("prefixes url and referer with https://www.amazon. and delegates to the scraping client", () => {
+  it("prefixes url and referer with https://www.amazon. and delegates to the scraping client with the proxy type", () => {
     const { service, client } = setup();
     const callback = { onSuccess: vi.fn() };
 
-    service.get("de/dp/B0TESTASIN", "de/s?k=B0TESTASIN", callback);
+    service.get("de/dp/B0TESTASIN", "de/s?k=B0TESTASIN", callback, "isp");
 
     expect(client.get).toHaveBeenCalledWith(
       "https://www.amazon.de/dp/B0TESTASIN",
       "https://www.amazon.de/s?k=B0TESTASIN",
       callback,
-      { country: "de" }
+      { country: "de" },
+      "isp"
     );
   });
 

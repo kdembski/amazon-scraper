@@ -1,11 +1,12 @@
 import { CronJob } from "cron";
+import _ from "lodash";
 import { ProxyAgentPool } from "@/shared/http/proxy/ProxyAgentPool";
 import { ProxyList } from "@/shared/http/proxy/ProxyList";
 import { ProxyTrafficMeter } from "@/shared/http/proxy/ProxyTrafficMeter";
 
 export class ProxyService {
   private static instance: ProxyService;
-  private proxies: string[] = [];
+  private pools: Record<string, string[]> = {};
   private loading?: Promise<void>;
   private idleSearchSize = 20;
 
@@ -27,19 +28,26 @@ export class ProxyService {
     return ProxyService.instance;
   }
 
-  // Random proxy, preferring one with an idle connection to the host among a
-  // few random picks
-  getAgent(host: string) {
+  // Random proxy of the pool, preferring one with an idle connection to the
+  // host among a few random picks
+  getAgent(host: string, proxyType = "datacenter") {
+    const proxies = this.getProxies(proxyType);
     for (let i = 0; i < this.idleSearchSize; i++) {
-      const url = this.getRandomProxy();
+      const url = this.getRandomProxy(proxies);
       if (this.pool.hasFreeSocket(url, host)) return this.pool.get(url);
     }
 
-    return this.pool.get(this.getRandomProxy());
+    return this.pool.get(this.getRandomProxy(proxies));
   }
 
-  private getRandomProxy() {
-    return this.proxies[Math.floor(Math.random() * this.proxies.length)];
+  private getProxies(proxyType: string) {
+    return this.pools[proxyType]?.length
+      ? this.pools[proxyType]
+      : (this.pools.datacenter ?? []);
+  }
+
+  private getRandomProxy(proxies: string[]) {
+    return proxies[Math.floor(Math.random() * proxies.length)];
   }
 
   countConnections() {
@@ -53,9 +61,12 @@ export class ProxyService {
   loadProxies() {
     this.loading ??= this.list
       .load()
-      .then((urls) => {
-        this.proxies = urls;
-        this.pool.retain(urls);
+      .then((pools) => {
+        this.pools = pools;
+        this.pool.retain(_.flatten(Object.values(pools)));
+        console.log(
+          "Proxies: " + _.map(pools, (urls, type) => `${type} ${urls.length}`).join(", ")
+        );
       })
       .finally(() => {
         this.loading = undefined;

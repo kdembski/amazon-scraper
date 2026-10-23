@@ -9,6 +9,7 @@ import { resetSingleton } from "@@tests/support/singleton";
 vi.mock("cron", async () => (await import("@@tests/support/cron")).cronModule);
 
 const urls = ["http://u1:p1@1.1.1.1:8080", "http://u2:p2@2.2.2.2:8081"];
+const ispUrls = ["http://u3:p3@3.3.3.3:8082"];
 
 const setup = () => {
   const meter = { collect: vi.fn(() => ({ bytesIn: 3, bytesOut: 1 })) };
@@ -18,7 +19,7 @@ const setup = () => {
     hasFreeSocket: vi.fn((_url: string, _host: string) => false),
     countConnections: vi.fn(() => 7),
   };
-  const list = { load: vi.fn().mockResolvedValue(urls) };
+  const list = { load: vi.fn().mockResolvedValue({ datacenter: urls, isp: ispUrls }) };
 
   resetSingleton(ProxyService);
   const Service = ProxyService as unknown as new (
@@ -39,6 +40,7 @@ describe("ProxyService", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     cronJobs.length = 0;
+    vi.spyOn(console, "log").mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -65,17 +67,25 @@ describe("ProxyService", () => {
   });
 
   describe("loadProxies", () => {
-    it("keeps only the agents of the loaded proxies", async () => {
+    it("keeps only the agents of the proxies of all loaded pools", async () => {
       const { service, pool } = setup();
 
       await service.loadProxies();
 
-      expect(pool.retain).toHaveBeenCalledWith(urls);
+      expect(pool.retain).toHaveBeenCalledWith([...urls, ...ispUrls]);
+    });
+
+    it("logs the number of proxies of every pool", async () => {
+      const { service } = setup();
+
+      await service.loadProxies();
+
+      expect(console.log).toHaveBeenCalledWith("Proxies: datacenter 2, isp 1");
     });
 
     it("lets a second caller share the load in progress", async () => {
       const { service, list } = setup();
-      let respond!: (urls: string[]) => void;
+      let respond!: (pools: Record<string, string[]>) => void;
       list.load.mockReturnValueOnce(new Promise((resolve) => (respond = resolve)));
 
       const first = vi.fn();
@@ -83,7 +93,7 @@ describe("ProxyService", () => {
       service.loadProxies().then(first);
       service.loadProxies().then(second);
 
-      respond(urls);
+      respond({ datacenter: urls });
       await vi.advanceTimersByTimeAsync(0);
       expect(first).toHaveBeenCalled();
       expect(second).toHaveBeenCalled();
@@ -132,6 +142,26 @@ describe("ProxyService", () => {
       vi.spyOn(Math, "random").mockReturnValue(0);
       expect(service.getAgent("www.amazon.fr")).toEqual({ url: urls[0] });
       expect(pool.hasFreeSocket).toHaveBeenCalledTimes(20);
+    });
+
+    it("picks from the pool of the proxy type", async () => {
+      const { service } = setup();
+      await service.loadProxies();
+
+      vi.spyOn(Math, "random").mockReturnValue(0);
+      expect(service.getAgent("www.amazon.de", "isp")).toEqual({ url: ispUrls[0] });
+    });
+
+    it.each([
+      ["an unknown", { datacenter: urls }, "residential"],
+      ["an empty", { datacenter: urls, isp: [] }, "isp"],
+    ])("falls back to the datacenter pool for %s pool", async (_name, pools, proxyType) => {
+      const { service, list } = setup();
+      list.load.mockResolvedValueOnce(pools);
+      await service.loadProxies();
+
+      vi.spyOn(Math, "random").mockReturnValue(0);
+      expect(service.getAgent("www.amazon.de", proxyType)).toEqual({ url: urls[0] });
     });
   });
 
