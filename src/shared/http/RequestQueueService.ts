@@ -56,6 +56,7 @@ export class RequestQueueService {
       return await callback();
     } finally {
       this.pending--;
+      this.next();
     }
   }
 

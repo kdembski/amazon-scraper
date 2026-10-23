@@ -108,6 +108,22 @@ describe("RequestQueueService", () => {
       expect(queue.pending).toBe(1);
     });
 
+    it("runs a queued request as soon as a slot frees up, without waiting for a tick", async () => {
+      const queue = setup({ limit: 1 });
+      const first = deferred();
+      const second = deferred();
+      queue.request(first.callback);
+      queue.request(second.callback);
+
+      first.finish();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(second.callback).toHaveBeenCalled();
+      expect(queue.queue).toEqual([]);
+      expect(queue.pending).toBe(1);
+    });
+
     it("starts at most 10 queued requests per tick", async () => {
       const queue = setup({ limit: 100 });
       queue.limit = 0;
