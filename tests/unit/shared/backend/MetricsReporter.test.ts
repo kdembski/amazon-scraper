@@ -14,6 +14,8 @@ const gauges = [
   { metric: "pending", value: 12 },
   { metric: "queue_length", value: 3 },
   { metric: "open_connections", value: 5 },
+  { metric: "event_loop_delay_mean_ms", value: 2.5 },
+  { metric: "event_loop_delay_max_ms", value: 40 },
 ];
 
 const setup = ({ isPdp = true, traffic = { bytesIn: 0, bytesOut: 0 } } = {}) => {
@@ -37,14 +39,29 @@ const setup = ({ isPdp = true, traffic = { bytesIn: 0, bytesOut: 0 } } = {}) => 
     new Date("2026-10-18T10:03:00.000Z"),
   ];
   const now = vi.fn(() => times.shift()!);
+  // Nanoseconds, including the 10 ms sampling interval
+  const eventLoopDelay = {
+    enable: vi.fn(),
+    reset: vi.fn(),
+    mean: 12_500_000,
+    max: 50_000_000,
+  };
 
   // The constructor is private, it is only called through getInstance()
   const Reporter = MetricsReporter as unknown as new (
     ...deps: unknown[]
   ) => MetricsReporter;
-  const reporter = new Reporter(args, api.service, metrics, client, proxy, now);
+  const reporter = new Reporter(
+    args,
+    api.service,
+    metrics,
+    client,
+    proxy,
+    now,
+    eventLoopDelay
+  );
 
-  return { api, metrics, reporter, proxy };
+  return { api, metrics, reporter, proxy, eventLoopDelay };
 };
 
 describe("MetricsReporter", () => {
@@ -92,6 +109,38 @@ describe("MetricsReporter", () => {
       },
       { timeout: 30000 }
     );
+  });
+
+  it("measures the event loop delay from the start and resets it after each send", async () => {
+    const { metrics, reporter, eventLoopDelay } = setup();
+    reporter.start("amazon");
+    expect(eventLoopDelay.enable).toHaveBeenCalled();
+
+    await reporter.send();
+    expect(eventLoopDelay.reset).not.toHaveBeenCalled();
+
+    metrics.increment("requests", { country: "de", outcome: "ok" });
+    await reporter.send();
+    expect(eventLoopDelay.reset).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    [Number.NaN, 0],
+    [9_000_000, 0],
+    [10_040_000, 0],
+    [10_060_000, 0.1],
+  ])("reports an event loop delay of %d ns as %d ms", async (delay, expected) => {
+    const { api, metrics, reporter, eventLoopDelay } = setup();
+    eventLoopDelay.mean = delay;
+    metrics.increment("requests", { country: "de", outcome: "ok" });
+    reporter.start("amazon");
+
+    await reporter.send();
+
+    expect(api.post.mock.calls[0][1].metrics).toContainEqual({
+      metric: "event_loop_delay_mean_ms",
+      value: expected,
+    });
   });
 
   it("sends the PLP flow", async () => {

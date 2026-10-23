@@ -46,14 +46,14 @@ Integration (`tests/integration/`) and e2e (`tests/e2e/`) tests share fakes in `
 
 - `ScrapingClient.get(url, referer, callbacks)` is the only path to shops; results go only to callbacks. `url` and `referer` are full URLs. Random proxy (only among proxies with an idle connection to the host, if any) and desktop User-Agent, hard 20 s `AbortSignal` timeout, one keep-alive agent per proxy.
 - `AmazonService.get(url, referer, callbacks)` prefixes `https://www.amazon.` to `url` and `referer` (`de/dp/...`) and delegates to `ScrapingClient`; `AmazonService.queueService` is the `ScrapingClient` queue.
-- `RequestQueueService`: custom concurrency limiter plus token bucket for `-r`, one per process. Logs `rate | limit | pending | connections | queue` every second.
+- `RequestQueueService`: custom concurrency limiter plus token bucket for `-r`, one per process. A finished request starts the next queued one at once; a 1 ms tick starts up to 10 more (needed when the token bucket refills). Logs `rate | limit | pending | connections | queue` every second.
 - `AmazonCountryService`: countries to scrape (`countryId`, `tld`) from `GET amazon/countries/scrap`, cached, reloaded hourly; URLs use `www.amazon.<tld>`.
 - PDP flow: `AmazonScraper` fetches `amazon/ads/scrap` when the queue is low → `AmazonPdpScraper` creates one `AmazonAdPrice` per country (manual state machine) → `AmazonPdpCountryScraper` + `AmazonPdpPriceHelper`.
   - Captcha, empty or invalid response, network error: retry with exponential backoff; after 15 failures the country finishes without a price.
   - 404: country deleted; if ≤2 countries remain, `DELETE amazon/ads/<id>`.
   - All complete: `PUT amazon/ads/<id>` with prices.
 - PLP flow: hourly category from `amazon/ads/categories/scrap` → `AmazonPlpScraper` awaits `AmazonNewReleasesScraper` (`AmazonNewReleasesBuilder`; a page without the browse tree is retried; metrics `new_releases_pages`, `new_releases_ads`), then starts `AmazonPlpPageScraper` → `AmazonPlpBuilder` → `POST amazon/ads`, recursing into subcategories.
-- `MetricsService` + `MetricsReporter` send counters every minute as `POST scrapers/<name>/metrics` (catalog in `docs/superpowers/specs/2026-10-18-scraper-metrics-design.md`); a marketplace maps its results to the shared `outcome` values.
+- `MetricsService` + `MetricsReporter` send counters every minute as `POST scrapers/<name>/metrics` (catalog in `docs/superpowers/specs/2026-10-18-scraper-metrics-design.md`); a marketplace maps its results to the shared `outcome` values. Gauges `event_loop_delay_mean_ms`/`event_loop_delay_max_ms` come from `monitorEventLoopDelay` (10 ms sampling interval subtracted), reset after each send.
 - `ApiService`: `get()` throws, `post`/`put`/`delete` only log errors.
 
 ## Connection limits

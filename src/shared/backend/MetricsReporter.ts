@@ -4,6 +4,9 @@ import { ProxyService } from "@/shared/http/proxy/ProxyService";
 import { ScrapingClient } from "@/shared/http/ScrapingClient";
 import { MetricsService } from "@/shared/metrics/MetricsService";
 import { CronJob } from "cron";
+import { monitorEventLoopDelay } from "node:perf_hooks";
+
+const EVENT_LOOP_RESOLUTION_MS = 10;
 
 export class MetricsReporter {
   private static instance: MetricsReporter;
@@ -13,6 +16,7 @@ export class MetricsReporter {
   private scrapingClient;
   private proxyService;
   private now;
+  private eventLoopDelay;
   private marketplace = "";
   private periodStart = new Date();
   private timeout = 30 * 1000;
@@ -23,7 +27,10 @@ export class MetricsReporter {
     metricsService = MetricsService.getInstance(),
     scrapingClient = ScrapingClient.getInstance(),
     proxyService = ProxyService.getInstance(),
-    now = () => new Date()
+    now = () => new Date(),
+    eventLoopDelay = monitorEventLoopDelay({
+      resolution: EVENT_LOOP_RESOLUTION_MS,
+    })
   ) {
     this.argsService = argsService;
     this.apiService = apiService;
@@ -31,6 +38,7 @@ export class MetricsReporter {
     this.scrapingClient = scrapingClient;
     this.proxyService = proxyService;
     this.now = now;
+    this.eventLoopDelay = eventLoopDelay;
   }
 
   public static getInstance(): MetricsReporter {
@@ -44,6 +52,7 @@ export class MetricsReporter {
   public start(marketplace: string) {
     this.marketplace = marketplace;
     this.periodStart = this.now();
+    this.eventLoopDelay.enable();
     new CronJob("0 * * * * *", () => this.send()).start();
   }
 
@@ -57,6 +66,10 @@ export class MetricsReporter {
     if (counters.length === 0) return;
 
     const { queueService } = this.scrapingClient;
+    const eventLoopDelayMean = this.toDelayMs(this.eventLoopDelay.mean);
+    const eventLoopDelayMax = this.toDelayMs(this.eventLoopDelay.max);
+    this.eventLoopDelay.reset();
+
     const response = await this.apiService.post(
       `scrapers/${process.env.name}/metrics`,
       {
@@ -71,6 +84,8 @@ export class MetricsReporter {
             metric: "open_connections",
             value: this.proxyService.countConnections(),
           },
+          { metric: "event_loop_delay_mean_ms", value: eventLoopDelayMean },
+          { metric: "event_loop_delay_max_ms", value: eventLoopDelayMax },
         ],
       },
       { timeout: this.timeout }
@@ -81,5 +96,11 @@ export class MetricsReporter {
       return;
     }
     this.periodStart = sentAt;
+  }
+
+  // The histogram includes the sampling interval; NaN without samples
+  private toDelayMs(nanoseconds: number) {
+    const ms = nanoseconds / 1e6 - EVENT_LOOP_RESOLUTION_MS;
+    return Number.isFinite(ms) ? Math.max(Math.round(ms * 10) / 10, 0) : 0;
   }
 }
