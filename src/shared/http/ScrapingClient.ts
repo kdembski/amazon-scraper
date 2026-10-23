@@ -1,4 +1,5 @@
 import axios from "axios";
+import _ from "lodash";
 import UserAgent from "user-agents";
 import { ArgsService } from "@/shared/args/ArgsService";
 import { ProxyService } from "@/shared/http/proxy/ProxyService";
@@ -9,6 +10,9 @@ import type { MetricLabels, RequestOutcome } from "@/shared/metrics/metrics.type
 export class ScrapingClient {
   private static instance: ScrapingClient;
   private timeout = 20 * 1000;
+  private userAgents = Array.from({ length: 500 }, () =>
+    new UserAgent({ deviceCategory: "desktop" }).toString()
+  );
   private proxyService;
   private metricsService;
   queueService;
@@ -49,7 +53,7 @@ export class ScrapingClient {
   ) {
     this.queueService.request(async () => {
       const httpsAgent = this.proxyService.getAgent(new URL(url).hostname);
-      const userAgent = new UserAgent({ deviceCategory: "desktop" }).toString();
+      const userAgent = _.sample(this.userAgents);
 
       const startedAt = Date.now();
       let recorded = false;

@@ -113,16 +113,25 @@ describe("ProxyService", () => {
       expect(pool.get).toHaveBeenCalledTimes(2);
     });
 
-    it("picks only among proxies with an idle connection to the host", async () => {
+    it("returns the first random proxy with an idle connection to the host", async () => {
       const { service, pool } = setup();
       await service.loadProxies();
       pool.hasFreeSocket.mockImplementation(
         (url: string, host: string) => url === urls[1] && host === "www.amazon.de"
       );
 
-      vi.spyOn(Math, "random").mockReturnValue(0);
+      vi.spyOn(Math, "random").mockReturnValueOnce(0).mockReturnValueOnce(0.99);
       expect(service.getAgent("www.amazon.de")).toEqual({ url: urls[1] });
+      expect(pool.hasFreeSocket).toHaveBeenCalledTimes(2);
+    });
+
+    it("checks at most 20 random proxies for an idle connection", async () => {
+      const { service, pool } = setup();
+      await service.loadProxies();
+
+      vi.spyOn(Math, "random").mockReturnValue(0);
       expect(service.getAgent("www.amazon.fr")).toEqual({ url: urls[0] });
+      expect(pool.hasFreeSocket).toHaveBeenCalledTimes(20);
     });
   });
 
