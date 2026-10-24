@@ -48,11 +48,14 @@ export class ScrapingClient {
     callback?: {
       onSuccess?: (data: T) => void;
       onError?: (e: any) => void;
+      isCancelled?: () => boolean;
     },
     labels: MetricLabels = {},
     proxyType?: string
   ) {
     this.queueService.request(async () => {
+      if (callback?.isCancelled?.()) return;
+
       const httpsAgent = this.proxyService.getAgent(new URL(url).hostname, proxyType);
       const userAgent = _.sample(this.userAgents);
 

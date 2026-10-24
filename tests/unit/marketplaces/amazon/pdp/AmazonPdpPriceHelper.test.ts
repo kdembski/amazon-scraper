@@ -27,6 +27,20 @@ describe("AmazonPdpPriceHelper", () => {
     });
   });
 
+  describe("hasEnoughPrices", () => {
+    const { helper } = setup();
+    const withValues = (values: (number | undefined)[]) =>
+      values.map((value) => buildPrice({ value, complete: true }));
+
+    it("is true once 4 countries have a price", () => {
+      expect(helper.hasEnoughPrices(withValues([10, 10, undefined, 10, 10]))).toBe(true);
+    });
+
+    it("is false with fewer than 4 prices", () => {
+      expect(helper.hasEnoughPrices(withValues([10, 10, 10, undefined]))).toBe(false);
+    });
+  });
+
   describe("isDeleted", () => {
     const { helper } = setup();
     const withDeleted = (total: number, deleted: number) =>

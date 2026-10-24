@@ -29,6 +29,7 @@ describe("AmazonPdpScraper", () => {
         complete: false,
         deleted: false,
         adDeleted: false,
+        abandoned: false,
         failed: 0,
       },
       {
@@ -37,6 +38,7 @@ describe("AmazonPdpScraper", () => {
         complete: false,
         deleted: false,
         adDeleted: false,
+        abandoned: false,
         failed: 0,
       },
     ]);

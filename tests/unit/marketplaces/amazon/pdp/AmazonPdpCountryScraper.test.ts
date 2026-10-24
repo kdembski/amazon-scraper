@@ -60,7 +60,11 @@ describe("AmazonPdpCountryScraper", () => {
     expect(amazon.get).toHaveBeenCalledWith(
       "c1/dp/B0TESTASIN",
       "c1/ref",
-      { onSuccess: expect.any(Function), onError: expect.any(Function) },
+      {
+        onSuccess: expect.any(Function),
+        onError: expect.any(Function),
+        isCancelled: expect.any(Function),
+      },
       "isp"
     );
     expect(prices[0].pending).toBe(true);
@@ -135,6 +139,69 @@ describe("AmazonPdpCountryScraper", () => {
         expect(resolveAd).toHaveBeenCalledTimes(1);
       }
     );
+
+    it("sends the prices once 4 countries have one and drops the rest", async () => {
+      const { amazon, api, resolveAd, run } = setup({ price: 10 });
+      const prices = buildPrices(6);
+      run(prices);
+
+      [0, 1, 2, 3].forEach((i) => amazon.respond(i, html));
+      await flush();
+
+      expect(api.put).toHaveBeenCalledTimes(1);
+      expect(api.put).toHaveBeenCalledWith("amazon/ads/7", {
+        prices: [1, 2, 3, 4].map((countryId) => ({
+          adId: 7,
+          countryId,
+          value: 10,
+          dispatchFrom: undefined,
+        })),
+      });
+      expect(resolveAd).toHaveBeenCalledTimes(1);
+      expect(prices[4].abandoned).toBe(true);
+      expect(prices[5].abandoned).toBe(true);
+      expect(amazon.requests[4].callback.isCancelled?.()).toBe(true);
+      expect(amazon.requests[0].callback.isCancelled?.()).toBe(false);
+
+      // Late responses of the dropped countries change nothing
+      amazon.respond(4, html);
+      amazon.fail(5, notFound);
+      await vi.runAllTimersAsync();
+
+      expect(api.put).toHaveBeenCalledTimes(1);
+      expect(api.delete).not.toHaveBeenCalled();
+      expect(resolveAd).toHaveBeenCalledTimes(1);
+      expect(prices[4].value).toBeUndefined();
+    });
+
+    it("keeps scraping while fewer than 4 countries have a price", async () => {
+      const { amazon, api, builder, run } = setup({ price: 10 });
+      builder.build.mockReturnValueOnce({ isCaptcha: false, isValid: true });
+      const prices = buildPrices(5);
+      run(prices);
+
+      [0, 1, 2, 3].forEach((i) => amazon.respond(i, html));
+      await flush();
+      expect(api.put).not.toHaveBeenCalled();
+
+      amazon.respond(4, html);
+      await flush();
+      expect(api.put).toHaveBeenCalledTimes(1);
+      expect(prices.some((price) => price.abandoned)).toBe(false);
+    });
+
+    it("does not retry a dropped country", async () => {
+      const { amazon, run } = setup({ price: 10 });
+      const prices = buildPrices(5);
+      run(prices);
+
+      amazon.fail(0);
+      [1, 2, 3, 4].forEach((i) => amazon.respond(i, html));
+      await vi.runAllTimersAsync();
+
+      expect(prices[0]).toMatchObject({ abandoned: true, failed: 0 });
+      expect(amazon.get).toHaveBeenCalledTimes(5);
+    });
 
     it("completes a country without an offer with no price", async () => {
       const { amazon, run } = setup({ isCaptcha: false, isValid: true });

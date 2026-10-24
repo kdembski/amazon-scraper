@@ -27,6 +27,7 @@ export class AmazonService {
     callback?: {
       onSuccess?: (data: T) => void;
       onError?: (e: any) => void;
+      isCancelled?: () => boolean;
     },
     proxyType?: string
   ) {

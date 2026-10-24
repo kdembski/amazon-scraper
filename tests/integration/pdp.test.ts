@@ -198,14 +198,27 @@ describe("PDP", () => {
 
     const put = await world.backend.waitFor("PUT", "amazon/ads/7");
 
-    expect(put.body.prices).toHaveLength(6);
+    expect(put.body.prices).toHaveLength(4);
     expect(world.amazon.maxInFlight).toBe(2);
+  });
+
+  it("sends the prices once 4 countries have one and drops the queued requests", async () => {
+    world.backend.on("GET", "scrapers/it/config", { concurrency: 1, rps: 0, batchSize: 10 });
+    world.backend.on("GET", "amazon/countries/scrap", sixCountries);
+    world.amazon.respond(() => aodPage({ price: "1,00" }));
+    scrape();
+
+    const put = await world.backend.waitFor("PUT", "amazon/ads/7");
+    await sleep(100);
+
+    expect(put.body.prices.map((price: { countryId: number }) => price.countryId)).toEqual([1, 2, 3, 4]);
+    expect(world.amazon.requests).toHaveLength(4);
   });
 
   it("starts at most rps requests per second", async () => {
     world.backend.on("GET", "scrapers/it/config", { concurrency: 10, rps: 2, batchSize: 10 });
     world.backend.on("GET", "amazon/countries/scrap", sixCountries);
-    world.amazon.respond(() => aodPage({ price: "1,00" }));
+    world.amazon.respond(() => aodPage());
     scrape();
 
     await world.backend.waitFor("PUT", "amazon/ads/7");

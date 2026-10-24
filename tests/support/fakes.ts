@@ -28,6 +28,7 @@ export function fakeAmazonCountryService() {
 type GetCallback = {
   onSuccess?: (data: string) => void;
   onError?: (e: any) => void;
+  isCancelled?: () => boolean;
 };
 
 // Records every request so a test can answer it with respond() / fail()

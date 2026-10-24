@@ -239,6 +239,19 @@ describe("ScrapingClient", () => {
       });
     });
 
+    it("skips a request cancelled while queued", async () => {
+      const { service, proxy, requests } = setup();
+      const callback = { onSuccess: vi.fn(), onError: vi.fn(), isCancelled: () => true };
+
+      service.get("https://www.amazon.de/dp/B0TESTASIN", "https://www.amazon.de", callback);
+      await Promise.all(requests);
+
+      expect(get).not.toHaveBeenCalled();
+      expect(proxy.getAgent).not.toHaveBeenCalled();
+      expect(callback.onSuccess).not.toHaveBeenCalled();
+      expect(callback.onError).not.toHaveBeenCalled();
+    });
+
     it("works without callbacks", async () => {
       const { service, requests } = setup();
       get.mockRejectedValue(new Error("down"));
