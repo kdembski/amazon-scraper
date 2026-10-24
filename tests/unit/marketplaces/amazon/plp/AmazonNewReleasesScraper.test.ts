@@ -6,18 +6,18 @@ import { newReleasesPage } from "@@tests/support/html";
 import {
   fakeAmazonService,
   fakeApiService,
-  fakeArgsService,
+  fakeScraperConfigService,
 } from "@@tests/support/fakes";
 
-const setup = ({ count = 50 } = {}) => {
+const setup = ({ batchSize = 50 } = {}) => {
   const amazon = fakeAmazonService();
-  const args = fakeArgsService({ count });
+  const config = fakeScraperConfigService({ batchSize });
   const api = fakeApiService();
   const increment = vi.fn();
   const scraper = new AmazonNewReleasesScraper(
     api.service,
     amazon.service,
-    args.service,
+    config.service,
     undefined,
     { increment } as unknown as MetricsService
   );
@@ -103,7 +103,7 @@ describe("AmazonNewReleasesScraper", () => {
   });
 
   it("waits while the request queue is full", async () => {
-    const { amazon, scraper } = setup({ count: 2 });
+    const { amazon, scraper } = setup({ batchSize: 2 });
     amazon.queueService.queue.push(vi.fn(), vi.fn());
     scraper.execute("electronics");
 

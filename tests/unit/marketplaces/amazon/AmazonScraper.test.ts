@@ -2,20 +2,21 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { AmazonScraper } from "@/marketplaces/amazon/AmazonScraper";
 import type { AmazonPdpScraper } from "@/marketplaces/amazon/pdp/AmazonPdpScraper";
 import type { AmazonPlpScraper } from "@/marketplaces/amazon/plp/AmazonPlpScraper";
+import type { ArgsService } from "@/shared/args/ArgsService";
 import type { ProxyService } from "@/shared/http/proxy/ProxyService";
 import { buildAd, buildAmazonCountry } from "@@tests/support/factories";
 import {
   fakeAmazonService,
   fakeApiService,
-  fakeArgsService,
+  fakeScraperConfigService,
   fakeAmazonCountryService,
 } from "@@tests/support/fakes";
 
-const setup = ({ count = 50 } = {}) => {
+const setup = ({ batchSize = 50 } = {}) => {
   const api = fakeApiService();
   const country = fakeAmazonCountryService();
   const amazon = fakeAmazonService();
-  const args = fakeArgsService({ count });
+  const config = fakeScraperConfigService({ batchSize });
   const pdpExecute = vi.fn();
   const pdpScraper = { execute: pdpExecute } as unknown as AmazonPdpScraper;
   const plpExecute = vi.fn();
@@ -23,11 +24,12 @@ const setup = ({ count = 50 } = {}) => {
   const scraper = new AmazonScraper(
     api.service,
     amazon.service,
-    args.service,
+    {} as ArgsService,
     pdpScraper,
     plpScraper,
     {} as ProxyService,
-    country.service
+    country.service,
+    config.service
   );
   return { api, country, amazon, pdpExecute, plpExecute, scraper };
 };
@@ -46,20 +48,20 @@ describe("AmazonScraper", () => {
     const ads = [buildAd({ id: 1 }), buildAd({ id: 2 })];
 
     it("scrapes a batch of ads in every country", async () => {
-      const { api, country, amazon, pdpExecute, scraper } = setup({ count: 50 });
+      const { api, country, amazon, pdpExecute, scraper } = setup({ batchSize: 50 });
       country.getCountries.mockResolvedValue(countries);
       api.get.mockResolvedValue(ads);
 
       await scraper.scrapPdp();
       await flush();
 
-      expect(api.get).toHaveBeenCalledWith("amazon/ads/scrap?count=50");
+      expect(api.get).toHaveBeenCalledWith("amazon/ads/scrap?batchSize=50");
       expect(pdpExecute).toHaveBeenCalledWith(ads[0], countries);
       expect(pdpExecute).toHaveBeenCalledWith(ads[1], countries);
     });
 
     it("waits while the queue is longer than a tenth of the batch", async () => {
-      const { api, country, amazon, scraper } = setup({ count: 50 });
+      const { api, country, amazon, scraper } = setup({ batchSize: 50 });
       amazon.queueService.queue.push(...Array.from({ length: 6 }, () => vi.fn()));
 
       await scraper.scrapPdp();

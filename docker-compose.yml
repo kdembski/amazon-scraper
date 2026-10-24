@@ -5,7 +5,6 @@ x-amazon-pdp: &amazon-pdp
   env_file: .env
   extra_hosts:
     - "host.docker.internal:host-gateway"
-  command: ["-c", "5000", "-l", "150", "-r", "150"]
 
 services:
   amazon-pdp-1:
@@ -30,7 +29,7 @@ services:
     env_file: .env
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    command: ["-c", "1000", "-l", "100", "-r", "5", "-t", "plp"]
+    command: ["-t", "plp"]
     environment:
       NODE_OPTIONS: --max-old-space-size=8192
       name: amazon-plp

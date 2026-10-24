@@ -6,7 +6,7 @@ configDotenv();
 // Ignore the certificate
 process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = "0";
 
-createScraper().execute();
+createScraper().then((scraper) => scraper.execute());
 
 process.on("uncaughtException", (e, o) => {
   console.log("uncaught exception", e, o);

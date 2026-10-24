@@ -47,8 +47,8 @@ describe("PDP", () => {
 
   afterEach(() => stopWorld(world));
 
-  const scrape = (args = ["-c", "10"]) => {
-    const booted = bootScraper(args);
+  const scrape = async (args: string[] = []) => {
+    const booted = await bootScraper(args);
     booted.scraper.execute();
     return booted;
   };
@@ -59,7 +59,7 @@ describe("PDP", () => {
 
     const put = await world.backend.waitFor("PUT", "amazon/ads/7");
 
-    expect(world.backend.find("GET", "amazon/ads/scrap")[0].query.get("count")).toBe("10");
+    expect(world.backend.find("GET", "amazon/ads/scrap")[0].query.get("batchSize")).toBe("10");
     expect(put.body).toEqual({
       prices: [
         price(1, 24.99, "Amazon"),
@@ -181,7 +181,7 @@ describe("PDP", () => {
       { body: [] },
     ]);
     world.amazon.respondPerCountry(offers);
-    const { scraper } = bootScraper(["-c", "10"]);
+    const { scraper } = await bootScraper();
     await ProxyService.getInstance().loadProxies();
 
     await expect(scraper.scrapPdp()).rejects.toThrow();
@@ -190,10 +190,11 @@ describe("PDP", () => {
     await world.backend.waitFor("PUT", "amazon/ads/7");
   });
 
-  it("keeps at most -l requests in flight", async () => {
+  it("keeps at most concurrency requests in flight", async () => {
+    world.backend.on("GET", "scrapers/it/config", { concurrency: 2, rps: 0, batchSize: 10 });
     world.backend.on("GET", "amazon/countries/scrap", sixCountries);
     world.amazon.respond(() => ({ body: aodPage({ price: "1,00" }), delay: 100 }));
-    scrape(["-c", "10", "-l", "2"]);
+    scrape();
 
     const put = await world.backend.waitFor("PUT", "amazon/ads/7");
 
@@ -201,10 +202,11 @@ describe("PDP", () => {
     expect(world.amazon.maxInFlight).toBe(2);
   });
 
-  it("starts at most -r requests per second", async () => {
+  it("starts at most rps requests per second", async () => {
+    world.backend.on("GET", "scrapers/it/config", { concurrency: 10, rps: 2, batchSize: 10 });
     world.backend.on("GET", "amazon/countries/scrap", sixCountries);
     world.amazon.respond(() => aodPage({ price: "1,00" }));
-    scrape(["-c", "10", "-r", "2"]);
+    scrape();
 
     await world.backend.waitFor("PUT", "amazon/ads/7");
 
@@ -213,13 +215,29 @@ describe("PDP", () => {
     expect(Math.max(...times) - Math.min(...times)).toBeGreaterThan(1500);
   });
 
+  it("applies a concurrency change from the backend on the next refresh", async () => {
+    world.amazon.respondPerCountry(offers);
+    const { queue } = await scrape();
+    expect(queue.concurrency).toBe(10);
+
+    world.backend.on("GET", "scrapers/it/config", { concurrency: 2, rps: 0, batchSize: 10 });
+    await Promise.all(
+      cronJobs
+        .filter((job) => job.cronTime === "0 * * * * *")
+        .map((job) => job.onTick())
+    );
+
+    expect(queue.concurrency).toBe(2);
+  });
+
   it("reports metrics every minute", async () => {
     world.amazon.respondPerCountry(offers);
     scrape();
     await world.backend.waitFor("PUT", "amazon/ads/7");
 
-    const report = cronJobs.find((job) => job.cronTime === "0 * * * * *");
-    report!.onTick();
+    cronJobs
+      .filter((job) => job.cronTime === "0 * * * * *")
+      .forEach((job) => job.onTick());
 
     const post = await world.backend.waitFor("POST", "scrapers/it/metrics");
     const { metrics, ...rest } = post.body;
