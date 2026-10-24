@@ -8,6 +8,7 @@ import { MetricsReporter } from "@/shared/backend/MetricsReporter";
 import { MetricsService } from "@/shared/metrics/MetricsService";
 import { ScrapingClient } from "@/shared/http/ScrapingClient";
 import { ArgsService } from "@/shared/args/ArgsService";
+import { ScraperConfigService } from "@/shared/backend/ScraperConfigService";
 import type { ProxyAgentPool } from "@/shared/http/proxy/ProxyAgentPool";
 import { ProxyService } from "@/shared/http/proxy/ProxyService";
 import { FakeAmazon } from "@@tests/support/fake/amazon";
@@ -23,6 +24,7 @@ const singletons = [
   AmazonService,
   MetricsService,
   MetricsReporter,
+  ScraperConfigService,
 ];
 const argv = process.argv;
 
@@ -36,7 +38,9 @@ export type World = Awaited<ReturnType<typeof startWorld>>;
 export async function startWorld() {
   const backend = await new FakeBackend().start();
   const amazon = await new FakeAmazon().start();
-  backend.on("GET", "proxies", amazon.proxyLine);
+  backend
+    .on("GET", "proxies", amazon.proxyLine)
+    .on("GET", "scrapers/it/config", { concurrency: 10, rps: 0, batchSize: 10 });
 
   vi.stubEnv("API_URL", backend.url);
   vi.stubEnv("PROXY_LIST_URL", `${backend.url}/proxies`);
@@ -47,11 +51,11 @@ export async function startWorld() {
 }
 
 // Builds the whole object graph from fresh singletons, as index.ts does
-export function bootScraper(args: string[] = []) {
+export async function bootScraper(args: string[] = []) {
   process.argv = [argv[0], "index.ts", ...args];
   singletons.forEach(resetSingleton);
 
-  const scraper = createScraper() as AmazonScraper;
+  const scraper = (await createScraper()) as AmazonScraper;
   return { scraper, queue: ScrapingClient.getInstance().queueService };
 }
 

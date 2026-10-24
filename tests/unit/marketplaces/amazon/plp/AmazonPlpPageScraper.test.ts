@@ -8,7 +8,7 @@ import { buildPlpPage } from "@@tests/support/factories";
 import {
   fakeAmazonService,
   fakeApiService,
-  fakeArgsService,
+  fakeScraperConfigService,
 } from "@@tests/support/fakes";
 
 const html = "<html><body></body></html>";
@@ -16,10 +16,10 @@ const ads: AmazonPlpAd[] = [
   { asin: "B0TESTASIN", name: "Test", image: "img", categoryName: "electronics" },
 ];
 
-const setup = ({ count = 50 } = {}) => {
+const setup = ({ batchSize = 50 } = {}) => {
   const amazon = fakeAmazonService();
   const api = fakeApiService();
-  const args = fakeArgsService({ count });
+  const config = fakeScraperConfigService({ batchSize });
   const build = vi.fn(() => ({
     ads,
     subcategories: [] as string[],
@@ -30,7 +30,7 @@ const setup = ({ count = 50 } = {}) => {
   const scraper = new AmazonPlpPageScraper(
     api.service,
     amazon.service,
-    args.service,
+    config.service,
     builder,
     { increment } as unknown as MetricsService
   );
@@ -175,7 +175,7 @@ describe("AmazonPlpPageScraper", () => {
     );
 
     it("waits while the queue is full and requests the page once it drains", async () => {
-      const { amazon, scraper } = setup({ count: 2 });
+      const { amazon, scraper } = setup({ batchSize: 2 });
       amazon.queueService.queue.push(vi.fn(), vi.fn());
       const page = buildPlpPage();
 

@@ -18,7 +18,8 @@ describe("PDP process", () => {
   });
 
   it("scrapes a batch and sends the prices to the backend", async () => {
-    scraper = await spawnScraper(["-c", "10", "-l", "5"], ({ backend, amazon }) => {
+    scraper = await spawnScraper([], ({ backend, amazon }) => {
+      backend.on("GET", "scrapers/e2e/config", { concurrency: 5, rps: 0, batchSize: 10 });
       backend
         .on("GET", "amazon/countries/scrap", countries)
         .onSequence("GET", "amazon/ads/scrap", [{ body: [ad] }, { body: [] }]);
@@ -40,7 +41,7 @@ describe("PDP process", () => {
   });
 
   it("deletes an ad that no longer exists", async () => {
-    scraper = await spawnScraper(["-c", "10"], ({ backend, amazon }) => {
+    scraper = await spawnScraper([], ({ backend, amazon }) => {
       backend
         .on("GET", "amazon/countries/scrap", countries)
         .onSequence("GET", "amazon/ads/scrap", [{ body: [ad] }, { body: [] }]);
@@ -52,7 +53,7 @@ describe("PDP process", () => {
   });
 
   it("keeps running and loads the batch again after the backend fails", async () => {
-    scraper = await spawnScraper(["-c", "10"], ({ backend, amazon }) => {
+    scraper = await spawnScraper([], ({ backend, amazon }) => {
       backend
         .on("GET", "amazon/countries/scrap", countries)
         .onSequence("GET", "amazon/ads/scrap", [

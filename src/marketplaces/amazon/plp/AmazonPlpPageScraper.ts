@@ -2,7 +2,7 @@ import { AmazonPlpBuilder } from "@/marketplaces/amazon/plp/AmazonPlpBuilder";
 import { getRetryDelay, MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
 import { AmazonService } from "@/marketplaces/amazon/AmazonService";
 import { ApiService } from "@/shared/backend/ApiService";
-import { ArgsService } from "@/shared/args/ArgsService";
+import { ScraperConfigService } from "@/shared/backend/ScraperConfigService";
 import { MetricsService } from "@/shared/metrics/MetricsService";
 import { ItemOutcome, ResponseOutcome } from "@/shared/metrics/metrics.types";
 import { AmazonPlpAdPage, AmazonPlpAd } from "@/marketplaces/amazon/types/amazon.types";
@@ -12,7 +12,7 @@ import _ from "lodash";
 export class AmazonPlpPageScraper {
   private apiService;
   private amazonService;
-  private argsService;
+  private configService;
   private builder;
   private metricsService;
   private queueFullDelay = 1000;
@@ -42,13 +42,13 @@ export class AmazonPlpPageScraper {
   constructor(
     apiService = ApiService.getInstance(),
     amazonService = AmazonService.getInstance(),
-    argsService = ArgsService.getInstance(),
+    configService = ScraperConfigService.getInstance(),
     builder = new AmazonPlpBuilder(),
     metricsService = MetricsService.getInstance()
   ) {
     this.apiService = apiService;
     this.amazonService = amazonService;
-    this.argsService = argsService;
+    this.configService = configService;
     this.builder = builder;
     this.metricsService = metricsService;
   }
@@ -67,11 +67,11 @@ export class AmazonPlpPageScraper {
   }
 
   async execute(page: AmazonPlpAdPage) {
-    const count = this.argsService.getCountFlag();
+    const { batchSize } = this.configService.get();
     const queue = this.amazonService.queueService.queue.length;
     if (page.complete || page.pending) return;
 
-    if (queue >= count) {
+    if (queue >= batchSize) {
       setTimeout(() => this.execute(page), this.queueFullDelay);
       return;
     }

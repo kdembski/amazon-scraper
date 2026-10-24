@@ -49,6 +49,18 @@ describe("ApiService", () => {
       );
     });
 
+    it("passes the request config to axios", async () => {
+      const service = setup();
+      mocked.get.mockResolvedValue({ data: {} });
+
+      await service.get("scrapers/it/config", { timeout: 10_000 });
+
+      expect(mocked.get).toHaveBeenCalledWith(
+        "http://api.test/scrapers/it/config",
+        expect.objectContaining({ timeout: 10_000, httpAgent: expect.anything() })
+      );
+    });
+
     it("throws on error", async () => {
       const service = setup();
       mocked.get.mockRejectedValue(new Error("down"));

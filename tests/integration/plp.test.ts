@@ -32,16 +32,18 @@ describe("PLP", () => {
 
   beforeEach(async () => {
     world = await startWorld();
-    world.backend.on("GET", "amazon/ads/categories/scrap", {
-      id: 1,
-      name: "electronics",
-      scrapedAt: null,
-    });
+    world.backend
+      .on("GET", "scrapers/it/config", { concurrency: 10, rps: 0, batchSize: 100 })
+      .on("GET", "amazon/ads/categories/scrap", {
+        id: 1,
+        name: "electronics",
+        scrapedAt: null,
+      });
   });
 
   afterEach(() => stopWorld(world));
 
-  const scrape = () => bootScraper(["-t", "plp", "-c", "100"]).scraper.execute();
+  const scrape = async () => (await bootScraper(["-t", "plp"])).scraper.execute();
 
   const isNewReleases = (url: string) => url.startsWith("pl/gp/new-releases/");
 
@@ -186,8 +188,9 @@ describe("PLP", () => {
     scrape();
     await waitForPosts(PRICE_RANGES);
 
-    const report = cronJobs.find((job) => job.cronTime === "0 * * * * *");
-    report!.onTick();
+    cronJobs
+      .filter((job) => job.cronTime === "0 * * * * *")
+      .forEach((job) => job.onTick());
 
     const post = await world.backend.waitFor("POST", "scrapers/it/metrics");
     expect(post.body).toMatchObject({ marketplace: "amazon", flow: "plp" });

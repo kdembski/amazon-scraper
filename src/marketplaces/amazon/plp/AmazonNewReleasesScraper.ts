@@ -1,6 +1,6 @@
 import { AmazonService } from "@/marketplaces/amazon/AmazonService";
 import { AmazonNewReleasesBuilder } from "@/marketplaces/amazon/plp/AmazonNewReleasesBuilder";
-import { ArgsService } from "@/shared/args/ArgsService";
+import { ScraperConfigService } from "@/shared/backend/ScraperConfigService";
 import { ApiService } from "@/shared/backend/ApiService";
 import { MetricsService } from "@/shared/metrics/MetricsService";
 import { ItemOutcome } from "@/shared/metrics/metrics.types";
@@ -12,7 +12,7 @@ type Crawl = { category: string; nodes: Set<string>; asins: Set<string> };
 export class AmazonNewReleasesScraper {
   private apiService;
   private amazonService;
-  private argsService;
+  private configService;
   private builder;
   private queueFullDelay = 1000;
   private metricsService;
@@ -20,13 +20,13 @@ export class AmazonNewReleasesScraper {
   constructor(
     apiService = ApiService.getInstance(),
     amazonService = AmazonService.getInstance(),
-    argsService = ArgsService.getInstance(),
+    configService = ScraperConfigService.getInstance(),
     builder = new AmazonNewReleasesBuilder(),
     metricsService = MetricsService.getInstance()
   ) {
     this.apiService = apiService;
     this.amazonService = amazonService;
-    this.argsService = argsService;
+    this.configService = configService;
     this.builder = builder;
     this.metricsService = metricsService;
   }
@@ -73,8 +73,8 @@ export class AmazonNewReleasesScraper {
   }
 
   private async fetch(url: string, referer: string) {
-    const count = this.argsService.getCountFlag();
-    while (this.amazonService.queueService.queue.length >= count) {
+    const { batchSize } = this.configService.get();
+    while (this.amazonService.queueService.queue.length >= batchSize) {
       await this.sleep(this.queueFullDelay);
     }
 

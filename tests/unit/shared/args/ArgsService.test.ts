@@ -29,50 +29,6 @@ describe("ArgsService", () => {
     });
   });
 
-  describe("getLimitFlag", () => {
-    it("defaults to 10", () => {
-      expect(args.getLimitFlag()).toBe(10);
-    });
-
-    it.each([["-l"], ["--limit"]])("reads %s", (flag) => {
-      setArgs(flag, "500");
-      expect(args.getLimitFlag()).toBe(500);
-    });
-  });
-
-  describe("getRateFlag", () => {
-    it("defaults to 0 (unlimited)", () => {
-      expect(args.getRateFlag()).toBe(0);
-    });
-
-    it.each([["-r"], ["--rate"]])("reads %s", (flag) => {
-      setArgs(flag, "200");
-      expect(args.getRateFlag()).toBe(200);
-    });
-  });
-
-  describe("getRateFlag", () => {
-    it("defaults to 0 (unlimited)", () => {
-      expect(args.getRateFlag()).toBe(0);
-    });
-
-    it.each([["-r"], ["--rate"]])("reads %s", (flag) => {
-      setArgs(flag, "11");
-      expect(args.getRateFlag()).toBe(11);
-    });
-  });
-
-  describe("getCountFlag", () => {
-    it("defaults to 50", () => {
-      expect(args.getCountFlag()).toBe(50);
-    });
-
-    it.each([["-c"], ["--count"]])("reads %s", (flag) => {
-      setArgs(flag, "1000");
-      expect(args.getCountFlag()).toBe(1000);
-    });
-  });
-
   describe("getTargetFlag", () => {
     it("defaults to pdp", () => {
       expect(args.getTargetFlag()).toEqual({ isPdp: true, isPlp: false });

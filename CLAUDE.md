@@ -12,7 +12,7 @@ Node.js/TypeScript (ESM) worker that scrapes Amazon through rotating proxies. No
 ## Commands
 
 ```bash
-npm start -- [-t plp] [-c 1000] [-l 500]   # tsx ./src/index.ts
+npm start -- [-t plp]                      # tsx ./src/index.ts
 npm run build                              # pkgroll → dist/ (used by Docker)
 npx tsc --noEmit                           # type check
 npm run test:unit                          # vitest
@@ -30,16 +30,17 @@ Integration (`tests/integration/`) and e2e (`tests/e2e/`) tests share fakes in `
 ## Configuration
 
 - Env: `API_URL`, `PROXY_API_KEY` (webshare.io API, reads the plans), `PROXY_LIST_TOKEN` (webshare.io list download), `PROXY_LIST_URL` (one list as the `datacenter` pool instead of webshare, used by e2e), `name` (set in docker-compose.yml, used in `scrapers/<name>/...`; `undefined` locally).
-- Flags (`ArgsService`): `-t pdp|plp`, `-l` concurrency limit (default 10), `-r` max requests/s per process (default 0 = unlimited), `-c` batch size in PDP / max queue length in PLP (default 50).
-- Flags configure the scraper as a whole, never one marketplace: every flag must take effect in every mode (`-t`) and every marketplace. Do not add a flag that is ignored in some mode or marketplace; put marketplace-specific behaviour in the marketplace code.
+- Flag (`ArgsService`): only `-t pdp|plp`.
+- Backend config (`ScraperConfigService`): `ScraperConfig` row of `name` in amazon-server, the only source of `concurrency` (max requests in flight, default 10), `rps` (max requests/s per process, 0 = unlimited, default 0) and `batchSize` (ads per batch in PDP / max queue length in PLP, default 50). Edited by hand in SQL; `createScraper()` waits for `GET scrapers/<name>/config` (retried until it answers), then polls it every minute and applies changes to the running queue; a failed poll keeps the last values, an invalid field is ignored.
+- Flags and backend config configure the scraper as a whole, never one marketplace: every parameter must take effect in every mode (`-t`) and every marketplace. Do not add one that is ignored in some mode or marketplace; put marketplace-specific behaviour in the marketplace code.
 - `uncaughtException`/`unhandledRejection` only log, so the process never crashes and Docker never restarts it. TLS verification is disabled globally.
 
 ## Structure
 
-- `src/shared/`: code that knows no shop — `args/` (`ArgsService`), `backend/` (`ApiService`, `MetricsReporter`), `metrics/` (`MetricsService`), `http/` (`RequestQueueService`, `ThrottledQueue`, `ScrapingClient`; `proxy/`: `ProxyService` over `ProxyList`, `ProxyAgentPool`, `ProxyTrafficMeter`), `interfaces/`, `utils/`.
+- `src/shared/`: code that knows no shop — `args/` (`ArgsService`), `backend/` (`ApiService`, `MetricsReporter`, `ScraperConfigService`), `metrics/` (`MetricsService`), `http/` (`RequestQueueService`, `ThrottledQueue`, `ScrapingClient`; `proxy/`: `ProxyService` over `ProxyList`, `ProxyAgentPool`, `ProxyTrafficMeter`), `interfaces/`, `utils/`.
 - `src/marketplaces/<name>/`: one folder per shop — scraper implementing `MarketplaceScraper`, a thin service over `ScrapingClient`, `types/`, and one folder per flow (`amazon/pdp/`, `amazon/plp/`) holding its scrapers and builders.
 - `src/shared` imports nothing from `src/marketplaces`.
-- `src/marketplaces.ts` (`createScraper()`) starts `MetricsReporter` and returns the scraper; `src/index.ts` calls `createScraper().execute()`.
+- `src/marketplaces.ts` (async `createScraper()`) loads the backend config, starts its refresh and `MetricsReporter` and returns the scraper; `src/index.ts` calls `createScraper().then((scraper) => scraper.execute())`.
 - Add a shop: a `src/marketplaces/<name>/` folder with `MarketplaceScraper.marketplace` set, a `-m` flag in `ArgsService`, the choice in `createScraper()`, services in `docker-compose.yml`.
 
 ## Architecture
@@ -47,20 +48,20 @@ Integration (`tests/integration/`) and e2e (`tests/e2e/`) tests share fakes in `
 - `ScrapingClient.get(url, referer, callbacks, labels, proxyType)` is the only path to shops; results go only to callbacks. `url` and `referer` are full URLs. Random proxy of the `proxyType` pool (the first of up to 20 random picks with an idle connection to the host, else any) and a desktop User-Agent from a pool of 500 generated at start, hard 20 s `AbortSignal` timeout, one keep-alive agent per proxy.
 - `ProxyService` pools: `ProxyList` reads the active webshare plans (`GET subscription/plan/`) and downloads each plan's list (`?plan_id=`); `proxy_subtype` `default` is the `datacenter` pool, other subtypes keep their name (`isp`). An unknown or empty pool falls back to `datacenter`. Reloaded hourly.
 - `AmazonService.get(url, referer, callbacks)` prefixes `https://www.amazon.` to `url` and `referer` (`de/dp/...`) and delegates to `ScrapingClient`; `AmazonService.queueService` is the `ScrapingClient` queue.
-- `RequestQueueService`: custom concurrency limiter plus token bucket for `-r`, one per process. A finished request starts the next queued one at once; a 1 ms tick starts up to 10 more (needed when the token bucket refills). Logs `rate | limit | pending | connections | queue` every second.
+- `RequestQueueService`: custom concurrency limiter plus token bucket for `rps` (`setRps()` never raises the bucket, so a change gives no burst), one per process. A finished request starts the next queued one at once; a 1 ms tick starts up to 10 more (needed when the token bucket refills). Logs `rps | concurrency | pending | connections | queue` every second.
 - `AmazonCountryService`: countries to scrape (`countryId`, `tld`, `proxyType`) from `GET amazon/countries/scrap`, cached, reloaded hourly; URLs use `www.amazon.<tld>`. PDP requests go through the country's `proxyType` pool, PLP through `datacenter`.
-- PDP flow: `AmazonScraper` fetches `amazon/ads/scrap` when the queue is low → `AmazonPdpScraper` creates one `AmazonAdPrice` per country (manual state machine) → `AmazonPdpCountryScraper` + `AmazonPdpPriceHelper`.
+- PDP flow: `AmazonScraper` fetches `amazon/ads/scrap?batchSize=` when the queue is low → `AmazonPdpScraper` creates one `AmazonAdPrice` per country (manual state machine) → `AmazonPdpCountryScraper` + `AmazonPdpPriceHelper`.
   - Captcha, empty or invalid response, network error: retry with exponential backoff; after 15 failures the country finishes without a price.
   - 404: country deleted; if ≤2 countries remain, `DELETE amazon/ads/<id>`.
-  - All complete: `PUT amazon/ads/<id>` with prices.
+  - All complete, or 4 countries with a price (`PRICES_TO_COMPLETE`): `PUT amazon/ads/<id>` with prices; the other countries are `abandoned` (queued requests skipped via `isCancelled`, late responses and retries ignored).
 - PLP flow: hourly category from `amazon/ads/categories/scrap` → `AmazonPlpScraper` awaits `AmazonNewReleasesScraper` (`AmazonNewReleasesBuilder`; a page without the browse tree is retried; metrics `new_releases_pages`, `new_releases_ads`), then starts `AmazonPlpPageScraper` → `AmazonPlpBuilder` → `POST amazon/ads`, recursing into subcategories.
 - `MetricsService` + `MetricsReporter` send counters every minute as `POST scrapers/<name>/metrics` (catalog in `docs/superpowers/specs/2026-10-18-scraper-metrics-design.md`); a marketplace maps its results to the shared `outcome` values. Gauges `event_loop_delay_mean_ms`/`event_loop_delay_max_ms` come from `monitorEventLoopDelay` (10 ms sampling interval subtracted), reset after each send.
-- `ApiService`: `get()` throws, `post`/`put`/`delete` only log errors. `put`/`delete` go through a `ThrottledQueue(5, 25)` (max 5 at once, starts spaced 40 ms apart, per process) so batch ends do not flood the backend. Use `ThrottledQueue` for backend calls and `RequestQueueService` only for shop requests.
+- `ApiService`: `get()` throws, `post`/`put`/`delete` only log errors. `put`/`delete` go through a `ThrottledQueue(5, 25)` (`concurrency` 5, `rps` 25: starts spaced 40 ms apart, per process) so batch ends do not flood the backend. Use `ThrottledQueue` for backend calls and `RequestQueueService` only for shop requests.
 
 ## Connection limits
 
 The bottleneck is open connections (home router NAT, host conntrack), not bandwidth.
-- Connections = `pending` (capped by `-l`) + idle keep-alive sockets (`maxFreeSockets: 1` per proxy × domain, closed after 15 s).
+- Connections = `pending` (capped by `concurrency`) + idle keep-alive sockets (`maxFreeSockets: 1` per proxy × domain, closed after 15 s).
 - Set the idle timeout via `agent.options.timeout` after construction; `HttpsProxyAgent` ignores `timeout` passed to the constructor.
 - Do not disable keep-alive or shorten the idle timeout.
 - Measure with `nf_conntrack_count` on the host, or `docker exec <container> sh -c "netstat -tn | grep -c ESTABLISHED"` (not `ss` on the host).

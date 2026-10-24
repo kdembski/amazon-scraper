@@ -1,7 +1,7 @@
 import axios from "axios";
 import _ from "lodash";
 import UserAgent from "user-agents";
-import { ArgsService } from "@/shared/args/ArgsService";
+import { ScraperConfigService } from "@/shared/backend/ScraperConfigService";
 import { ProxyService } from "@/shared/http/proxy/ProxyService";
 import { RequestQueueService } from "@/shared/http/RequestQueueService";
 import { MetricsService } from "@/shared/metrics/MetricsService";
@@ -18,11 +18,11 @@ export class ScrapingClient {
   queueService;
 
   private constructor(
-    argsService = ArgsService.getInstance(),
+    configService = ScraperConfigService.getInstance(),
     proxyService = ProxyService.getInstance(),
     queueService = new RequestQueueService(
-      argsService.getLimitFlag(),
-      argsService.getRateFlag(),
+      configService.get().concurrency,
+      configService.get().rps,
       true,
       () => proxyService.countConnections()
     ),
@@ -48,11 +48,14 @@ export class ScrapingClient {
     callback?: {
       onSuccess?: (data: T) => void;
       onError?: (e: any) => void;
+      isCancelled?: () => boolean;
     },
     labels: MetricLabels = {},
     proxyType?: string
   ) {
     this.queueService.request(async () => {
+      if (callback?.isCancelled?.()) return;
+
       const httpsAgent = this.proxyService.getAgent(new URL(url).hostname, proxyType);
       const userAgent = _.sample(this.userAgents);
 

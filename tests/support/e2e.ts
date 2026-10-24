@@ -16,7 +16,7 @@ let containers = 0;
 export type Process = Awaited<ReturnType<typeof spawnScraper>>;
 
 // Runs the built scraper as its own process against the fakes, configured
-// only through env and flags like in docker-compose
+// only through env, flags and the backend config like in docker-compose
 export async function spawnScraper(
   args: string[],
   configure: (fakes: { backend: FakeBackend; amazon: FakeAmazon }) => void
@@ -24,7 +24,9 @@ export async function spawnScraper(
   const host = runtime === "docker" ? "host.docker.internal" : "127.0.0.1";
   const backend = await new FakeBackend(host).start();
   const amazon = await new FakeAmazon(host).start();
-  backend.on("GET", "proxies", amazon.proxyLine);
+  backend
+    .on("GET", "proxies", amazon.proxyLine)
+    .on("GET", "scrapers/e2e/config", { concurrency: 10, rps: 0, batchSize: 10 });
   configure({ backend, amazon });
 
   const env = {

@@ -11,7 +11,8 @@ describe("PLP process", () => {
   });
 
   it("scrapes the category and sends the ads to the backend", async () => {
-    scraper = await spawnScraper(["-t", "plp", "-c", "100"], ({ backend, amazon }) => {
+    scraper = await spawnScraper(["-t", "plp"], ({ backend, amazon }) => {
+      backend.on("GET", "scrapers/e2e/config", { concurrency: 10, rps: 0, batchSize: 100 });
       backend.on("GET", "amazon/ads/categories/scrap", { id: 1, name: "electronics", scrapedAt: null });
       amazon.respond(({ url }) =>
         url === "pl/s?i=electronics&rh=p_36%3A-999&s=date-desc-rank"

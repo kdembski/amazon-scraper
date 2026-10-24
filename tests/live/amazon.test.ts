@@ -111,10 +111,10 @@ describe("live Amazon", () => {
 
     vi.spyOn(console, "log").mockImplementation(() => {});
     vi.spyOn(console, "warn").mockImplementation(() => {});
-    process.argv = [process.argv[0], "index.ts", "-l", "4"];
 
     await ProxyService.getInstance().loadProxies();
     amazon = AmazonService.getInstance();
+    amazon.queueService.concurrency = 4;
   });
 
   it("finds the buy box offer in the offers fragment", async () => {

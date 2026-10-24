@@ -41,7 +41,13 @@ export class AmazonPdpCountryScraper {
     resolveAd: () => void
   ) {
     new Promise<void>((resolvePrice, rejectPrice) => {
-      if (price.complete || price.deleted || price.pending || price.adDeleted) {
+      if (
+        price.complete ||
+        price.deleted ||
+        price.pending ||
+        price.adDeleted ||
+        price.abandoned
+      ) {
         return;
       }
 
@@ -57,12 +63,14 @@ export class AmazonPdpCountryScraper {
         {
           onSuccess: (res) => this.onSuccess(res, price),
           onError: (e) => this.onError(e, price, ad, prices, resolveAd),
+          isCancelled: () => price.abandoned,
         },
         price.country.proxyType
       );
     })
       .then(() => {
         price.pending = false;
+        if (price.abandoned) return;
         price.complete = true;
         if (!price.deleted) {
           this.countItem(price, _.isNil(price.value) ? "no_data" : "data");
@@ -71,12 +79,15 @@ export class AmazonPdpCountryScraper {
       })
       .catch(() => {
         price.pending = false;
+        if (price.abandoned) return;
         price.failed++;
         this.retry(price, ad, prices, resolveAd);
       });
   }
 
   private async onSuccess(data: string, price: AmazonAdPrice) {
+    if (price.abandoned) return;
+
     if (!data.length) {
       this.countResponse(price, "empty");
       price.reject?.("Received empty data");
@@ -125,6 +136,8 @@ export class AmazonPdpCountryScraper {
     prices: AmazonAdPrice[],
     resolveAd: () => void
   ) {
+    if (price.abandoned) return;
+
     if (e.status === 404) {
       this.tryDelete(ad, price, prices, resolveAd);
       return;
@@ -159,8 +172,13 @@ export class AmazonPdpCountryScraper {
     resolve: () => void
   ) {
     const isCompleted = this.priceHelper.isComplete(prices);
+    const hasEnoughPrices = this.priceHelper.hasEnoughPrices(prices);
     const isDeleted = this.priceHelper.isDeleted(prices);
-    if (!isCompleted || isDeleted) return;
+    if ((!isCompleted && !hasEnoughPrices) || isDeleted) return;
+
+    prices.forEach((price) => {
+      if (!price.complete) price.abandoned = true;
+    });
 
     this.priceHelper.sendCompletedPrices(prices, ad);
     resolve();

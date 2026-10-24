@@ -1,7 +1,7 @@
 import { vi } from "vitest";
 import type { AmazonService } from "@/marketplaces/amazon/AmazonService";
 import type { ApiService } from "@/shared/backend/ApiService";
-import type { ArgsService } from "@/shared/args/ArgsService";
+import type { ScraperConfigService } from "@/shared/backend/ScraperConfigService";
 import type { AmazonCountryService } from "@/marketplaces/amazon/AmazonCountryService";
 import type { AmazonAdBuilder, AmazonAdBuildResult } from "@/marketplaces/amazon/types/amazon.types";
 
@@ -28,6 +28,7 @@ export function fakeAmazonCountryService() {
 type GetCallback = {
   onSuccess?: (data: string) => void;
   onError?: (e: any) => void;
+  isCancelled?: () => boolean;
 };
 
 // Records every request so a test can answer it with respond() / fail()
@@ -48,10 +49,10 @@ export function fakeAmazonService() {
   return { service, get, queueService, requests, respond, fail };
 }
 
-export function fakeArgsService({ count = 50 } = {}) {
-  const getCountFlag = vi.fn(() => count);
-  const service = { getCountFlag } as unknown as ArgsService;
-  return { service, getCountFlag };
+export function fakeScraperConfigService({ batchSize = 50 } = {}) {
+  const get = vi.fn(() => ({ concurrency: 10, rps: 0, batchSize }));
+  const service = { get } as unknown as ScraperConfigService;
+  return { service, get };
 }
 
 export function fakeAdBuilder(result: AmazonAdBuildResult = {}) {

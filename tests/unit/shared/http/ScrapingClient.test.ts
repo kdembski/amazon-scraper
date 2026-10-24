@@ -1,7 +1,7 @@
 import axios from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ScrapingClient } from "@/shared/http/ScrapingClient";
-import type { ArgsService } from "@/shared/args/ArgsService";
+import type { ScraperConfigService } from "@/shared/backend/ScraperConfigService";
 import type { ProxyService } from "@/shared/http/proxy/ProxyService";
 import type { RequestQueueService } from "@/shared/http/RequestQueueService";
 
@@ -27,7 +27,7 @@ const setup = () => {
     }),
   };
   const service = new Client(
-    {} as ArgsService,
+    {} as ScraperConfigService,
     proxy,
     queue as unknown as RequestQueueService
   );
@@ -52,13 +52,12 @@ describe("ScrapingClient", () => {
   it("logs open proxy connections with the queue state", async () => {
     vi.useFakeTimers();
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
-    const args = {
-      getLimitFlag: vi.fn(() => 10),
-      getRateFlag: vi.fn(() => 0),
+    const config = {
+      get: vi.fn(() => ({ concurrency: 10, rps: 0, batchSize: 50 })),
     };
     const proxy = { countConnections: vi.fn(() => 7) };
 
-    new Client(args, proxy);
+    new Client(config, proxy);
     await vi.advanceTimersByTimeAsync(1000);
 
     expect(log.mock.calls[0][0]).toContain("connections: 7");
@@ -151,7 +150,7 @@ describe("ScrapingClient", () => {
           requests.push(cb());
         });
         const service = new Client(
-          {} as ArgsService,
+          {} as ScraperConfigService,
           { getAgent: vi.fn() },
           queue,
           metrics
@@ -238,6 +237,19 @@ describe("ScrapingClient", () => {
         );
         expect(counted).toEqual([["requests", { outcome: "ok" }]]);
       });
+    });
+
+    it("skips a request cancelled while queued", async () => {
+      const { service, proxy, requests } = setup();
+      const callback = { onSuccess: vi.fn(), onError: vi.fn(), isCancelled: () => true };
+
+      service.get("https://www.amazon.de/dp/B0TESTASIN", "https://www.amazon.de", callback);
+      await Promise.all(requests);
+
+      expect(get).not.toHaveBeenCalled();
+      expect(proxy.getAgent).not.toHaveBeenCalled();
+      expect(callback.onSuccess).not.toHaveBeenCalled();
+      expect(callback.onError).not.toHaveBeenCalled();
     });
 
     it("works without callbacks", async () => {

@@ -1,6 +1,8 @@
 import { ApiService } from "@/shared/backend/ApiService";
 import { AmazonAd, AmazonAdPrice } from "@/marketplaces/amazon/types/amazon.types";
 
+export const PRICES_TO_COMPLETE = 4;
+
 export class AmazonPdpPriceHelper {
   private apiService;
 
@@ -10,6 +12,10 @@ export class AmazonPdpPriceHelper {
 
   isComplete(prices: AmazonAdPrice[]) {
     return prices?.every((price) => price.complete);
+  }
+
+  hasEnoughPrices(prices: AmazonAdPrice[]) {
+    return prices.filter((price) => !!price.value).length >= PRICES_TO_COMPLETE;
   }
 
   isDeleted(prices: AmazonAdPrice[]) {

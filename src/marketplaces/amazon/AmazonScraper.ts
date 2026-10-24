@@ -5,6 +5,7 @@ import { AmazonService } from "@/marketplaces/amazon/AmazonService";
 import { ApiService } from "@/shared/backend/ApiService";
 import { AmazonCountryService } from "@/marketplaces/amazon/AmazonCountryService";
 import { ArgsService } from "@/shared/args/ArgsService";
+import { ScraperConfigService } from "@/shared/backend/ScraperConfigService";
 import { ProxyService } from "@/shared/http/proxy/ProxyService";
 import { AmazonAd, AmazonAdCategory } from "@/marketplaces/amazon/types/amazon.types";
 import { MarketplaceScraper } from "@/shared/interfaces/MarketplaceScraper";
@@ -19,6 +20,7 @@ export class AmazonScraper implements MarketplaceScraper {
   private plpScraper;
   private proxyService;
   private countryService;
+  private configService;
   private isLoadingAds = false;
   private categoryRetryDelay = 60 * 1000;
 
@@ -29,7 +31,8 @@ export class AmazonScraper implements MarketplaceScraper {
     pdpScraper = new AmazonPdpScraper(new AmazonPdpCountryScraper()),
     plpScraper = new AmazonPlpScraper(),
     proxyService = ProxyService.getInstance(),
-    countryService = AmazonCountryService.getInstance()
+    countryService = AmazonCountryService.getInstance(),
+    configService = ScraperConfigService.getInstance()
   ) {
     this.apiService = apiService;
     this.amazonService = amazonService;
@@ -38,6 +41,7 @@ export class AmazonScraper implements MarketplaceScraper {
     this.plpScraper = plpScraper;
     this.proxyService = proxyService;
     this.countryService = countryService;
+    this.configService = configService;
   }
 
   async execute() {
@@ -67,15 +71,15 @@ export class AmazonScraper implements MarketplaceScraper {
   async scrapPdp() {
     if (this.isLoadingAds) return;
 
-    const count = this.argsService.getCountFlag();
-    if (this.amazonService.queueService.queue.length > count / 10) return;
+    const { batchSize } = this.configService.get();
+    if (this.amazonService.queueService.queue.length > batchSize / 10) return;
 
     this.isLoadingAds = true;
 
     try {
       const countries = await this.countryService.getCountries();
       const ads = await this.apiService.get<AmazonAd[]>(
-        `amazon/ads/scrap?count=${count}`
+        `amazon/ads/scrap?batchSize=${batchSize}`
       );
       ads.forEach((ad) => this.pdpScraper.execute(ad, countries));
     } finally {
