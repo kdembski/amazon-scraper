@@ -62,7 +62,8 @@ export class ScraperConfigService {
 
   private fetch() {
     return this.apiService.get<ScraperConfig>(
-      `scrapers/${process.env.name}/config`
+      `scrapers/${process.env.name}/config`,
+      { timeout: 10 * 1000 }
     );
   }
 

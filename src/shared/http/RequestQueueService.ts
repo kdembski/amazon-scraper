@@ -34,7 +34,7 @@ export class RequestQueueService {
 
   setRps(rps: number) {
     this.rps = rps;
-    this.tokens = rps;
+    this.tokens = Math.min(this.tokens, rps);
     this.lastRefill = Date.now();
   }
 

@@ -50,7 +50,7 @@ describe("ScraperConfigService", () => {
 
     await service.load();
 
-    expect(get).toHaveBeenCalledWith("scrapers/amazon-pdp-1/config");
+    expect(get).toHaveBeenCalledWith("scrapers/amazon-pdp-1/config", { timeout: 10_000 });
     expect(service.get()).toEqual(config);
     expect(queue.concurrency).toBe(150);
     expect(queue.setRps).toHaveBeenCalledWith(150);
@@ -122,6 +122,6 @@ describe("ScraperConfigService", () => {
     expect(cronJobs[0].cronTime).toBe("0 * * * * *");
     expect(cronJobs[0].start).toHaveBeenCalled();
     await cronJobs[0].onTick();
-    expect(get).toHaveBeenCalledWith("scrapers/amazon-pdp-1/config");
+    expect(get).toHaveBeenCalledWith("scrapers/amazon-pdp-1/config", { timeout: 10_000 });
   });
 });

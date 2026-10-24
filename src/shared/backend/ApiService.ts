@@ -22,9 +22,9 @@ export class ApiService {
     return process.env.API_URL + "/" + path;
   }
 
-  async get<T>(path: string) {
+  async get<T>(path: string, config: AxiosRequestConfig = {}) {
     const agent = new http.Agent({ keepAlive: true });
-    return (await axios.get<T>(this.url(path), { httpAgent: agent })).data;
+    return (await axios.get<T>(this.url(path), { ...config, httpAgent: agent })).data;
   }
 
   async post<T>(path: string, data: unknown, config: AxiosRequestConfig = {}) {

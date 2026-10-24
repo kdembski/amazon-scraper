@@ -212,13 +212,28 @@ describe("RequestQueueService", () => {
       expect(queue.pending).toBe(4);
     });
 
-    it("setRps from 0 starts with a full bucket of the new rps", () => {
+    it("setRps from 0 starts at most the new rps in the first second", async () => {
       const queue = setup({ concurrency: 100, rps: 0 });
       queue.setRps(2);
       const requests = Array.from({ length: 5 }, () => deferred());
       requests.forEach((request) => queue.request(request.callback));
+      queue.start();
 
+      await vi.advanceTimersByTimeAsync(999);
       expect(queue.rps).toBe(2);
+      expect(queue.pending).toBeLessThanOrEqual(2);
+
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(queue.pending).toBe(3);
+    });
+
+    it("setRps to a higher rps does not refill a drained bucket", () => {
+      const queue = setup({ concurrency: 100, rps: 2 });
+      const requests = Array.from({ length: 5 }, () => deferred());
+      requests.forEach((request) => queue.request(request.callback));
+      queue.setRps(5);
+      queue.request(deferred().callback);
+
       expect(queue.pending).toBe(2);
     });
 
