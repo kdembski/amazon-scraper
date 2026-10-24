@@ -1,21 +1,21 @@
 export class RequestQueueService {
   queue: (() => any)[] = [];
   pending = 0;
-  limit;
-  rate;
+  concurrency;
+  rps;
   private tokens;
   private lastRefill = Date.now();
   private countConnections;
 
   constructor(
-    limit: number,
-    rate = 0,
+    concurrency: number,
+    rps = 0,
     enableLogs = false,
     countConnections?: () => number
   ) {
-    this.limit = limit;
-    this.rate = rate;
-    this.tokens = rate;
+    this.concurrency = concurrency;
+    this.rps = rps;
+    this.tokens = rps;
     this.countConnections = countConnections;
 
     if (enableLogs) {
@@ -30,6 +30,12 @@ export class RequestQueueService {
       }
       this.start();
     }, 1);
+  }
+
+  setRps(rps: number) {
+    this.rps = rps;
+    this.tokens = rps;
+    this.lastRefill = Date.now();
   }
 
   async request(callback: () => Promise<void>) {
@@ -49,7 +55,7 @@ export class RequestQueueService {
   }
 
   private async run(callback: () => any) {
-    if (this.rate) this.tokens--;
+    if (this.rps) this.tokens--;
 
     this.pending++;
     try {
@@ -61,8 +67,8 @@ export class RequestQueueService {
   }
 
   private canStart() {
-    if (this.pending >= this.limit) return false;
-    if (!this.rate) return true;
+    if (this.pending >= this.concurrency) return false;
+    if (!this.rps) return true;
 
     this.refillTokens();
     return this.tokens >= 1;
@@ -71,16 +77,16 @@ export class RequestQueueService {
   // Token bucket holding at most one second worth of requests
   private refillTokens() {
     const now = Date.now();
-    const refill = ((now - this.lastRefill) * this.rate) / 1000;
+    const refill = ((now - this.lastRefill) * this.rps) / 1000;
 
-    this.tokens = Math.min(this.rate, this.tokens + refill);
+    this.tokens = Math.min(this.rps, this.tokens + refill);
     this.lastRefill = now;
   }
 
   private logState() {
     const stats = [
-      `rate: ${this.rate || "-"}/s`,
-      `limit: ${this.limit}`,
+      `rps: ${this.rps || "-"}/s`,
+      `concurrency: ${this.concurrency}`,
       `pending: ${this.pending}`,
       ...(this.countConnections
         ? [`connections: ${this.countConnections()}`]

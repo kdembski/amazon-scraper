@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RequestQueueService } from "@/shared/http/RequestQueueService";
 
-const setup = ({ limit = 2, rate = 0, enableLogs = false } = {}) =>
-  new RequestQueueService(limit, rate, enableLogs);
+const setup = ({ concurrency = 2, rps = 0, enableLogs = false } = {}) =>
+  new RequestQueueService(concurrency, rps, enableLogs);
 
 // A request that stays pending until finish() is called
 const deferred = () => {
@@ -23,8 +23,8 @@ describe("RequestQueueService", () => {
   });
 
   describe("request", () => {
-    it("runs a request at once while below the limit", async () => {
-      const queue = setup({ limit: 2 });
+    it("runs a request at once while below concurrency", async () => {
+      const queue = setup({ concurrency: 2 });
       const request = deferred();
 
       const result = queue.request(request.callback);
@@ -43,7 +43,7 @@ describe("RequestQueueService", () => {
     });
 
     it("frees the slot when a request throws", async () => {
-      const queue = setup({ limit: 1 });
+      const queue = setup({ concurrency: 1 });
       const callback = vi.fn(async () => {
         throw new Error("boom");
       });
@@ -54,7 +54,7 @@ describe("RequestQueueService", () => {
 
     it("keeps running queued requests after one of them throws", async () => {
       const error = vi.spyOn(console, "error").mockImplementation(() => {});
-      const queue = setup({ limit: 1 });
+      const queue = setup({ concurrency: 1 });
       const first = deferred();
       const failing = vi.fn(async () => {
         throw new Error("boom");
@@ -74,8 +74,8 @@ describe("RequestQueueService", () => {
       expect(queue.pending).toBe(1);
     });
 
-    it("queues requests over the limit", () => {
-      const queue = setup({ limit: 1 });
+    it("queues requests over concurrency", () => {
+      const queue = setup({ concurrency: 1 });
       const first = deferred();
       const second = deferred();
 
@@ -91,7 +91,7 @@ describe("RequestQueueService", () => {
 
   describe("start", () => {
     it("runs queued requests when slots free up", async () => {
-      const queue = setup({ limit: 1 });
+      const queue = setup({ concurrency: 1 });
       const first = deferred();
       const second = deferred();
       queue.request(first.callback);
@@ -109,7 +109,7 @@ describe("RequestQueueService", () => {
     });
 
     it("runs a queued request as soon as a slot frees up, without waiting for a tick", async () => {
-      const queue = setup({ limit: 1 });
+      const queue = setup({ concurrency: 1 });
       const first = deferred();
       const second = deferred();
       queue.request(first.callback);
@@ -124,12 +124,30 @@ describe("RequestQueueService", () => {
       expect(queue.pending).toBe(1);
     });
 
+    it("lowering concurrency holds new requests until pending drops below it", async () => {
+      const queue = setup({ concurrency: 3 });
+      const running = Array.from({ length: 3 }, () => deferred());
+      running.forEach((request) => queue.request(request.callback));
+      queue.concurrency = 1;
+      const next = deferred();
+      queue.request(next.callback);
+
+      running[0].finish();
+      running[1].finish();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(next.callback).not.toHaveBeenCalled();
+
+      running[2].finish();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(next.callback).toHaveBeenCalled();
+    });
+
     it("starts at most 10 queued requests per tick", async () => {
-      const queue = setup({ limit: 100 });
-      queue.limit = 0;
+      const queue = setup({ concurrency: 100 });
+      queue.concurrency = 0;
       const requests = Array.from({ length: 15 }, () => deferred());
       requests.forEach((request) => queue.request(request.callback));
-      queue.limit = 100;
+      queue.concurrency = 100;
 
       queue.start();
       await vi.advanceTimersByTimeAsync(1);
@@ -140,17 +158,17 @@ describe("RequestQueueService", () => {
     });
   });
 
-  describe("rate limit", () => {
-    it("is unlimited when rate is 0", () => {
-      const queue = setup({ limit: 100, rate: 0 });
+  describe("rps limit", () => {
+    it("is unlimited when rps is 0", () => {
+      const queue = setup({ concurrency: 100, rps: 0 });
       const requests = Array.from({ length: 50 }, () => deferred());
       requests.forEach((request) => queue.request(request.callback));
 
       expect(queue.pending).toBe(50);
     });
 
-    it("starts at most `rate` requests at once", () => {
-      const queue = setup({ limit: 100, rate: 3 });
+    it("starts at most `rps` requests at once", () => {
+      const queue = setup({ concurrency: 100, rps: 3 });
       const requests = Array.from({ length: 5 }, () => deferred());
       requests.forEach((request) => queue.request(request.callback));
 
@@ -159,7 +177,7 @@ describe("RequestQueueService", () => {
     });
 
     it("refills tokens over time", async () => {
-      const queue = setup({ limit: 100, rate: 2 });
+      const queue = setup({ concurrency: 100, rps: 2 });
       const requests = Array.from({ length: 5 }, () => deferred());
       requests.forEach((request) => queue.request(request.callback));
       queue.start();
@@ -174,8 +192,8 @@ describe("RequestQueueService", () => {
       expect(queue.pending).toBe(5);
     });
 
-    it("is still bound by the concurrency limit when tokens are available", () => {
-      const queue = setup({ limit: 2, rate: 100 });
+    it("is still bound by concurrency when tokens are available", () => {
+      const queue = setup({ concurrency: 2, rps: 100 });
       const requests = Array.from({ length: 5 }, () => deferred());
       requests.forEach((request) => queue.request(request.callback));
 
@@ -184,7 +202,7 @@ describe("RequestQueueService", () => {
     });
 
     it("does not spend tokens while the queue is empty", async () => {
-      const queue = setup({ limit: 100, rate: 4 });
+      const queue = setup({ concurrency: 100, rps: 4 });
       queue.start();
       await vi.advanceTimersByTimeAsync(100);
 
@@ -194,8 +212,27 @@ describe("RequestQueueService", () => {
       expect(queue.pending).toBe(4);
     });
 
+    it("setRps from 0 starts with a full bucket of the new rps", () => {
+      const queue = setup({ concurrency: 100, rps: 0 });
+      queue.setRps(2);
+      const requests = Array.from({ length: 5 }, () => deferred());
+      requests.forEach((request) => queue.request(request.callback));
+
+      expect(queue.rps).toBe(2);
+      expect(queue.pending).toBe(2);
+    });
+
+    it("setRps to a lower rps starts at most the new rps at once", () => {
+      const queue = setup({ concurrency: 100, rps: 5 });
+      queue.setRps(2);
+      const requests = Array.from({ length: 5 }, () => deferred());
+      requests.forEach((request) => queue.request(request.callback));
+
+      expect(queue.pending).toBe(2);
+    });
+
     it("holds at most one second worth of tokens", async () => {
-      const queue = setup({ limit: 100, rate: 2 });
+      const queue = setup({ concurrency: 100, rps: 2 });
       await vi.advanceTimersByTimeAsync(10_000);
 
       const requests = Array.from({ length: 5 }, () => deferred());
@@ -208,11 +245,11 @@ describe("RequestQueueService", () => {
   describe("logs", () => {
     it("logs the state every second when enabled", async () => {
       const log = vi.spyOn(console, "log").mockImplementation(() => {});
-      setup({ limit: 5, rate: 3, enableLogs: true });
+      setup({ concurrency: 5, rps: 3, enableLogs: true });
 
       await vi.advanceTimersByTimeAsync(1000);
 
-      expect(log).toHaveBeenCalledWith("rate: 3/s | limit: 5 | pending: 0 | queue: 0");
+      expect(log).toHaveBeenCalledWith("rps: 3/s | concurrency: 5 | pending: 0 | queue: 0");
     });
 
     it("logs open connections after pending when they are counted", async () => {
@@ -224,13 +261,13 @@ describe("RequestQueueService", () => {
       expect(log.mock.calls[0][0]).toContain("pending: 0 | connections: 42 | queue: 0");
     });
 
-    it("shows a dash when the rate is unlimited", async () => {
+    it("shows a dash when rps is unlimited", async () => {
       const log = vi.spyOn(console, "log").mockImplementation(() => {});
       setup({ enableLogs: true });
 
       await vi.advanceTimersByTimeAsync(1000);
 
-      expect(log.mock.calls[0][0]).toContain("rate: -/s");
+      expect(log.mock.calls[0][0]).toContain("rps: -/s");
     });
 
     it("does not log by default", async () => {

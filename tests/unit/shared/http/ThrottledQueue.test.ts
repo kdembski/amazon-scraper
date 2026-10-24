@@ -42,7 +42,7 @@ describe("ThrottledQueue", () => {
     expect(next.callback).toHaveBeenCalledTimes(1);
   });
 
-  it("spaces starts by 1000 / rate ms", async () => {
+  it("spaces starts by 1000 / rps ms", async () => {
     const queue = new ThrottledQueue(10, 10);
     const jobs = [deferred(), deferred(), deferred()];
 
@@ -56,7 +56,7 @@ describe("ThrottledQueue", () => {
     expect(jobs.map((job) => job.callback.mock.calls.length)).toEqual([1, 1, 1]);
   });
 
-  it("waits for a free slot when the limit is reached", async () => {
+  it("waits for a free slot when concurrency is reached", async () => {
     const queue = new ThrottledQueue(1, 1000);
     const first = deferred();
     const second = deferred();

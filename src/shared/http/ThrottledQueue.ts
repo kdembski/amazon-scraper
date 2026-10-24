@@ -1,15 +1,15 @@
-// Runs at most `limit` callbacks at once and starts at most `rate` per second, evenly spaced
+// Runs at most `concurrency` callbacks at once and starts at most `rps` per second, evenly spaced
 export class ThrottledQueue {
   private queue: (() => Promise<void>)[] = [];
   private pending = 0;
   private lastStart = 0;
   private timer?: ReturnType<typeof setTimeout>;
-  private limit;
+  private concurrency;
   private interval;
 
-  constructor(limit: number, rate: number) {
-    this.limit = limit;
-    this.interval = 1000 / rate;
+  constructor(concurrency: number, rps: number) {
+    this.concurrency = concurrency;
+    this.interval = 1000 / rps;
   }
 
   request<T>(callback: () => Promise<T>) {
@@ -20,7 +20,7 @@ export class ThrottledQueue {
   }
 
   private next() {
-    if (!this.queue.length || this.pending >= this.limit || this.timer) return;
+    if (!this.queue.length || this.pending >= this.concurrency || this.timer) return;
 
     const wait = this.lastStart + this.interval - Date.now();
     if (wait > 0) {
