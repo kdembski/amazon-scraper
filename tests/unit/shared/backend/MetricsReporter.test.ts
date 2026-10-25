@@ -18,9 +18,9 @@ const gauges = [
   { metric: "event_loop_delay_max_ms", value: 40 },
 ];
 
-const setup = ({ isPdp = true, traffic = { bytesIn: 0, bytesOut: 0 } } = {}) => {
+const setup = ({ target = "pdp", traffic = { bytesIn: 0, bytesOut: 0 } } = {}) => {
   const args = {
-    getTargetFlag: vi.fn(() => ({ isPdp, isPlp: !isPdp })),
+    getTargetFlag: vi.fn(() => target),
   } as unknown as ArgsService;
   const api = fakeApiService();
   api.post.mockResolvedValue({ status: 200 });
@@ -79,8 +79,8 @@ describe("MetricsReporter", () => {
     resetSingleton(MetricsReporter);
   });
 
-  it.each([true, false])("starts a cron every minute (pdp: %s)", (isPdp) => {
-    const { reporter } = setup({ isPdp });
+  it.each(["pdp", "plp"])("starts a cron every minute (%s)", (target) => {
+    const { reporter } = setup({ target });
 
     reporter.start("amazon");
 
@@ -144,7 +144,7 @@ describe("MetricsReporter", () => {
   });
 
   it("sends the PLP flow", async () => {
-    const { api, metrics, reporter } = setup({ isPdp: false });
+    const { api, metrics, reporter } = setup({ target: "plp" });
     metrics.increment("requests", { country: "pl", outcome: "ok" });
     reporter.start("amazon");
 

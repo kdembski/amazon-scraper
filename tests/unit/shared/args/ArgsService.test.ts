@@ -31,22 +31,22 @@ describe("ArgsService", () => {
 
   describe("getTargetFlag", () => {
     it("defaults to pdp", () => {
-      expect(args.getTargetFlag()).toEqual({ isPdp: true, isPlp: false });
+      expect(args.getTargetFlag()).toBe("pdp");
     });
 
     it.each([["-t"], ["--target"]])("reads plp from %s", (flag) => {
       setArgs(flag, "plp");
-      expect(args.getTargetFlag()).toEqual({ isPdp: false, isPlp: true });
+      expect(args.getTargetFlag()).toBe("plp");
     });
 
     it("reads explicit pdp", () => {
       setArgs("-t", "pdp");
-      expect(args.getTargetFlag()).toEqual({ isPdp: true, isPlp: false });
+      expect(args.getTargetFlag()).toBe("pdp");
     });
 
-    it("treats an unknown target as neither mode", () => {
+    it("throws on an unknown target", () => {
       setArgs("-t", "foo");
-      expect(args.getTargetFlag()).toEqual({ isPdp: false, isPlp: false });
+      expect(() => args.getTargetFlag()).toThrow("Unknown target: foo");
     });
   });
 });

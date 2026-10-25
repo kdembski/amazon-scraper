@@ -74,7 +74,7 @@ export class MetricsReporter {
       `scrapers/${process.env.name}/metrics`,
       {
         marketplace: this.marketplace,
-        flow: this.argsService.getTargetFlag().isPlp ? "plp" : "pdp",
+        flow: this.argsService.getTargetFlag(),
         periodStart: this.periodStart.toISOString(),
         metrics: [
           ...counters,

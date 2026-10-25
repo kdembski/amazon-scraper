@@ -22,11 +22,8 @@ export const buildPrice = (
   overrides: Partial<AmazonAdPrice> = {}
 ): AmazonAdPrice => ({
   country: buildAmazonCountry(),
-  pending: false,
   complete: false,
   deleted: false,
-  adDeleted: false,
-  abandoned: false,
   failed: 0,
   ...overrides,
 });

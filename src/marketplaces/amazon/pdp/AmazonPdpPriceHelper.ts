@@ -4,14 +4,10 @@ import { AmazonAd, AmazonAdPrice } from "@/marketplaces/amazon/types/amazon.type
 export const PRICES_TO_COMPLETE = 4;
 
 export class AmazonPdpPriceHelper {
-  private apiService;
-
-  constructor(apiService = ApiService.getInstance()) {
-    this.apiService = apiService;
-  }
+  constructor(private apiService = ApiService.getInstance()) {}
 
   isComplete(prices: AmazonAdPrice[]) {
-    return prices?.every((price) => price.complete);
+    return prices.every((price) => price.complete);
   }
 
   hasEnoughPrices(prices: AmazonAdPrice[]) {
@@ -24,8 +20,10 @@ export class AmazonPdpPriceHelper {
   }
 
   sendCompletedPrices(prices: AmazonAdPrice[], ad: AmazonAd) {
+    if (!prices.length) return;
+
     const prepared = prices
-      ?.filter((price) => !!price.value)
+      .filter((price) => !!price.value)
       .map((price) => ({
         adId: ad.id,
         countryId: price.country.countryId,
@@ -33,7 +31,6 @@ export class AmazonPdpPriceHelper {
         dispatchFrom: price.dispatchFrom,
       }));
 
-    if (!prices?.length) return;
     this.apiService.put("amazon/ads/" + ad.id, { prices: prepared });
   }
 }

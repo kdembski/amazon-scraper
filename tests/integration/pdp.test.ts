@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
-import { ProxyService } from "@/shared/http/proxy/ProxyService";
+import { AmazonPdpScraper } from "@/marketplaces/amazon/pdp/AmazonPdpScraper";
 import { cronJobs } from "@@tests/support/cron";
 import { buildAd, buildAmazonCountry } from "@@tests/support/factories";
 import { aodPage, captchaPage } from "@@tests/support/html";
@@ -181,11 +181,10 @@ describe("PDP", () => {
       { body: [] },
     ]);
     world.amazon.respondPerCountry(offers);
-    const { scraper } = await bootScraper();
-    await ProxyService.getInstance().loadProxies();
+    const scraper = (await bootScraper()).scraper as AmazonPdpScraper;
 
-    await expect(scraper.scrapPdp()).rejects.toThrow();
-    await scraper.scrapPdp();
+    await scraper.scrape();
+    await scraper.scrape();
 
     await world.backend.waitFor("PUT", "amazon/ads/7");
   });

@@ -1,3 +1,5 @@
+export type Target = "pdp" | "plp";
+
 export class ArgsService {
   private static instance: ArgsService;
 
@@ -19,11 +21,10 @@ export class ArgsService {
     return args[index + 1];
   }
 
-  getTargetFlag() {
-    const value = this.getFlagValue("-t") || this.getFlagValue("--target");
+  getTargetFlag(): Target {
+    const value = this.getFlagValue("-t") || this.getFlagValue("--target") || "pdp";
 
-    const isPlp = value === "plp";
-    const isPdp = !value || value === "pdp";
-    return { isPdp, isPlp };
+    if (value !== "pdp" && value !== "plp") throw new Error(`Unknown target: ${value}`);
+    return value;
   }
 }
