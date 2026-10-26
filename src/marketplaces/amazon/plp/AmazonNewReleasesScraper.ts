@@ -5,7 +5,8 @@ import { ApiService } from "@/shared/backend/ApiService";
 import { MetricsService } from "@/shared/metrics/MetricsService";
 import { ItemOutcome } from "@/shared/metrics/metrics.types";
 import { getRetryDelay, MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
-import { parseHTML } from "linkedom";
+import { sleep } from "@/shared/utils/sleep";
+import { parseDocument } from "htmlparser2";
 
 type Crawl = { category: string; nodes: Set<string>; asins: Set<string> };
 
@@ -53,7 +54,7 @@ export class AmazonNewReleasesScraper {
     const url = number > 1 ? `${path}?pg=${number}` : path;
 
     for (let failed = 0; failed < MAX_FAILED_ATTEMPTS; failed++) {
-      if (failed) await this.sleep(getRetryDelay(failed));
+      if (failed) await sleep(getRetryDelay(failed));
 
       const page = await this.fetch(url, path)
         .then((html) => this.builder.build(this.parse(html), crawl.category))
@@ -75,7 +76,7 @@ export class AmazonNewReleasesScraper {
   private async fetch(url: string, referer: string) {
     const { batchSize } = this.configService.get();
     while (this.amazonService.queueService.queue.length >= batchSize) {
-      await this.sleep(this.queueFullDelay);
+      await sleep(this.queueFullDelay);
     }
 
     return new Promise<string>((resolve, reject) =>
@@ -87,11 +88,7 @@ export class AmazonNewReleasesScraper {
   }
 
   private parse(html: string) {
-    return parseHTML(html).document as unknown as Document;
-  }
-
-  private sleep(ms: number) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+    return parseDocument(html);
   }
 
   private countPage(outcome: ItemOutcome) {

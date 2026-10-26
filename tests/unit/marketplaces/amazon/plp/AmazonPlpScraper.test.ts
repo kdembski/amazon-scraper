@@ -1,44 +1,64 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { AmazonPlpScraper } from "@/marketplaces/amazon/plp/AmazonPlpScraper";
-import type { AmazonPlpPageScraper } from "@/marketplaces/amazon/plp/AmazonPlpPageScraper";
-import type { AmazonNewReleasesScraper } from "@/marketplaces/amazon/plp/AmazonNewReleasesScraper";
+import type { AmazonPlpCategoryScraper } from "@/marketplaces/amazon/plp/AmazonPlpCategoryScraper";
+import { fakeApiService } from "@@tests/support/fakes";
 
 const setup = () => {
-  const executeCategory = vi.fn();
-  let finishNewReleases!: () => void;
-  const execute = vi.fn(() => new Promise<void>((resolve) => (finishNewReleases = resolve)));
-  const scraper = new AmazonPlpScraper(
-    { executeCategory } as unknown as AmazonPlpPageScraper,
-    { execute } as unknown as AmazonNewReleasesScraper
-  );
-  return { scraper, executeCategory, execute, finishNewReleases: () => finishNewReleases() };
+  const api = fakeApiService();
+  const categoryExecute = vi.fn();
+  const categoryScraper = { execute: categoryExecute } as unknown as AmazonPlpCategoryScraper;
+  const scraper = new AmazonPlpScraper(api.service, categoryScraper);
+  return { api, categoryExecute, scraper };
 };
 
 describe("AmazonPlpScraper", () => {
-  it.each([
-    ["all pages of a category never scraped", null, true],
-    ["the first page of a category scraped before", "2026-10-18T10:00:00.000Z", false],
-  ])("scrapes %s", async (_name, scrapedAt, allPages) => {
-    const { scraper, executeCategory, finishNewReleases } = setup();
-
-    const done = scraper.execute({ id: 1, name: "toys", scrapedAt });
-    finishNewReleases();
-    await done;
-
-    expect(executeCategory).toHaveBeenCalledWith("toys", allPages);
+  it("is the amazon marketplace", () => {
+    expect(setup().scraper.marketplace).toBe("amazon");
   });
 
-  it("searches the listings only after the new releases are crawled", async () => {
-    const { scraper, executeCategory, execute, finishNewReleases } = setup();
+  describe("scrape", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
 
-    const done = scraper.execute({ id: 1, name: "toys", scrapedAt: null });
-    await Promise.resolve();
+    it("scrapes the category from the backend", async () => {
+      const { api, categoryExecute, scraper } = setup();
+      api.get.mockResolvedValue({ id: 1, name: "electronics" });
 
-    expect(execute).toHaveBeenCalledWith("toys");
-    expect(executeCategory).not.toHaveBeenCalled();
+      await scraper.scrape();
 
-    finishNewReleases();
-    await done;
-    expect(executeCategory).toHaveBeenCalled();
+      expect(api.get).toHaveBeenCalledWith("amazon/ads/categories/scrap");
+      expect(categoryExecute).toHaveBeenCalledWith({ id: 1, name: "electronics" });
+    });
+
+    it("asks for the category again a minute after loading fails", async () => {
+      vi.useFakeTimers();
+      const { api, categoryExecute, scraper } = setup();
+      api.get
+        .mockRejectedValueOnce(new Error("down"))
+        .mockResolvedValue({ id: 1, name: "electronics" });
+
+      await scraper.scrape();
+      expect(api.get).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(59 * 1000);
+      expect(api.get).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(api.get).toHaveBeenCalledTimes(2);
+      expect(categoryExecute).toHaveBeenCalledWith({ id: 1, name: "electronics" });
+    });
+
+    it("asks for the category again a minute after scraping it fails", async () => {
+      vi.useFakeTimers();
+      const { api, categoryExecute, scraper } = setup();
+      api.get.mockResolvedValue({ id: 1, name: "electronics" });
+      categoryExecute.mockRejectedValueOnce(new Error("down"));
+
+      await scraper.scrape();
+      await vi.advanceTimersByTimeAsync(60 * 1000);
+
+      expect(categoryExecute).toHaveBeenCalledTimes(2);
+    });
   });
 });

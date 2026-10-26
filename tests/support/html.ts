@@ -1,12 +1,8 @@
-import { parseHTML } from "linkedom";
+import { parseDocument } from "htmlparser2";
 
 // Wraps a markup fragment into a full page, the way builders receive it
-export const toDocument = (body: string) => {
-  const { document } = parseHTML(
-    `<!doctype html><html><head></head><body>${body}</body></html>`
-  );
-  return document as unknown as Document;
-};
+export const toDocument = (body: string) =>
+  parseDocument(`<!doctype html><html><head></head><body>${body}</body></html>`);
 
 export const captchaPage = `
   <form method="get" action="/errors/validateCaptcha">

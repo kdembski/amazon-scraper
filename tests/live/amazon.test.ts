@@ -1,5 +1,5 @@
 import { configDotenv } from "dotenv";
-import { parseHTML } from "linkedom";
+import { parseDocument } from "htmlparser2";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { AmazonAodAdBuilder } from "@/marketplaces/amazon/pdp/AmazonAodAdBuilder";
 import { AmazonPlpBuilder } from "@/marketplaces/amazon/plp/AmazonPlpBuilder";
@@ -60,14 +60,13 @@ const fetchPage = (url: string, referer: string) =>
 const scrape = async (
   url: string,
   referer: string,
-  build: (document: Document) => AmazonAdBuildResult
+  build: (html: string) => AmazonAdBuildResult
 ) => {
   let blocked = "";
 
   for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
     try {
-      const { document } = parseHTML(await fetchPage(url, referer));
-      const result = build(document as unknown as Document);
+      const result = build(await fetchPage(url, referer));
       if (!result.isCaptcha) return result;
       blocked = "captcha";
     } catch (e: any) {
@@ -85,7 +84,9 @@ const scrapeAll = (builder: AmazonAdBuilder, codes: string[]) =>
       codes.map(async (code): Promise<Result> => {
         const ad = buildAd({ asin });
         const { url, referer } = builder.buildUrl(buildAmazonCountry({ tld: code }), ad);
-        const result = await scrape(url, referer, (d) => builder.build(d));
+        const result = await scrape(url, referer, (html) =>
+          builder.build(parseDocument(builder.trimHtml(html)))
+        );
         return { code, asin, ...result };
       })
     )
@@ -140,8 +141,8 @@ describe("live Amazon", () => {
     let built: ReturnType<AmazonPlpBuilder["build"]> | undefined;
 
     // A listing without products counts as blocked, so it is asked again
-    await scrape("pl/s?i=electronics&s=date-desc-rank", "pl/b?node=1", (d) => {
-      built = builder.build(d, "electronics");
+    await scrape("pl/s?i=electronics&s=date-desc-rank", "pl/b?node=1", (html) => {
+      built = builder.build(parseDocument(html), "electronics");
       return { isCaptcha: !built.ads.length };
     });
     console.info("pl listing:", built?.ads.length, "ads,", built?.subcategories.length, "subcategories");

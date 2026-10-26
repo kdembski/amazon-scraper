@@ -1,9 +1,11 @@
+import type { Document, Element } from "domhandler";
 import { AmazonPlpAd } from "@/marketplaces/amazon/types/amazon.types";
+import { find, findAll, text } from "@/shared/utils/html";
 
 export class AmazonPlpBuilder {
   build(document: Document, category: string) {
     const listItemSelector = "div[role='listitem']";
-    const items = [...document.querySelectorAll(listItemSelector)];
+    const items = findAll(listItemSelector, document);
 
     const ads = items.reduce((accum: AmazonPlpAd[], item) => {
       const ad = this.buildItem(item, category);
@@ -14,7 +16,7 @@ export class AmazonPlpBuilder {
     }, []);
 
     const subcategories = this.buildSubcategories(document);
-    const hasNextPage = !!document.querySelector("a.s-pagination-next");
+    const hasNextPage = !!find("a.s-pagination-next", document);
 
     return {
       ads,
@@ -24,9 +26,9 @@ export class AmazonPlpBuilder {
   }
 
   private buildItem(item: Element, category: string) {
-    const asin = item.getAttribute("data-asin");
-    const image = item.querySelector("img")?.getAttribute("src");
-    const name = item.querySelector("a > h2 > span")?.textContent;
+    const asin = item.attribs["data-asin"];
+    const image = find("img", item)?.attribs.src;
+    const name = text(find("a > h2 > span", item));
 
     if (!asin || !image || !name) return;
 
@@ -39,12 +41,12 @@ export class AmazonPlpBuilder {
   }
 
   private buildSubcategories(document: Document) {
-    const list = document.querySelector("ul#filter-n");
-    const items = list?.querySelectorAll("li[id].s-navigation-indent-2");
+    const list = find("ul#filter-n", document);
+    const items = list && findAll("li[id].s-navigation-indent-2", list);
 
     if (!items) return [];
-    return [...items]
-      .map((item) => item.getAttribute("id")?.replace("/", "%3A"))
+    return items
+      .map((item) => item.attribs.id?.replace("/", "%3A"))
       .filter((id) => !!id) as string[];
   }
 }

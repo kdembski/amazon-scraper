@@ -20,11 +20,15 @@ const setup = () => {
   return ApiService.getInstance();
 };
 
-const withAgent = { httpAgent: expect.any(http.Agent) };
+const withAgent = {
+  headers: { Authorization: "Bearer api-token" },
+  httpAgent: expect.any(http.Agent),
+};
 
 describe("ApiService", () => {
   beforeEach(() => {
     vi.stubEnv("API_URL", "http://api.test");
+    vi.stubEnv("API_TOKEN", "api-token");
     Object.values(mocked).forEach((fn) => fn.mockReset());
   });
 
@@ -58,6 +62,20 @@ describe("ApiService", () => {
       expect(mocked.get).toHaveBeenCalledWith(
         "http://api.test/scrapers/it/config",
         expect.objectContaining({ timeout: 10_000, httpAgent: expect.anything() })
+      );
+    });
+
+    it("keeps Authorization when the config has headers", async () => {
+      const service = setup();
+      mocked.get.mockResolvedValue({ data: {} });
+
+      await service.get("a", { headers: { "X-A": "1" } });
+
+      expect(mocked.get).toHaveBeenCalledWith(
+        "http://api.test/a",
+        expect.objectContaining({
+          headers: { "X-A": "1", Authorization: "Bearer api-token" },
+        })
       );
     });
 
@@ -126,6 +144,28 @@ describe("ApiService", () => {
       expect(mocked[method]).toHaveBeenCalledTimes(2);
       vi.useRealTimers();
     });
+  });
+
+  it("reuses one keep-alive agent for every request", async () => {
+    const service = setup();
+    mocked.get.mockResolvedValue({ data: {} });
+    mocked.post.mockResolvedValue({ data: "ok" });
+    mocked.put.mockResolvedValue({ data: "ok" });
+    mocked.delete.mockResolvedValue({ data: "ok" });
+
+    await service.get("a");
+    await service.post("a", {});
+    await service.put("a", {});
+    await service.delete("a");
+
+    const agents = [
+      mocked.get.mock.calls[0][1]?.httpAgent,
+      mocked.post.mock.calls[0][2]?.httpAgent,
+      mocked.put.mock.calls[0][2]?.httpAgent,
+      mocked.delete.mock.calls[0][1]?.httpAgent,
+    ];
+    expect(new Set(agents).size).toBe(1);
+    expect(agents[0].keepAlive).toBe(true);
   });
 
   describe("post config", () => {

@@ -4,10 +4,27 @@ import { cronJobs } from "@@tests/support/cron";
 // Crons are triggered by hand through cronJobs
 vi.mock("cron", async () => (await import("@@tests/support/cron")).cronModule);
 
-// Retries go out right away, so a country can fail 15 times within a test
+// Retries go out right away, so a country can fail MAX_FAILED_ATTEMPTS times within a test
 vi.mock("@/shared/utils/retry", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/shared/utils/retry")>()),
   getRetryDelay: () => 0,
+}));
+
+// Retry sleeps (0 ms) run at once; longer ones, like the PDP loop, wait on a
+// fake interval, so a test advances them like the queue stats and they stop
+// for good once the fake timers are dropped
+vi.mock("@/shared/utils/sleep", () => ({
+  sleep: (ms: number) =>
+    new Promise<void>((resolve) => {
+      if (!ms) {
+        setTimeout(resolve, 0);
+        return;
+      }
+      const id = setInterval(() => {
+        clearInterval(id);
+        resolve();
+      }, ms);
+    }),
 }));
 
 beforeEach(() => {

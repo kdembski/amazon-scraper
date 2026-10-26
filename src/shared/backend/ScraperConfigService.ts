@@ -2,6 +2,7 @@ import { CronJob } from "cron";
 import { ApiService } from "@/shared/backend/ApiService";
 import { ScrapingClient } from "@/shared/http/ScrapingClient";
 import { getRetryDelay } from "@/shared/utils/retry";
+import { sleep } from "@/shared/utils/sleep";
 
 export type ScraperConfig = {
   concurrency: number;
@@ -43,7 +44,7 @@ export class ScraperConfigService {
         return this.apply(await this.fetch());
       } catch (e) {
         console.error("config: load failed", e);
-        await new Promise((resolve) => setTimeout(resolve, getRetryDelay(failed)));
+        await sleep(getRetryDelay(failed));
       }
     }
   }

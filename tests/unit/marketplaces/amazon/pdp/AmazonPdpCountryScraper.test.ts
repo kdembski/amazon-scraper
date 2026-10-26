@@ -1,43 +1,42 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AmazonPdpCountryScraper } from "@/marketplaces/amazon/pdp/AmazonPdpCountryScraper";
-import { AmazonPdpPriceHelper } from "@/marketplaces/amazon/pdp/AmazonPdpPriceHelper";
 import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
-import { AmazonAdBuildResult, AmazonAdPrice } from "@/marketplaces/amazon/types/amazon.types";
+import { AmazonAdBuildResult } from "@/marketplaces/amazon/types/amazon.types";
 import type { MetricsService } from "@/shared/metrics/MetricsService";
-import { buildAd, buildPrices } from "@@tests/support/factories";
-import {
-  fakeAdBuilder,
-  fakeAmazonService,
-  fakeApiService,
-} from "@@tests/support/fakes";
+import { buildAd, buildAmazonCountry, buildPrice } from "@@tests/support/factories";
+import { fakeAdBuilder, fakeAmazonService } from "@@tests/support/fakes";
 
 const html = "<html><body></body></html>";
 const notFound = { status: 404 };
 
 const setup = (result: AmazonAdBuildResult = { price: 10 }) => {
   const amazon = fakeAmazonService();
-  const api = fakeApiService();
   const builder = fakeAdBuilder(result);
   const increment = vi.fn();
   const metrics = { increment } as unknown as MetricsService;
-  const scraper = new AmazonPdpCountryScraper(
-    amazon.service,
-    api.service,
-    builder.builder,
-    new AmazonPdpPriceHelper(api.service),
-    metrics
-  );
+  const scraper = new AmazonPdpCountryScraper(amazon.service, builder.builder, metrics);
   const ad = buildAd({ id: 7 });
-  const resolveAd = vi.fn();
+  const price = buildPrice({ country: buildAmazonCountry({ countryId: 1, tld: "c1" }) });
+  let cancelled = false;
+  const cancel = () => {
+    cancelled = true;
+  };
+  const outcome = vi.fn();
+  const run = () => scraper.execute(price, ad, () => cancelled).then(outcome);
 
-  const run = (prices: AmazonAdPrice[]) =>
-    prices.forEach((price) => scraper.execute(price, ad, prices, resolveAd));
+  // Fails the latest request, then lets the backoff pass
+  const failLast = async (error?: any) => {
+    amazon.fail(amazon.requests.length - 1, error);
+    await vi.runAllTimersAsync();
+  };
 
-  return { amazon, api, builder, scraper, ad, resolveAd, run, increment };
+  return { amazon, builder, scraper, ad, price, cancel, outcome, run, failLast, increment };
 };
 
-// Settles the promise chains started by the callbacks
 const flush = () => vi.advanceTimersByTimeAsync(0);
+
+const calls = (increment: ReturnType<typeof vi.fn>, metric: string) =>
+  increment.mock.calls.filter((call) => call[0] === metric);
 
 describe("AmazonPdpCountryScraper", () => {
   beforeEach(() => {
@@ -51,12 +50,11 @@ describe("AmazonPdpCountryScraper", () => {
   });
 
   it("requests the url built for the country through its proxy type", () => {
-    const { amazon, builder, ad, run } = setup();
-    const prices = buildPrices(1);
-    prices[0].country.proxyType = "isp";
-    run(prices);
+    const { amazon, builder, ad, price, run } = setup();
+    price.country.proxyType = "isp";
+    run();
 
-    expect(builder.buildUrl).toHaveBeenCalledWith(prices[0].country, ad);
+    expect(builder.buildUrl).toHaveBeenCalledWith(price.country, ad);
     expect(amazon.get).toHaveBeenCalledWith(
       "c1/dp/B0TESTASIN",
       "c1/ref",
@@ -67,152 +65,65 @@ describe("AmazonPdpCountryScraper", () => {
       },
       "isp"
     );
-    expect(prices[0].pending).toBe(true);
   });
 
-  it.each([["complete"], ["deleted"], ["pending"], ["adDeleted"]] as const)(
-    "skips a country that is already %s",
-    (state) => {
-      const { amazon, run } = setup();
-      const prices = buildPrices(1);
-      prices[0][state] = true;
-      run(prices);
+  it("passes the cancellation to the request", () => {
+    const { amazon, cancel, run } = setup();
+    run();
 
-      expect(amazon.get).not.toHaveBeenCalled();
-    }
-  );
+    expect(amazon.requests[0].callback.isCancelled?.()).toBe(false);
+    cancel();
+    expect(amazon.requests[0].callback.isCancelled?.()).toBe(true);
+  });
+
+  it("does not request a cancelled country", async () => {
+    const { amazon, cancel, outcome, run } = setup();
+    cancel();
+    run();
+    await flush();
+
+    expect(amazon.get).not.toHaveBeenCalled();
+    expect(outcome).toHaveBeenCalledWith(undefined);
+  });
 
   describe("on success", () => {
-    it("stores the price and dispatchFrom of the country", async () => {
-      const { amazon, builder, run } = setup({ price: 24.99, dispatchFrom: "Amazon" });
-      const prices = buildPrices(3);
-      run(prices);
+    it("stores the price and dispatchFrom and returns data", async () => {
+      const { amazon, builder, price, outcome, run } = setup({
+        price: 24.99,
+        dispatchFrom: "Amazon",
+      });
+      run();
 
       amazon.respond(0, html);
       await flush();
 
       expect(builder.trimHtml).toHaveBeenCalledWith(html);
-      expect(prices[0]).toMatchObject({
-        value: 24.99,
-        dispatchFrom: "Amazon",
-        pending: false,
-        complete: true,
-      });
+      expect(price).toMatchObject({ value: 24.99, dispatchFrom: "Amazon" });
+      expect(outcome).toHaveBeenCalledWith("data");
     });
 
-    it("waits for all countries before sending the prices", async () => {
-      const { amazon, api, resolveAd, run } = setup({ price: 10 });
-      const prices = buildPrices(3);
-      run(prices);
-
-      amazon.respond(0, html);
-      amazon.respond(1, html);
-      await flush();
-      expect(api.put).not.toHaveBeenCalled();
-      expect(resolveAd).not.toHaveBeenCalled();
-
-      amazon.respond(2, html);
-      await flush();
-      expect(api.put).toHaveBeenCalledTimes(1);
-      expect(api.put).toHaveBeenCalledWith("amazon/ads/7", {
-        prices: [1, 2, 3].map((countryId) => ({
-          adId: 7,
-          countryId,
-          value: 10,
-          dispatchFrom: undefined,
-        })),
-      });
-      expect(resolveAd).toHaveBeenCalledTimes(1);
-    });
-
-    it.each([[1], [2]])(
-      "sends the prices of an ad with %i countries",
-      async (count) => {
-        const { amazon, api, resolveAd, run } = setup({ price: 10 });
-        const prices = buildPrices(count);
-        run(prices);
-
-        prices.forEach((_, i) => amazon.respond(i, html));
-        await flush();
-
-        expect(api.put).toHaveBeenCalledTimes(1);
-        expect(resolveAd).toHaveBeenCalledTimes(1);
-      }
-    );
-
-    it("sends the prices once 4 countries have one and drops the rest", async () => {
-      const { amazon, api, resolveAd, run } = setup({ price: 10 });
-      const prices = buildPrices(6);
-      run(prices);
-
-      [0, 1, 2, 3].forEach((i) => amazon.respond(i, html));
-      await flush();
-
-      expect(api.put).toHaveBeenCalledTimes(1);
-      expect(api.put).toHaveBeenCalledWith("amazon/ads/7", {
-        prices: [1, 2, 3, 4].map((countryId) => ({
-          adId: 7,
-          countryId,
-          value: 10,
-          dispatchFrom: undefined,
-        })),
-      });
-      expect(resolveAd).toHaveBeenCalledTimes(1);
-      expect(prices[4].abandoned).toBe(true);
-      expect(prices[5].abandoned).toBe(true);
-      expect(amazon.requests[4].callback.isCancelled?.()).toBe(true);
-      expect(amazon.requests[0].callback.isCancelled?.()).toBe(false);
-
-      // Late responses of the dropped countries change nothing
-      amazon.respond(4, html);
-      amazon.fail(5, notFound);
-      await vi.runAllTimersAsync();
-
-      expect(api.put).toHaveBeenCalledTimes(1);
-      expect(api.delete).not.toHaveBeenCalled();
-      expect(resolveAd).toHaveBeenCalledTimes(1);
-      expect(prices[4].value).toBeUndefined();
-    });
-
-    it("keeps scraping while fewer than 4 countries have a price", async () => {
-      const { amazon, api, builder, run } = setup({ price: 10 });
-      builder.build.mockReturnValueOnce({ isCaptcha: false, isValid: true });
-      const prices = buildPrices(5);
-      run(prices);
-
-      [0, 1, 2, 3].forEach((i) => amazon.respond(i, html));
-      await flush();
-      expect(api.put).not.toHaveBeenCalled();
-
-      amazon.respond(4, html);
-      await flush();
-      expect(api.put).toHaveBeenCalledTimes(1);
-      expect(prices.some((price) => price.abandoned)).toBe(false);
-    });
-
-    it("does not retry a dropped country", async () => {
-      const { amazon, run } = setup({ price: 10 });
-      const prices = buildPrices(5);
-      run(prices);
-
-      amazon.fail(0);
-      [1, 2, 3, 4].forEach((i) => amazon.respond(i, html));
-      await vi.runAllTimersAsync();
-
-      expect(prices[0]).toMatchObject({ abandoned: true, failed: 0 });
-      expect(amazon.get).toHaveBeenCalledTimes(5);
-    });
-
-    it("completes a country without an offer with no price", async () => {
-      const { amazon, run } = setup({ isCaptcha: false, isValid: true });
-      const prices = buildPrices(3);
-      run(prices);
+    it("returns no_data for a country without an offer", async () => {
+      const { amazon, price, outcome, run } = setup({ isCaptcha: false, isValid: true });
+      run();
 
       amazon.respond(0, html);
       await flush();
 
-      expect(prices[0].complete).toBe(true);
-      expect(prices[0].value).toBeUndefined();
+      expect(price.value).toBeUndefined();
+      expect(outcome).toHaveBeenCalledWith("no_data");
+    });
+
+    it("ignores a response that arrives after cancellation", async () => {
+      const { amazon, price, cancel, outcome, run, increment } = setup();
+      run();
+
+      cancel();
+      amazon.respond(0, html);
+      await flush();
+
+      expect(price.value).toBeUndefined();
+      expect(outcome).toHaveBeenCalledWith(undefined);
+      expect(increment).not.toHaveBeenCalled();
     });
   });
 
@@ -222,137 +133,52 @@ describe("AmazonPdpCountryScraper", () => {
       ["a captcha", { isCaptcha: true }, html],
       ["an invalid response", { isCaptcha: false, isValid: false }, html],
     ])("on %s", async (_name, result, data) => {
-      const { amazon, run } = setup(result);
-      const prices = buildPrices(3);
-      run(prices);
+      const { amazon, price, outcome, run } = setup(result);
+      run();
 
       amazon.respond(0, data);
       await flush();
 
-      expect(prices[0]).toMatchObject({
-        pending: false,
-        complete: false,
-        failed: 1,
-      });
-      expect(amazon.get).toHaveBeenCalledTimes(3);
+      expect(price.failed).toBe(1);
+      expect(outcome).not.toHaveBeenCalled();
 
       await vi.advanceTimersByTimeAsync(1000);
-      expect(amazon.get).toHaveBeenCalledTimes(4);
-      expect(amazon.requests[3].url).toBe("c1/dp/B0TESTASIN");
+      expect(amazon.get).toHaveBeenCalledTimes(2);
+      expect(amazon.requests[1].url).toBe("c1/dp/B0TESTASIN");
     });
 
     it("on a network error", async () => {
-      const { amazon, run } = setup();
-      const prices = buildPrices(3);
-      run(prices);
+      const { amazon, price, run } = setup();
+      run();
 
       amazon.fail(0);
       await flush();
 
-      expect(prices[0].failed).toBe(1);
+      expect(price.failed).toBe(1);
       await vi.advanceTimersByTimeAsync(1000);
-      expect(amazon.get).toHaveBeenCalledTimes(4);
+      expect(amazon.get).toHaveBeenCalledTimes(2);
     });
 
-    it("gives up on a country after the attempt limit", async () => {
-      const { amazon, api, resolveAd, run } = setup({ price: 10 });
-      const prices = buildPrices(3);
-      run(prices);
-      amazon.respond(1, html);
-      amazon.respond(2, html);
-
-      amazon.fail(0);
-      for (let i = 1; i < MAX_FAILED_ATTEMPTS; i++) {
-        await vi.runAllTimersAsync();
-        amazon.fail(amazon.requests.length - 1);
-      }
-      await vi.runAllTimersAsync();
-
-      expect(prices[0]).toMatchObject({
-        complete: true,
-        failed: MAX_FAILED_ATTEMPTS,
+    it("on a parse error", async () => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      const { amazon, builder, price, run } = setup();
+      builder.build.mockImplementationOnce(() => {
+        throw new Error("broken");
       });
-      expect(prices[0].value).toBeUndefined();
-      expect(amazon.get).toHaveBeenCalledTimes(3 + MAX_FAILED_ATTEMPTS - 1);
-      expect(api.put).toHaveBeenCalledWith("amazon/ads/7", {
-        prices: [
-          { adId: 7, countryId: 2, value: 10, dispatchFrom: undefined },
-          { adId: 7, countryId: 3, value: 10, dispatchFrom: undefined },
-        ],
-      });
-      expect(resolveAd).toHaveBeenCalledTimes(1);
-    });
-  });
+      run();
 
-  describe("on 404", () => {
-    it("marks the country as deleted without retrying", async () => {
-      const { amazon, api, run } = setup();
-      const prices = buildPrices(5);
-      run(prices);
-
-      amazon.fail(0, notFound);
-      await vi.runAllTimersAsync();
-
-      expect(prices[0]).toMatchObject({ deleted: true, complete: true });
-      expect(prices[0].failed).toBe(0);
-      expect(amazon.get).toHaveBeenCalledTimes(5);
-      expect(api.delete).not.toHaveBeenCalled();
-    });
-
-    it("sends prices of the remaining countries", async () => {
-      const { amazon, api, resolveAd, run } = setup({ price: 10 });
-      const prices = buildPrices(5);
-      run(prices);
-
-      amazon.fail(0, notFound);
-      amazon.fail(1, notFound);
-      [2, 3, 4].forEach((i) => amazon.respond(i, html));
+      amazon.respond(0, html);
       await flush();
 
-      expect(api.put).toHaveBeenCalledWith("amazon/ads/7", {
-        prices: [3, 4, 5].map((countryId) => ({
-          adId: 7,
-          countryId,
-          value: 10,
-          dispatchFrom: undefined,
-        })),
-      });
-      expect(resolveAd).toHaveBeenCalledTimes(1);
+      expect(price.failed).toBe(1);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(amazon.get).toHaveBeenCalledTimes(2);
     });
 
-    it("deletes the ad when at most 2 countries are left", async () => {
-      const { amazon, api, resolveAd, run } = setup({ price: 10 });
-      const prices = buildPrices(5);
-      run(prices);
-
-      [0, 1, 2].forEach((i) => amazon.fail(i, notFound));
-      await flush();
-
-      expect(api.delete).toHaveBeenCalledTimes(1);
-      expect(api.delete).toHaveBeenCalledWith("amazon/ads/7");
-      expect(resolveAd).toHaveBeenCalledTimes(1);
-      prices.forEach((price) =>
-        expect(price).toMatchObject({ deleted: true, adDeleted: true })
-      );
-
-      // Late responses of the other countries change nothing
-      amazon.respond(3, html);
-      amazon.fail(4, notFound);
-      await vi.runAllTimersAsync();
-
-      expect(api.put).not.toHaveBeenCalled();
-      expect(api.delete).toHaveBeenCalledTimes(1);
-      expect(resolveAd).toHaveBeenCalledTimes(1);
-      expect(amazon.get).toHaveBeenCalledTimes(5);
-    });
-  });
-
-  describe("retry backoff", () => {
-    it("retries after an exponential backoff delay", async () => {
-      const { amazon, run } = setup();
-      const prices = buildPrices(1);
-      prices[0].failed = 2;
-      run(prices);
+    it("after an exponential backoff delay", async () => {
+      const { amazon, price, run } = setup();
+      price.failed = 2;
+      run();
 
       amazon.fail(0);
       await flush();
@@ -363,44 +189,52 @@ describe("AmazonPdpCountryScraper", () => {
       expect(amazon.get).toHaveBeenCalledTimes(2);
     });
 
-    it("waits for other countries before completing the ad", async () => {
-      const { amazon, api, resolveAd, run } = setup();
-      const prices = buildPrices(2);
-      prices[0].failed = MAX_FAILED_ATTEMPTS - 1;
-      run(prices);
+    it("not once cancelled during the backoff", async () => {
+      const { amazon, cancel, outcome, run } = setup();
+      run();
 
       amazon.fail(0);
+      await flush();
+      cancel();
       await vi.runAllTimersAsync();
 
-      expect(prices[0].complete).toBe(true);
-      expect(api.put).not.toHaveBeenCalled();
-      expect(resolveAd).not.toHaveBeenCalled();
+      expect(amazon.get).toHaveBeenCalledTimes(1);
+      expect(outcome).toHaveBeenCalledWith(undefined);
+    });
+
+    it("gives up after the attempt limit", async () => {
+      const { amazon, price, outcome, run, failLast } = setup();
+      run();
+
+      for (let i = 0; i < MAX_FAILED_ATTEMPTS; i++) await failLast();
+
+      expect(price.failed).toBe(MAX_FAILED_ATTEMPTS);
+      expect(price.value).toBeUndefined();
+      expect(amazon.get).toHaveBeenCalledTimes(MAX_FAILED_ATTEMPTS);
+      expect(outcome).toHaveBeenCalledWith("given_up");
     });
   });
 
+  it("returns deleted on 404 without retrying", async () => {
+    const { amazon, price, outcome, run } = setup();
+    run();
+
+    amazon.fail(0, notFound);
+    await vi.runAllTimersAsync();
+
+    expect(price.failed).toBe(0);
+    expect(amazon.get).toHaveBeenCalledTimes(1);
+    expect(outcome).toHaveBeenCalledWith("deleted");
+  });
+
   describe("metrics", () => {
-    const calls = (increment: ReturnType<typeof vi.fn>, metric: string) =>
-      increment.mock.calls.filter((call) => call[0] === metric);
-
-    it("counts a response with a price as data", async () => {
-      const { amazon, run, increment } = setup({ price: 10 });
-      const prices = buildPrices(3);
-      run(prices);
-      const labels = { country: prices[0].country.tld, outcome: "data" };
-
-      amazon.respond(0, html);
-      await flush();
-
-      expect(increment).toHaveBeenCalledWith("responses", labels);
-      expect(increment).toHaveBeenCalledWith("items", labels);
-      expect(increment).toHaveBeenCalledWith("item_attempts", labels, 1);
-    });
-
-    it("counts a response without a price as no_data", async () => {
-      const { amazon, run, increment } = setup({ isCaptcha: false, isValid: true });
-      const prices = buildPrices(3);
-      run(prices);
-      const labels = { country: prices[0].country.tld, outcome: "no_data" };
+    it.each([
+      ["data", { price: 10 }],
+      ["no_data", { isCaptcha: false, isValid: true }],
+    ])("counts a response and an item as %s", async (result, buildResult) => {
+      const { amazon, run, increment } = setup(buildResult);
+      run();
+      const labels = { country: "c1", outcome: result };
 
       amazon.respond(0, html);
       await flush();
@@ -416,90 +250,61 @@ describe("AmazonPdpCountryScraper", () => {
       ["empty", { price: 10 }, ""],
     ])("counts a %s response without an item", async (outcome, result, data) => {
       const { amazon, run, increment } = setup(result);
-      const prices = buildPrices(3);
-      run(prices);
+      run();
 
       amazon.respond(0, data);
       await flush();
 
-      expect(increment).toHaveBeenCalledWith("responses", {
-        country: prices[0].country.tld,
-        outcome,
-      });
+      expect(increment).toHaveBeenCalledWith("responses", { country: "c1", outcome });
       expect(calls(increment, "items")).toHaveLength(0);
       expect(calls(increment, "item_attempts")).toHaveLength(0);
     });
 
     it("counts the attempts of a country that succeeded after failures", async () => {
-      const { amazon, run, increment } = setup({ price: 10 });
-      const prices = buildPrices(3);
-      run(prices);
+      const { amazon, run, failLast, increment } = setup();
+      run();
 
-      amazon.fail(0);
-      await flush();
-      await vi.advanceTimersByTimeAsync(1000);
-      amazon.fail(amazon.requests.length - 1);
-      await flush();
-      await vi.advanceTimersByTimeAsync(2000);
+      await failLast();
+      await failLast();
       amazon.respond(amazon.requests.length - 1, html);
       await flush();
 
       expect(increment).toHaveBeenCalledWith(
         "item_attempts",
-        { country: prices[0].country.tld, outcome: "data" },
+        { country: "c1", outcome: "data" },
         3
       );
     });
 
-    it("counts a deleted item only for the country that got the 404", async () => {
-      const { amazon, run, increment } = setup({ price: 10 });
-      const prices = buildPrices(5);
-      run(prices);
+    it("counts a deleted item", async () => {
+      const { amazon, run, increment } = setup();
+      run();
 
-      [0, 1, 2].forEach((i) => amazon.fail(i, notFound));
-      await vi.runAllTimersAsync();
+      amazon.fail(0, notFound);
+      await flush();
 
-      const items = calls(increment, "items");
-      expect(items.map((call) => call[1])).toEqual(
-        [0, 1, 2].map((i) => ({
-          country: prices[i].country.tld,
-          outcome: "deleted",
-        }))
-      );
-      expect(calls(increment, "item_attempts")).toHaveLength(3);
+      const labels = { country: "c1", outcome: "deleted" };
+      expect(increment).toHaveBeenCalledWith("items", labels);
+      expect(increment).toHaveBeenCalledWith("item_attempts", labels, 1);
     });
 
     it("counts a given up country with the failed attempts", async () => {
-      const { amazon, run, increment } = setup({ price: 10 });
-      const prices = buildPrices(3);
-      run(prices);
+      const { run, failLast, increment } = setup();
+      run();
 
-      amazon.fail(0);
-      for (let i = 1; i < MAX_FAILED_ATTEMPTS; i++) {
-        await vi.runAllTimersAsync();
-        amazon.fail(amazon.requests.length - 1);
-      }
-      await vi.runAllTimersAsync();
+      for (let i = 0; i < MAX_FAILED_ATTEMPTS; i++) await failLast();
 
-      const labels = { country: prices[0].country.tld, outcome: "given_up" };
+      const labels = { country: "c1", outcome: "given_up" };
       expect(increment).toHaveBeenCalledWith("items", labels);
-      expect(increment).toHaveBeenCalledWith(
-        "item_attempts",
-        labels,
-        MAX_FAILED_ATTEMPTS
-      );
+      expect(increment).toHaveBeenCalledWith("item_attempts", labels, MAX_FAILED_ATTEMPTS);
     });
   });
 
   it("reads prices from the AOD fragment by default", () => {
     const amazon = fakeAmazonService();
-    const scraper = new AmazonPdpCountryScraper(
-      amazon.service,
-      fakeApiService().service
-    );
-    const prices = buildPrices(1);
+    const scraper = new AmazonPdpCountryScraper(amazon.service);
 
-    scraper.execute(prices[0], buildAd(), prices, vi.fn());
+    scraper.execute(buildPrice({ country: buildAmazonCountry({ tld: "c1" }) }), buildAd(), () => false);
 
     expect(amazon.requests[0].url).toBe(
       "c1/gp/product/ajax/aodAjaxMain/?asin=B0TESTASIN&pc=dp"

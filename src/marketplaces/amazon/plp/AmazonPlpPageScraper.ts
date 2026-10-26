@@ -6,7 +6,7 @@ import { ScraperConfigService } from "@/shared/backend/ScraperConfigService";
 import { MetricsService } from "@/shared/metrics/MetricsService";
 import { ItemOutcome, ResponseOutcome } from "@/shared/metrics/metrics.types";
 import { AmazonPlpAdPage, AmazonPlpAd } from "@/marketplaces/amazon/types/amazon.types";
-import { parseHTML } from "linkedom";
+import { parseDocument } from "htmlparser2";
 import _ from "lodash";
 
 export class AmazonPlpPageScraper {
@@ -122,7 +122,7 @@ export class AmazonPlpPageScraper {
       return;
     }
 
-    const { document } = parseHTML(data);
+    const document = parseDocument(data);
     const { ads, subcategories, hasNextPage } = this.builder.build(
       document,
       page.category

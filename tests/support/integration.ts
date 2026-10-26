@@ -1,6 +1,5 @@
 import { vi } from "vitest";
 import { createScraper } from "@/marketplaces";
-import type { AmazonScraper } from "@/marketplaces/amazon/AmazonScraper";
 import { AmazonService } from "@/marketplaces/amazon/AmazonService";
 import { ApiService } from "@/shared/backend/ApiService";
 import { AmazonCountryService } from "@/marketplaces/amazon/AmazonCountryService";
@@ -45,6 +44,7 @@ export async function startWorld() {
   vi.stubEnv("API_URL", backend.url);
   vi.stubEnv("PROXY_LIST_URL", `${backend.url}/proxies`);
   vi.stubEnv("name", "it");
+  vi.stubEnv("API_TOKEN", "it-token");
   vi.stubEnv("NODE_TLS_REJECT_UNAUTHORIZED", "0");
 
   return { backend, amazon };
@@ -55,7 +55,7 @@ export async function bootScraper(args: string[] = []) {
   process.argv = [argv[0], "index.ts", ...args];
   singletons.forEach(resetSingleton);
 
-  const scraper = (await createScraper()) as AmazonScraper;
+  const scraper = await createScraper();
   return { scraper, queue: ScrapingClient.getInstance().queueService };
 }
 

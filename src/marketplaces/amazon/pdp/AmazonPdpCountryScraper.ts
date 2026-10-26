@@ -1,118 +1,102 @@
 import { AmazonService } from "@/marketplaces/amazon/AmazonService";
 import { AmazonAodAdBuilder } from "@/marketplaces/amazon/pdp/AmazonAodAdBuilder";
-import { AmazonPdpPriceHelper } from "@/marketplaces/amazon/pdp/AmazonPdpPriceHelper";
 import {
   AmazonAd,
   AmazonAdBuilder,
   AmazonAdPrice,
 } from "@/marketplaces/amazon/types/amazon.types";
-import { ApiService } from "@/shared/backend/ApiService";
 import { MetricsService } from "@/shared/metrics/MetricsService";
 import { ItemOutcome, ResponseOutcome } from "@/shared/metrics/metrics.types";
 import { getRetryDelay, MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
-import { parseHTML } from "linkedom";
+import { sleep } from "@/shared/utils/sleep";
+import { parseDocument } from "htmlparser2";
 import _ from "lodash";
 
+type FetchResult = { ok: true; data: string } | { ok: false; status?: number };
+
 export class AmazonPdpCountryScraper {
-  private amazonService;
-  private apiService;
-  private builder;
-  private priceHelper;
-  private metricsService;
-
   constructor(
-    amazonService = AmazonService.getInstance(),
-    apiService = ApiService.getInstance(),
-    builder: AmazonAdBuilder = new AmazonAodAdBuilder(),
-    priceHelper = new AmazonPdpPriceHelper(),
-    metricsService = MetricsService.getInstance()
-  ) {
-    this.amazonService = amazonService;
-    this.apiService = apiService;
-    this.builder = builder;
-    this.priceHelper = priceHelper;
-    this.metricsService = metricsService;
-  }
+    private amazonService = AmazonService.getInstance(),
+    private builder: AmazonAdBuilder = new AmazonAodAdBuilder(),
+    private metricsService = MetricsService.getInstance()
+  ) {}
 
-  execute(
+  async execute(
     price: AmazonAdPrice,
     ad: AmazonAd,
-    prices: AmazonAdPrice[],
-    resolveAd: () => void
-  ) {
-    new Promise<void>((resolvePrice, rejectPrice) => {
-      if (
-        price.complete ||
-        price.deleted ||
-        price.pending ||
-        price.adDeleted ||
-        price.abandoned
-      ) {
-        return;
+    isCancelled: () => boolean
+  ): Promise<ItemOutcome | undefined> {
+    const { url, referer } = this.builder.buildUrl(price.country, ad);
+
+    while (!isCancelled()) {
+      const result = await this.fetch(url, referer, price, isCancelled);
+      if (isCancelled()) return;
+
+      const outcome = this.toOutcome(result, price);
+      if (outcome) {
+        this.countItem(price, outcome);
+        return outcome;
       }
 
-      price.resolve = resolvePrice;
-      price.reject = rejectPrice;
+      price.failed++;
+      if (price.failed >= MAX_FAILED_ATTEMPTS) {
+        this.countItem(price, "given_up");
+        return "given_up";
+      }
 
-      const { url, referer } = this.builder.buildUrl(price.country, ad);
-      price.pending = true;
+      await sleep(getRetryDelay(price.failed));
+    }
+  }
 
+  private fetch(
+    url: string,
+    referer: string,
+    price: AmazonAdPrice,
+    isCancelled: () => boolean
+  ) {
+    return new Promise<FetchResult>((resolve) => {
       this.amazonService.get<string>(
         url,
         referer,
         {
-          onSuccess: (res) => this.onSuccess(res, price),
-          onError: (e) => this.onError(e, price, ad, prices, resolveAd),
-          isCancelled: () => price.abandoned,
+          onSuccess: (data) => resolve({ ok: true, data }),
+          onError: (e) => resolve({ ok: false, status: e?.status }),
+          isCancelled,
         },
         price.country.proxyType
       );
-    })
-      .then(() => {
-        price.pending = false;
-        if (price.abandoned) return;
-        price.complete = true;
-        if (!price.deleted) {
-          this.countItem(price, _.isNil(price.value) ? "no_data" : "data");
-        }
-        this.tryComplete(ad, prices, resolveAd);
-      })
-      .catch(() => {
-        price.pending = false;
-        if (price.abandoned) return;
-        price.failed++;
-        this.retry(price, ad, prices, resolveAd);
-      });
+    });
   }
 
-  private async onSuccess(data: string, price: AmazonAdPrice) {
-    if (price.abandoned) return;
+  private toOutcome(result: FetchResult, price: AmazonAdPrice): ItemOutcome | undefined {
+    if (!result.ok) return result.status === 404 ? "deleted" : undefined;
 
-    if (!data.length) {
+    if (!result.data.length) {
       this.countResponse(price, "empty");
-      price.reject?.("Received empty data");
       return;
     }
 
-    const { document } = parseHTML(this.builder.trimHtml(data));
-    const ad = this.builder.build(document);
+    try {
+      const ad = this.builder.build(parseDocument(this.builder.trimHtml(result.data)));
 
-    if (ad.isCaptcha) {
-      this.countResponse(price, "captcha");
-      price.reject?.("Captcha occured");
-      return;
+      if (ad.isCaptcha) {
+        this.countResponse(price, "captcha");
+        return;
+      }
+
+      if (ad.isValid === false) {
+        this.countResponse(price, "invalid");
+        return;
+      }
+
+      const outcome = _.isNil(ad.price) ? "no_data" : "data";
+      this.countResponse(price, outcome);
+      price.value = ad.price;
+      price.dispatchFrom = ad.dispatchFrom;
+      return outcome;
+    } catch (e) {
+      console.error("pdp: parse failed", e);
     }
-
-    if (ad.isValid === false) {
-      this.countResponse(price, "invalid");
-      price.reject?.("Unexpected response");
-      return;
-    }
-
-    this.countResponse(price, _.isNil(ad.price) ? "no_data" : "data");
-    price.value = ad.price;
-    price.dispatchFrom = ad.dispatchFrom;
-    price.resolve?.();
   }
 
   private countResponse(price: AmazonAdPrice, outcome: ResponseOutcome) {
@@ -127,85 +111,5 @@ export class AmazonPdpCountryScraper {
     const attempts = outcome === "given_up" ? price.failed : price.failed + 1;
     this.metricsService.increment("items", labels);
     this.metricsService.increment("item_attempts", labels, attempts);
-  }
-
-  private onError(
-    e: any,
-    price: AmazonAdPrice,
-    ad: AmazonAd,
-    prices: AmazonAdPrice[],
-    resolveAd: () => void
-  ) {
-    if (price.abandoned) return;
-
-    if (e.status === 404) {
-      this.tryDelete(ad, price, prices, resolveAd);
-      return;
-    }
-
-    price.reject?.("Failed");
-  }
-
-  private retry(
-    price: AmazonAdPrice,
-    ad: AmazonAd,
-    prices: AmazonAdPrice[],
-    resolve: () => void
-  ) {
-    // Give up on this country, the ad is completed without its price
-    if (price.failed >= MAX_FAILED_ATTEMPTS) {
-      price.complete = true;
-      this.countItem(price, "given_up");
-      this.tryComplete(ad, prices, resolve);
-      return;
-    }
-
-    setTimeout(
-      () => this.execute(price, ad, prices, resolve),
-      getRetryDelay(price.failed)
-    );
-  }
-
-  private tryComplete(
-    ad: AmazonAd,
-    prices: AmazonAdPrice[],
-    resolve: () => void
-  ) {
-    const isCompleted = this.priceHelper.isComplete(prices);
-    const hasEnoughPrices = this.priceHelper.hasEnoughPrices(prices);
-    const isDeleted = this.priceHelper.isDeleted(prices);
-    if ((!isCompleted && !hasEnoughPrices) || isDeleted) return;
-
-    prices.forEach((price) => {
-      if (!price.complete) price.abandoned = true;
-    });
-
-    this.priceHelper.sendCompletedPrices(prices, ad);
-    resolve();
-  }
-
-  private tryDelete(
-    ad: AmazonAd,
-    price: AmazonAdPrice,
-    prices: AmazonAdPrice[],
-    resolveAd: () => void
-  ) {
-    if (price.adDeleted) return;
-    price.deleted = true;
-    this.countItem(price, "deleted");
-
-    if (!this.priceHelper.isDeleted(prices)) {
-      price.resolve?.();
-      return;
-    }
-
-    prices.forEach((price) => {
-      price.deleted = true;
-      price.adDeleted = true;
-      price.resolve?.();
-    });
-
-    this.apiService.delete("amazon/ads/" + ad.id);
-    resolveAd();
   }
 }

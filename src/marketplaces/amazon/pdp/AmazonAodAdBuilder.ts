@@ -1,9 +1,11 @@
+import type { Document, Element } from "domhandler";
 import {
   AmazonAd,
   AmazonAdBuilder,
   AmazonAdBuildResult,
 } from "@/marketplaces/amazon/types/amazon.types";
 import { AmazonCountry } from "@/marketplaces/amazon/types/amazon.types";
+import { find, text } from "@/shared/utils/html";
 
 export class AmazonAodAdBuilder implements AmazonAdBuilder {
   // Cuts the filters and the other offers that follow the pinned offer
@@ -15,18 +17,17 @@ export class AmazonAodAdBuilder implements AmazonAdBuilder {
   }
 
   build(document: Document): AmazonAdBuildResult {
-    const form = document.querySelector("form");
-    const isCaptcha =
-      form?.getAttribute("action") === "/errors/validateCaptcha";
+    const form = find("form", document);
+    const isCaptcha = form?.attribs.action === "/errors/validateCaptcha";
 
     if (isCaptcha) {
       console.warn("Warning: Captcha triggered!");
       return { isCaptcha };
     }
 
-    const isValid = !!document.querySelector("#aod-container");
-    const pinned = document.querySelector("#aod-pinned-offer");
-    const priceBox = pinned?.querySelector("[id^='aod-price-']");
+    const isValid = !!find("#aod-container", document);
+    const pinned = find("#aod-pinned-offer", document);
+    const priceBox = pinned && find("[id^='aod-price-']", pinned);
 
     // Pinned offer without a price box means "no featured offers available"
     if (!isValid || !pinned || !priceBox) {
@@ -53,15 +54,15 @@ export class AmazonAodAdBuilder implements AmazonAdBuilder {
 
   private getPrice(priceBox: Element) {
     const container =
-      priceBox.querySelector(".apex-pricetopay-value") ??
-      priceBox.querySelector(".a-price");
+      find(".apex-pricetopay-value", priceBox) ??
+      find(".a-price", priceBox);
 
     // The whole part ends with the marketplace's decimal separator ("12," or "12.")
     const whole = this.getDigits(
-      container?.querySelector(".a-price-whole")?.textContent
+      text(container && find(".a-price-whole", container))
     );
     const fraction = this.getDigits(
-      container?.querySelector(".a-price-fraction")?.textContent
+      text(container && find(".a-price-fraction", container))
     );
 
     if (whole && fraction) {
@@ -72,19 +73,19 @@ export class AmazonAodAdBuilder implements AmazonAdBuilder {
     // label goes first
     return (
       this.parseLabel(
-        priceBox.querySelector(".apex-pricetopay-accessibility-label")
-          ?.textContent
+        text(find(".apex-pricetopay-accessibility-label", priceBox))
       ) ??
-      this.parseLabel(container?.querySelector(".a-offscreen")?.textContent)
+      this.parseLabel(text(container && find(".a-offscreen", container)))
     );
   }
 
   private getDispatchFrom(pinned: Element) {
-    const row = pinned.querySelector("#aod-offer-shipsFrom");
+    const row = find("#aod-offer-shipsFrom", pinned);
     const value =
-      row?.querySelector(".a-col-right .a-size-small") ??
-      row?.querySelector(".a-col-right");
-    const dispatchFrom = value?.textContent?.replace(/\s+/g, " ").trim();
+      row &&
+      (find(".a-col-right .a-size-small", row) ??
+        find(".a-col-right", row));
+    const dispatchFrom = text(value)?.replace(/\s+/g, " ").trim();
 
     // Some marketplaces (e.g. nl) name Amazon by its domain here, while the
     // product page and the backend use plain "Amazon"

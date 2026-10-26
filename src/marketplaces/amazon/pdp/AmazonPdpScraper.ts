@@ -1,29 +1,44 @@
-import { AmazonPdpCountryScraper } from "@/marketplaces/amazon/pdp/AmazonPdpCountryScraper";
-import { AmazonCountry } from "@/marketplaces/amazon/types/amazon.types";
+import { MarketplaceScraper } from "@/shared/interfaces/MarketplaceScraper";
+import { AmazonPdpAdScraper } from "@/marketplaces/amazon/pdp/AmazonPdpAdScraper";
+import { AmazonService } from "@/marketplaces/amazon/AmazonService";
+import { AmazonCountryService } from "@/marketplaces/amazon/AmazonCountryService";
 import { AmazonAd } from "@/marketplaces/amazon/types/amazon.types";
+import { ApiService } from "@/shared/backend/ApiService";
+import { ScraperConfigService } from "@/shared/backend/ScraperConfigService";
+import { sleep } from "@/shared/utils/sleep";
 
-export class AmazonPdpScraper {
-  private countryScraper;
+const POLL_INTERVAL = 5 * 1000;
 
-  constructor(countryScraper: AmazonPdpCountryScraper) {
-    this.countryScraper = countryScraper;
+export class AmazonPdpScraper implements MarketplaceScraper {
+  readonly marketplace = "amazon";
+
+  constructor(
+    private apiService = ApiService.getInstance(),
+    private amazonService = AmazonService.getInstance(),
+    private adScraper = new AmazonPdpAdScraper(),
+    private countryService = AmazonCountryService.getInstance(),
+    private configService = ScraperConfigService.getInstance()
+  ) {}
+
+  async execute() {
+    while (true) {
+      await this.scrape();
+      await sleep(POLL_INTERVAL);
+    }
   }
 
-  execute(ad: AmazonAd, countries: AmazonCountry[]) {
-    const prices = countries.map((country) => ({
-      country,
-      pending: false,
-      complete: false,
-      deleted: false,
-      adDeleted: false,
-      abandoned: false,
-      failed: 0,
-    }));
+  async scrape() {
+    const { batchSize } = this.configService.get();
+    if (this.amazonService.queueService.queue.length > batchSize / 10) return;
 
-    return new Promise<void>((resolve) => {
-      prices.forEach((price) => {
-        this.countryScraper.execute(price, ad, prices, resolve);
-      });
-    });
+    try {
+      const countries = await this.countryService.getCountries();
+      const ads = await this.apiService.get<AmazonAd[]>(
+        `amazon/ads/scrap?batchSize=${batchSize}`
+      );
+      ads.forEach((ad) => this.adScraper.execute(ad, countries));
+    } catch (e) {
+      console.error("pdp: batch load failed", e);
+    }
   }
 }

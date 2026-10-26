@@ -1,3 +1,5 @@
+import type { Document } from "domhandler";
+
 export interface AmazonCountry {
   countryId: number;
   tld: string;
@@ -53,12 +55,7 @@ export interface AmazonAdPrice {
   country: AmazonCountry;
   value?: number;
   dispatchFrom?: string;
-  pending: boolean;
   complete: boolean;
   deleted: boolean;
-  adDeleted: boolean;
-  abandoned: boolean;
   failed: number;
-  resolve?: () => void;
-  reject?: (e: any) => void;
 }
