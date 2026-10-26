@@ -128,6 +128,28 @@ describe("ApiService", () => {
     });
   });
 
+  it("reuses one keep-alive agent for every request", async () => {
+    const service = setup();
+    mocked.get.mockResolvedValue({ data: {} });
+    mocked.post.mockResolvedValue({ data: "ok" });
+    mocked.put.mockResolvedValue({ data: "ok" });
+    mocked.delete.mockResolvedValue({ data: "ok" });
+
+    await service.get("a");
+    await service.post("a", {});
+    await service.put("a", {});
+    await service.delete("a");
+
+    const agents = [
+      mocked.get.mock.calls[0][1]?.httpAgent,
+      mocked.post.mock.calls[0][2]?.httpAgent,
+      mocked.put.mock.calls[0][2]?.httpAgent,
+      mocked.delete.mock.calls[0][1]?.httpAgent,
+    ];
+    expect(new Set(agents).size).toBe(1);
+    expect(agents[0].keepAlive).toBe(true);
+  });
+
   describe("post config", () => {
     it("forwards the extra config together with the agent", async () => {
       const service = setup();

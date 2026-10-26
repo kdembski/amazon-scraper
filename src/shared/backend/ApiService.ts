@@ -5,9 +5,14 @@ import { ThrottledQueue } from "@/shared/http/ThrottledQueue";
 export class ApiService {
   private static instance: ApiService;
   private writeQueue;
+  private agent;
 
-  private constructor(writeQueue = new ThrottledQueue(5, 25)) {
+  private constructor(
+    writeQueue = new ThrottledQueue(5, 25),
+    agent = new http.Agent({ keepAlive: true })
+  ) {
     this.writeQueue = writeQueue;
+    this.agent = agent;
   }
 
   public static getInstance(): ApiService {
@@ -23,32 +28,28 @@ export class ApiService {
   }
 
   async get<T>(path: string, config: AxiosRequestConfig = {}) {
-    const agent = new http.Agent({ keepAlive: true });
-    return (await axios.get<T>(this.url(path), { ...config, httpAgent: agent })).data;
+    return (await axios.get<T>(this.url(path), { ...config, httpAgent: this.agent })).data;
   }
 
   async post<T>(path: string, data: unknown, config: AxiosRequestConfig = {}) {
-    const agent = new http.Agent({ keepAlive: true });
     return axios
-      .post<T>(this.url(path), data, { ...config, httpAgent: agent })
+      .post<T>(this.url(path), data, { ...config, httpAgent: this.agent })
       .catch((e) => {
         this.handleError(e);
       });
   }
 
   async put<T>(path: string, data: unknown) {
-    const agent = new http.Agent({ keepAlive: true });
     return this.writeQueue.request(() =>
-      axios.put<T>(this.url(path), data, { httpAgent: agent }).catch((e) => {
+      axios.put<T>(this.url(path), data, { httpAgent: this.agent }).catch((e) => {
         this.handleError(e);
       })
     );
   }
 
   async delete<T>(path: string) {
-    const agent = new http.Agent({ keepAlive: true });
     return this.writeQueue.request(() =>
-      axios.delete<T>(this.url(path), { httpAgent: agent }).catch((e) => {
+      axios.delete<T>(this.url(path), { httpAgent: this.agent }).catch((e) => {
         this.handleError(e);
       })
     );

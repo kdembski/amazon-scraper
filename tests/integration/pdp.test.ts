@@ -240,6 +240,7 @@ describe("PDP", () => {
     );
 
     expect(queue.concurrency).toBe(2);
+    await world.backend.waitFor("PUT", "amazon/ads/7");
   });
 
   it("reports metrics every minute", async () => {
