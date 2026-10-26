@@ -20,11 +20,15 @@ const setup = () => {
   return ApiService.getInstance();
 };
 
-const withAgent = { httpAgent: expect.any(http.Agent) };
+const withAgent = {
+  headers: { Authorization: "Bearer api-token" },
+  httpAgent: expect.any(http.Agent),
+};
 
 describe("ApiService", () => {
   beforeEach(() => {
     vi.stubEnv("API_URL", "http://api.test");
+    vi.stubEnv("API_TOKEN", "api-token");
     Object.values(mocked).forEach((fn) => fn.mockReset());
   });
 
@@ -58,6 +62,20 @@ describe("ApiService", () => {
       expect(mocked.get).toHaveBeenCalledWith(
         "http://api.test/scrapers/it/config",
         expect.objectContaining({ timeout: 10_000, httpAgent: expect.anything() })
+      );
+    });
+
+    it("keeps Authorization when the config has headers", async () => {
+      const service = setup();
+      mocked.get.mockResolvedValue({ data: {} });
+
+      await service.get("a", { headers: { "X-A": "1" } });
+
+      expect(mocked.get).toHaveBeenCalledWith(
+        "http://api.test/a",
+        expect.objectContaining({
+          headers: { "X-A": "1", Authorization: "Bearer api-token" },
+        })
       );
     });
 

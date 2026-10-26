@@ -59,6 +59,7 @@ describe("PDP", () => {
 
     const put = await world.backend.waitFor("PUT", "amazon/ads/7");
 
+    expect(put.headers.authorization).toBe("Bearer it-token");
     expect(world.backend.find("GET", "amazon/ads/scrap")[0].query.get("batchSize")).toBe("10");
     expect(put.body).toEqual({
       prices: [

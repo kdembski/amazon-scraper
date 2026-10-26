@@ -27,13 +27,21 @@ export class ApiService {
     return process.env.API_URL + "/" + path;
   }
 
+  private config(extra: AxiosRequestConfig = {}): AxiosRequestConfig {
+    return {
+      ...extra,
+      headers: { ...extra.headers, Authorization: `Bearer ${process.env.API_TOKEN}` },
+      httpAgent: this.agent,
+    };
+  }
+
   async get<T>(path: string, config: AxiosRequestConfig = {}) {
-    return (await axios.get<T>(this.url(path), { ...config, httpAgent: this.agent })).data;
+    return (await axios.get<T>(this.url(path), this.config(config))).data;
   }
 
   async post<T>(path: string, data: unknown, config: AxiosRequestConfig = {}) {
     return axios
-      .post<T>(this.url(path), data, { ...config, httpAgent: this.agent })
+      .post<T>(this.url(path), data, this.config(config))
       .catch((e) => {
         this.handleError(e);
       });
@@ -41,7 +49,7 @@ export class ApiService {
 
   async put<T>(path: string, data: unknown) {
     return this.writeQueue.request(() =>
-      axios.put<T>(this.url(path), data, { httpAgent: this.agent }).catch((e) => {
+      axios.put<T>(this.url(path), data, this.config()).catch((e) => {
         this.handleError(e);
       })
     );
@@ -49,7 +57,7 @@ export class ApiService {
 
   async delete<T>(path: string) {
     return this.writeQueue.request(() =>
-      axios.delete<T>(this.url(path), { httpAgent: this.agent }).catch((e) => {
+      axios.delete<T>(this.url(path), this.config()).catch((e) => {
         this.handleError(e);
       })
     );

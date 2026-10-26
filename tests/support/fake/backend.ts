@@ -8,6 +8,7 @@ export type BackendRequest = {
   path: string;
   query: URLSearchParams;
   body: any;
+  headers: http.IncomingHttpHeaders;
 };
 
 export type BackendReply = { status?: number; body?: unknown };
@@ -100,6 +101,7 @@ export class FakeBackend {
       path: url.pathname.slice(1),
       query: url.searchParams,
       body: raw ? JSON.parse(raw) : undefined,
+      headers: req.headers,
     };
 
     const route = this.routes.get(`${request.method} ${request.path}`);

@@ -44,6 +44,7 @@ export async function startWorld() {
   vi.stubEnv("API_URL", backend.url);
   vi.stubEnv("PROXY_LIST_URL", `${backend.url}/proxies`);
   vi.stubEnv("name", "it");
+  vi.stubEnv("API_TOKEN", "it-token");
   vi.stubEnv("NODE_TLS_REJECT_UNAUTHORIZED", "0");
 
   return { backend, amazon };

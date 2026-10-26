@@ -29,7 +29,7 @@ Integration (`tests/integration/`) and e2e (`tests/e2e/`) tests share fakes in `
 
 ## Configuration
 
-- Env: `API_URL`, `PROXY_API_KEY` (webshare.io API, reads the plans), `PROXY_LIST_TOKEN` (webshare.io list download), `PROXY_LIST_URL` (one list as the `datacenter` pool instead of webshare, used by e2e), `name` (set in docker-compose.yml, used in `scrapers/<name>/...`; `undefined` locally).
+- Env: `API_URL`, `API_TOKEN` (sent as `Authorization: Bearer` with every backend request by `ApiService`), `PROXY_API_KEY` (webshare.io API, reads the plans), `PROXY_LIST_TOKEN` (webshare.io list download), `PROXY_LIST_URL` (one list as the `datacenter` pool instead of webshare, used by e2e), `name` (set in docker-compose.yml, used in `scrapers/<name>/...`; `undefined` locally).
 - Flag (`ArgsService`): only `-t pdp|plp`.
 - Backend config (`ScraperConfigService`): `ScraperConfig` row of `name` in amazon-server, the only source of `concurrency` (max requests in flight, default 10), `rps` (max requests/s per process, 0 = unlimited, default 0) and `batchSize` (ads per batch in PDP / max queue length in PLP, default 50). Edited by hand in SQL; `createScraper()` waits for `GET scrapers/<name>/config` (retried until it answers), then polls it every minute and applies changes to the running queue; a failed poll keeps the last values, an invalid field is ignored.
 - Flags and backend config configure the scraper as a whole, never one marketplace: every parameter must take effect in every mode (`-t`) and every marketplace. Do not add one that is ignored in some mode or marketplace; put marketplace-specific behaviour in the marketplace code.
