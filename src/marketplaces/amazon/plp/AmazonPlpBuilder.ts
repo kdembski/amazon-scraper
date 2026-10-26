@@ -15,13 +15,13 @@ export class AmazonPlpBuilder {
       return accum;
     }, []);
 
-    const subcategories = this.buildSubcategories(document);
-    const hasNextPage = !!find("a.s-pagination-next", document);
+    const hasResults = !!find("[data-component-type='s-search-results']", document);
+    const isEmpty = !!find("[data-csa-c-content-id='messaging-messages-no-results']", document);
 
     return {
+      isValid: hasResults && (ads.length > 0 || isEmpty),
       ads,
-      subcategories,
-      hasNextPage,
+      lastPage: this.buildLastPage(document),
     };
   }
 
@@ -40,13 +40,10 @@ export class AmazonPlpBuilder {
     };
   }
 
-  private buildSubcategories(document: Document) {
-    const list = find("ul#filter-n", document);
-    const items = list && findAll("li[id].s-navigation-indent-2", list);
-
-    if (!items) return [];
-    return items
-      .map((item) => item.attribs.id?.replace("/", "%3A"))
-      .filter((id) => !!id) as string[];
+  private buildLastPage(document: Document) {
+    const pages = findAll(".s-pagination-item", document)
+      .map((item) => Number(text(item)?.trim()))
+      .filter((page) => page > 0);
+    return Math.max(1, ...pages);
   }
 }

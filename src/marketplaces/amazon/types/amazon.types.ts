@@ -20,19 +20,6 @@ export interface AmazonPlpAd {
   categoryName: string;
 }
 
-export interface AmazonPlpAdPage {
-  category: string;
-  allPages: boolean;
-  subcategory?: string;
-  pending: boolean;
-  complete: boolean;
-  failed: number;
-  visited: Set<string>;
-  number: number;
-  price?: string;
-  resolve?: (value?: AmazonPlpAd[] | PromiseLike<AmazonPlpAd[]>) => void;
-  reject?: (e: any) => void;
-}
 export interface AmazonAd {
   id: number;
   asin: string;

@@ -18,6 +18,6 @@ export class AmazonPlpCategoryScraper {
   async execute(category: AmazonAdCategory) {
     const crawl = new AmazonPlpCrawl(category.name, !category.scrapedAt);
     await this.newReleasesScraper.execute(crawl);
-    this.pageScraper.executeCategory(category.name, !category.scrapedAt);
+    await this.pageScraper.execute(crawl);
   }
 }

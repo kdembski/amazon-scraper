@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AmazonPlpBuilder } from "@/marketplaces/amazon/plp/AmazonPlpBuilder";
-import { categoryItem, pagination, toDocument } from "@@tests/support/html";
+import { pagination, plpPage, toDocument } from "@@tests/support/html";
 
 const builder = new AmazonPlpBuilder();
 const build = (body: string, category = "electronics") =>
@@ -19,27 +19,47 @@ const listItem = ({
   </div>
 `;
 
+const results = (body: string) =>
+  `<div data-component-type="s-search-results">${body}</div>`;
+
 describe("AmazonPlpBuilder", () => {
-  it("returns nothing for an empty page", () => {
+  it("is invalid without search results", () => {
     expect(build(`<div id="search"></div>`)).toEqual({
+      isValid: false,
       ads: [],
-      subcategories: [],
-      hasNextPage: false,
+      lastPage: 1,
     });
   });
 
-  it.each([
-    ["an active", true],
-    ["a disabled", false],
-  ])("detects a next page from %s next link", (_name, next) => {
-    expect(build(pagination(next)).hasNextPage).toBe(next);
+  it("is invalid when search results have no products and no empty message", () => {
+    expect(build(results("")).isValid).toBe(false);
+  });
+
+  it("is valid and empty with the no results message", () => {
+    expect(build(plpPage({ empty: true }))).toEqual({
+      isValid: true,
+      ads: [],
+      lastPage: 1,
+    });
+  });
+
+  it("is valid with products", () => {
+    expect(build(results(listItem())).isValid).toBe(true);
+  });
+
+  it.each([2, 11, 400])("reads the last page %i from the pagination", (lastPage) => {
+    expect(build(results(listItem()) + pagination(lastPage)).lastPage).toBe(lastPage);
+  });
+
+  it("has one page without pagination", () => {
+    expect(build(results(listItem())).lastPage).toBe(1);
   });
 
   it("builds ads from list items", () => {
-    const body = `
+    const body = results(`
       ${listItem()}
       ${listItem({ asin: "B0SECOND", name: "Second product" })}
-    `;
+    `);
 
     expect(build(body, "toys").ads).toEqual([
       { asin: "B0TESTASIN", name: "Test product", image, categoryName: "toys" },
@@ -52,40 +72,7 @@ describe("AmazonPlpBuilder", () => {
     ["image", { src: "" }],
     ["name", { name: "" }],
   ])("skips items without %s", (_field, overrides) => {
-    const body = `${listItem(overrides)}${listItem({ asin: "B0VALID" })}`;
+    const body = results(`${listItem(overrides)}${listItem({ asin: "B0VALID" })}`);
     expect(build(body).ads.map((ad) => ad.asin)).toEqual(["B0VALID"]);
-  });
-
-  it("builds child category ids with an encoded separator", () => {
-    const body = `
-      <ul id="filter-n">
-        <li><a>Header without id</a></li>
-        ${categoryItem("n/20788220031")}
-        ${categoryItem("n/20788221031", 1)}
-        ${categoryItem("n/20788222031", 2)}
-        ${categoryItem("n/20788223031", 2)}
-      </ul>
-    `;
-
-    expect(build(body).subcategories).toEqual([
-      "n%3A20788222031",
-      "n%3A20788223031",
-    ]);
-  });
-
-  it("returns no subcategories for a category without children", () => {
-    const body = `
-      <ul id="filter-n">
-        ${categoryItem("n/20788220031")}
-        ${categoryItem("n/20788221031", 1)}
-      </ul>
-    `;
-
-    expect(build(body).subcategories).toEqual([]);
-  });
-
-  it("ignores li elements outside the category filter", () => {
-    const body = `<ul id="filter-p">${categoryItem("p_123/abc", 2)}</ul>`;
-    expect(build(body).subcategories).toEqual([]);
   });
 });

@@ -1,45 +1,41 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AmazonPlpPageScraper } from "@/marketplaces/amazon/plp/AmazonPlpPageScraper";
-import type { AmazonPlpBuilder } from "@/marketplaces/amazon/plp/AmazonPlpBuilder";
+import { AmazonPlpCrawl } from "@/marketplaces/amazon/plp/AmazonPlpCrawl";
+import type { AmazonPlpPageFetcher } from "@/marketplaces/amazon/plp/AmazonPlpPageFetcher";
 import type { MetricsService } from "@/shared/metrics/MetricsService";
 import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
-import { AmazonPlpAd } from "@/marketplaces/amazon/types/amazon.types";
-import { buildPlpPage } from "@@tests/support/factories";
-import {
-  fakeAmazonService,
-  fakeApiService,
-  fakeScraperConfigService,
-} from "@@tests/support/fakes";
+import { fakeApiService } from "@@tests/support/fakes";
 
-const html = "<html><body></body></html>";
-const ads: AmazonPlpAd[] = [
-  { asin: "B0TESTASIN", name: "Test", image: "img", categoryName: "electronics" },
-];
+type Reply = { lastPage?: number; asins?: string[]; failed?: number; givenUp?: boolean };
 
-const setup = ({ batchSize = 50 } = {}) => {
-  const amazon = fakeAmazonService();
+const ad = (asin: string) => ({ asin, name: asin, image: `${asin}.jpg`, categoryName: "electronics" });
+
+// Price filter and page number of a requested listing
+const parse = (url: string) => ({
+  price: url.match(/p_36%3A([\d-]+)/)![1],
+  number: Number(url.match(/&page=(\d+)/)?.[1] ?? 1),
+});
+
+const setup = (reply: (price: string, number: number) => Reply = () => ({}), allPages = false) => {
   const api = fakeApiService();
-  const config = fakeScraperConfigService({ batchSize });
-  const build = vi.fn(() => ({
-    ads,
-    subcategories: [] as string[],
-    hasNextPage: false,
-  }));
+  const fetch = vi.fn(async (url: string, _referer: string) => {
+    const { price, number } = parse(url);
+    const { lastPage = 1, asins = [`B0${price}P${number}`], failed = 0, givenUp } = reply(price, number);
+    if (givenUp) return { failed: MAX_FAILED_ATTEMPTS };
+    return { page: { isValid: true, ads: asins.map(ad), lastPage }, failed };
+  });
   const increment = vi.fn();
-  const builder = { build } as unknown as AmazonPlpBuilder;
   const scraper = new AmazonPlpPageScraper(
-    api.service,
-    amazon.service,
-    config.service,
-    builder,
+    { fetch } as unknown as AmazonPlpPageFetcher,
+    undefined,
     { increment } as unknown as MetricsService
   );
-  return { amazon, api, build, scraper, increment };
+  const crawl = new AmazonPlpCrawl("electronics", allPages, api.service);
+  const requests = () => fetch.mock.calls.map(([url]) => parse(url));
+  return { api, fetch, increment, scraper, crawl, requests };
 };
 
-const flush = () => vi.advanceTimersByTimeAsync(0);
-
-const priceRanges = [
+const seeds = [
   "-999",
   "1000-1999",
   "2000-2999",
@@ -60,340 +56,132 @@ const priceRanges = [
   "300000-499999",
   "500000-",
 ];
-const inPriceRanges = (subcategory?: string) =>
-  priceRanges.map(
-    (price) =>
-      `pl/s?i=electronics&rh=${
-        subcategory ? `${subcategory}%2C` : ""
-      }p_36%3A${price}&s=date-desc-rank`
-  );
 
 describe("AmazonPlpPageScraper", () => {
   beforeEach(() => {
-    vi.useFakeTimers();
-    vi.spyOn(Math, "random").mockReturnValue(1);
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
   });
 
   afterEach(() => {
-    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
-  describe("buildPage", () => {
-    it("builds a fresh page", () => {
-      const { scraper } = setup();
-      expect(scraper.buildPage("toys", false, "n%3A123")).toEqual({
-        category: "toys",
-        allPages: false,
-        subcategory: "n%3A123",
-        pending: false,
-        complete: false,
-        failed: 0,
-        visited: new Set(),
-        number: 1,
-      });
-    });
+  it("scrapes the first page of every seed price range", async () => {
+    const { fetch, scraper, crawl } = setup();
 
-    it("shares the visited subcategories of the category", () => {
-      const { scraper } = setup();
-      const visited = new Set(["n%3A1"]);
-      expect(scraper.buildPage("toys", false, "n%3A2", visited).visited).toBe(visited);
-    });
+    await scraper.execute(crawl);
+
+    expect(fetch.mock.calls.map(([url]) => url)).toEqual(
+      seeds.map((price) => `pl/s?i=electronics&rh=p_36%3A${price}&s=date-desc-rank`)
+    );
+    expect(fetch.mock.calls[0][1]).toBe("pl/b?node=50000000000");
   });
 
-  describe("executeCategory", () => {
-    it("scrapes the category in every price range", () => {
-      const { amazon, scraper } = setup();
-      scraper.executeCategory("electronics", false);
-
-      expect(amazon.requests.map((request) => request.url)).toEqual(
-        inPriceRanges()
+  it.each([false, true])(
+    "splits a range with 400 pages and skips its further pages (allPages %s)",
+    async (allPages) => {
+      const { requests, scraper, crawl } = setup(
+        (price) => ({ lastPage: price === "-999" ? 400 : 1 }),
+        allPages
       );
-    });
 
-    it("scrapes a subcategory in every price range", () => {
-      const { amazon, scraper } = setup();
-      scraper.executeCategory("electronics", false, "n%3A1");
+      await scraper.execute(crawl);
 
-      expect(amazon.requests.map((request) => request.url)).toEqual(
-        inPriceRanges("n%3A1")
-      );
-    });
+      expect(requests()).toContainEqual({ price: "-499", number: 1 });
+      expect(requests()).toContainEqual({ price: "500-999", number: 1 });
+      expect(requests().filter(({ number }) => number > 1)).toEqual([]);
+      expect(requests()).toHaveLength(seeds.length + 2);
+    }
+  );
+
+  it("splits the open range at double its minimum", async () => {
+    const { requests, scraper, crawl } = setup((price) => ({
+      lastPage: price === "500000-" ? 400 : 1,
+    }));
+
+    await scraper.execute(crawl);
+
+    expect(requests()).toContainEqual({ price: "500000-999999", number: 1 });
+    expect(requests()).toContainEqual({ price: "1000000-", number: 1 });
   });
 
-  describe("execute", () => {
-    it("requests the category listing sorted by newest", () => {
-      const { amazon, scraper } = setup();
-      const page = buildPlpPage();
-      scraper.execute(page);
-
-      expect(amazon.requests[0].url).toBe(
-        "pl/s?i=electronics&s=date-desc-rank"
-      );
-      expect(amazon.requests[0].referer).toMatch(/^pl\/b\?node=\d+$/);
-      expect(page.pending).toBe(true);
-    });
-
-    it("requests a subcategory listing", () => {
-      const { amazon, scraper } = setup();
-      scraper.execute(buildPlpPage({ subcategory: "n%3A123" }));
-
-      expect(amazon.requests[0].url).toBe(
-        "pl/s?i=electronics&rh=n%3A123&s=date-desc-rank"
-      );
-    });
-
-    it("requests a further page of the listing", () => {
-      const { amazon, scraper } = setup();
-      scraper.execute(buildPlpPage({ subcategory: "n%3A123", number: 3 }));
-
-      expect(amazon.requests[0].url).toBe(
-        "pl/s?i=electronics&rh=n%3A123&s=date-desc-rank&page=3"
-      );
-    });
-
-    it.each([
-      [undefined, "pl/s?i=electronics&rh=p_36%3A2000-4999&s=date-desc-rank"],
-      [
-        "n%3A123",
-        "pl/s?i=electronics&rh=n%3A123%2Cp_36%3A2000-4999&s=date-desc-rank",
-      ],
-    ])("requests a listing in a price range of %s", (subcategory, url) => {
-      const { amazon, scraper } = setup();
-      scraper.execute(buildPlpPage({ subcategory, price: "2000-4999" }));
-
-      expect(amazon.requests[0].url).toBe(url);
-    });
-
-    it.each([["complete"], ["pending"]] as const)(
-      "skips a page that is already %s",
-      (state) => {
-        const { amazon, scraper } = setup();
-        scraper.execute(buildPlpPage({ [state]: true }));
-        expect(amazon.get).not.toHaveBeenCalled();
-      }
+  it("follows the pagination of a range below 400 pages when scraping all pages", async () => {
+    const { requests, scraper, crawl } = setup(
+      (price) => ({ lastPage: price === "-999" ? 3 : 1 }),
+      true
     );
 
-    it("waits while the queue is full and requests the page once it drains", async () => {
-      const { amazon, scraper } = setup({ batchSize: 2 });
-      amazon.queueService.queue.push(vi.fn(), vi.fn());
-      const page = buildPlpPage();
+    await scraper.execute(crawl);
 
-      scraper.execute(page);
-      await vi.advanceTimersByTimeAsync(1000);
-      expect(amazon.get).not.toHaveBeenCalled();
-
-      amazon.queueService.queue.length = 0;
-      await vi.advanceTimersByTimeAsync(1000);
-      expect(amazon.get).toHaveBeenCalledTimes(1);
-      expect(page).toMatchObject({ pending: true, failed: 0 });
-    });
+    expect(requests().filter(({ price }) => price === "-999")).toEqual([
+      { price: "-999", number: 1 },
+      { price: "-999", number: 2 },
+      { price: "-999", number: 3 },
+    ]);
   });
 
-  describe("on success", () => {
-    it("sends the ads and completes the page", async () => {
-      const { amazon, api, build, scraper } = setup();
-      const page = buildPlpPage();
-      const done = scraper.execute(page);
+  it("scrapes only the first page when not scraping all pages", async () => {
+    const { requests, scraper, crawl } = setup(() => ({ lastPage: 3 }));
 
-      amazon.respond(0, html);
-      await done;
+    await scraper.execute(crawl);
 
-      expect(build).toHaveBeenCalledWith(expect.anything(), "electronics");
-      expect(api.post).toHaveBeenCalledWith("amazon/ads", ads);
-      expect(page).toMatchObject({ pending: false, complete: true });
-    });
-
-    it("scrapes every subcategory in every price range", async () => {
-      const { amazon, build, scraper } = setup();
-      build.mockReturnValueOnce({ ads, subcategories: ["n%3A1", "n%3A2"], hasNextPage: false });
-      scraper.execute(buildPlpPage());
-
-      amazon.respond(0, html);
-      await flush();
-
-      expect(amazon.requests.map((request) => request.url)).toEqual([
-        "pl/s?i=electronics&s=date-desc-rank",
-        ...inPriceRanges("n%3A1"),
-        ...inPriceRanges("n%3A2"),
-      ]);
-    });
-
-    it("scrapes the next page in the same price range", async () => {
-      const { amazon, build, scraper } = setup();
-      build.mockReturnValueOnce({ ads, subcategories: [], hasNextPage: true });
-      const page = buildPlpPage({
-        allPages: true,
-        subcategory: "n%3A1",
-        price: "2000-4999",
-      });
-      scraper.execute(page);
-
-      amazon.respond(0, html);
-      await flush();
-
-      expect(amazon.requests.map((request) => request.url)).toEqual([
-        "pl/s?i=electronics&rh=n%3A1%2Cp_36%3A2000-4999&s=date-desc-rank",
-        "pl/s?i=electronics&rh=n%3A1%2Cp_36%3A2000-4999&s=date-desc-rank&page=2",
-      ]);
-    });
-
-    it("scrapes only the first page when not all pages are wanted", async () => {
-      const { amazon, build, scraper } = setup();
-      build.mockReturnValueOnce({ ads, subcategories: [], hasNextPage: true });
-      scraper.execute(buildPlpPage());
-
-      amazon.respond(0, html);
-      await flush();
-
-      expect(amazon.requests).toHaveLength(1);
-    });
-
-    it("passes all pages on to the subcategories", async () => {
-      const { amazon, build, scraper } = setup();
-      build
-        .mockReturnValueOnce({ ads, subcategories: ["n%3A1"], hasNextPage: false })
-        .mockReturnValueOnce({ ads, subcategories: [], hasNextPage: true });
-      scraper.execute(buildPlpPage({ allPages: true }));
-
-      amazon.respond(0, html);
-      await flush();
-      amazon.respond(1, html);
-      await flush();
-
-      expect(amazon.requests.at(-1)?.url).toBe(`${inPriceRanges("n%3A1")[0]}&page=2`);
-    });
-
-    it("stops when there is no next page", async () => {
-      const { amazon, scraper } = setup();
-      scraper.execute(buildPlpPage());
-
-      amazon.respond(0, html);
-      await flush();
-
-      expect(amazon.requests).toHaveLength(1);
-    });
-
-    it("scrapes a subcategory only once", async () => {
-      const { amazon, build, scraper } = setup();
-      build
-        .mockReturnValueOnce({ ads, subcategories: ["n%3A1", "n%3A2"], hasNextPage: false })
-        .mockReturnValueOnce({ ads, subcategories: ["n%3A2", "n%3A3"], hasNextPage: false });
-      scraper.execute(buildPlpPage());
-
-      amazon.respond(0, html);
-      await flush();
-      amazon.respond(1, html);
-      await flush();
-
-      expect(amazon.requests.map((request) => request.url)).toEqual([
-        "pl/s?i=electronics&s=date-desc-rank",
-        ...inPriceRanges("n%3A1"),
-        ...inPriceRanges("n%3A2"),
-        ...inPriceRanges("n%3A3"),
-      ]);
-    });
+    expect(requests().every(({ number }) => number === 1)).toBe(true);
   });
 
-  describe("retries", () => {
-    it.each([
-      ["an empty response", (s: ReturnType<typeof setup>) => s.amazon.respond(0, "")],
-      [
-        "a page without ads",
-        (s: ReturnType<typeof setup>) => {
-          s.build.mockReturnValueOnce({ ads: [], subcategories: ["n%3A1"], hasNextPage: false });
-          s.amazon.respond(0, html);
-        },
-      ],
-      ["a network error", (s: ReturnType<typeof setup>) => s.amazon.fail(0)],
-    ])("on %s", async (_name, answer) => {
-      const s = setup();
-      const page = buildPlpPage();
-      s.scraper.execute(page);
+  it("paginates a single grosz range with 400 pages instead of splitting it", async () => {
+    const { requests, scraper, crawl } = setup(
+      (price) => ({ lastPage: price.startsWith("-") ? 400 : 1 }),
+      true
+    );
 
-      answer(s);
-      await flush();
+    await scraper.execute(crawl);
 
-      expect(page).toMatchObject({ pending: false, complete: false, failed: 1 });
-      expect(s.api.post).not.toHaveBeenCalled();
-      expect(s.amazon.get).toHaveBeenCalledTimes(1);
-
-      await vi.advanceTimersByTimeAsync(1000);
-      expect(s.amazon.get).toHaveBeenCalledTimes(2);
-      expect(s.amazon.requests[1].url).toBe(s.amazon.requests[0].url);
-    });
-
-    it("gives up on the page after the attempt limit", async () => {
-      const { amazon, api, scraper } = setup();
-      const page = buildPlpPage();
-      scraper.execute(page);
-
-      for (let i = 0; i < MAX_FAILED_ATTEMPTS; i++) {
-        amazon.fail(amazon.requests.length - 1);
-        await vi.runAllTimersAsync();
-      }
-
-      expect(page).toMatchObject({
-        complete: true,
-        failed: MAX_FAILED_ATTEMPTS,
-      });
-      expect(amazon.get).toHaveBeenCalledTimes(MAX_FAILED_ATTEMPTS);
-      expect(api.post).not.toHaveBeenCalled();
-    });
+    const single = requests().filter(({ price }) => price === "-0");
+    expect(single).toHaveLength(400);
+    expect(single.at(-1)).toEqual({ price: "-0", number: 400 });
+    expect(requests().filter(({ price }) => price.startsWith("-") && price !== "-0")
+      .every(({ number }) => number === 1)).toBe(true);
   });
 
-  describe("metrics", () => {
-    const labels = (outcome: string) => ({ country: "pl", outcome });
+  it("stops paginating a range after a given up page", async () => {
+    const { requests, increment, scraper, crawl } = setup(
+      (price, number) => ({
+        lastPage: price === "-999" ? 3 : 1,
+        givenUp: price === "-999" && number === 2,
+      }),
+      true
+    );
 
-    it("counts a page with products as data", async () => {
-      const { amazon, scraper, increment } = setup();
-      const done = scraper.execute(buildPlpPage());
+    await scraper.execute(crawl);
 
-      amazon.respond(0, html);
-      await done;
+    expect(requests()).not.toContainEqual({ price: "-999", number: 3 });
+    expect(increment).toHaveBeenCalledWith("items", { country: "pl", outcome: "given_up" });
+    expect(increment).toHaveBeenCalledWith(
+      "item_attempts",
+      { country: "pl", outcome: "given_up" },
+      MAX_FAILED_ATTEMPTS
+    );
+  });
 
-      expect(increment).toHaveBeenCalledWith("responses", labels("data"));
-      expect(increment).toHaveBeenCalledWith("items", labels("data"));
-      expect(increment).toHaveBeenCalledWith("item_attempts", labels("data"), 1);
-    });
+  it("counts a page with products as data and an empty one as no_data", async () => {
+    const { increment, scraper, crawl } = setup((price) => ({
+      asins: price === "-999" ? [] : undefined,
+      failed: price === "1000-1999" ? 2 : 0,
+    }));
 
-    it("counts a page without products as no_data", async () => {
-      const s = setup();
-      s.build.mockReturnValueOnce({ ads: [], subcategories: [], hasNextPage: false });
-      s.scraper.execute(buildPlpPage());
+    await scraper.execute(crawl);
 
-      s.amazon.respond(0, html);
-      await flush();
+    expect(increment).toHaveBeenCalledWith("items", { country: "pl", outcome: "no_data" });
+    expect(increment).toHaveBeenCalledWith("item_attempts", { country: "pl", outcome: "data" }, 3);
+    expect(increment.mock.calls.filter(([metric]) => metric === "items")).toHaveLength(seeds.length);
+  });
 
-      expect(s.increment).toHaveBeenCalledWith("responses", labels("no_data"));
-      expect(s.increment).not.toHaveBeenCalledWith("items", expect.anything());
-    });
+  it("sends the ads of every page through the crawl", async () => {
+    const { api, scraper, crawl } = setup(() => ({ asins: ["B0SAME"] }));
 
-    it("counts an empty response", async () => {
-      const { amazon, scraper, increment } = setup();
-      scraper.execute(buildPlpPage());
+    await scraper.execute(crawl);
 
-      amazon.respond(0, "");
-      await flush();
-
-      expect(increment).toHaveBeenCalledWith("responses", labels("empty"));
-    });
-
-    it("counts a given up page", async () => {
-      const { amazon, scraper, increment } = setup();
-      scraper.execute(buildPlpPage());
-
-      for (let i = 0; i < MAX_FAILED_ATTEMPTS; i++) {
-        amazon.fail(amazon.requests.length - 1);
-        await vi.runAllTimersAsync();
-      }
-
-      expect(increment).toHaveBeenCalledWith("items", labels("given_up"));
-      expect(increment).toHaveBeenCalledWith(
-        "item_attempts",
-        labels("given_up"),
-        MAX_FAILED_ATTEMPTS
-      );
-    });
+    expect(api.post).toHaveBeenCalledTimes(1);
+    expect(api.post).toHaveBeenCalledWith("amazon/ads", [ad("B0SAME")]);
   });
 });

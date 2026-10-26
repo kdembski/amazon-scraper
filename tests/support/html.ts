@@ -46,27 +46,33 @@ export const aodPage = ({
   `;
 };
 
-// Entry of the category filter, indent 1 is the current category, 2 its child
-export const categoryItem = (id: string, indent?: 1 | 2) =>
-  `<li id="${id}" class="a-spacing-micro${
-    indent ? ` s-navigation-indent-${indent}` : ""
-  }"><a>${id}</a></li>`;
+// Pagination of a search listing as Amazon renders it on page 1: the first
+// pages, an ellipsis, the last page and "next"; none for a single page
+export const pagination = (lastPage: number) =>
+  lastPage > 1
+    ? `
+      <span class="s-pagination-item s-pagination-selected">1</span>
+      <a href="/s?page=2" class="s-pagination-item s-pagination-button">2</a>
+      <span class="s-pagination-item s-pagination-ellipsis"></span>
+      <span class="s-pagination-item s-pagination-disabled">${lastPage}</span>
+      <a href="/s?page=2" class="s-pagination-item s-pagination-next">Dalej</a>
+    `
+    : "";
 
-// Pagination of a search listing, "next" is a link only if there is a next page
-export const pagination = (next: boolean) =>
-  next
-    ? `<a href="/s?page=2" class="s-pagination-item s-pagination-next">Dalej</a>`
-    : `<span class="s-pagination-item s-pagination-next s-pagination-disabled">Dalej</span>`;
+export const noResults = `
+  <div data-csa-c-content-id="messaging-messages-no-results">
+    <span>Brak wyników dla Twojego zapytania.</span>
+  </div>
+`;
 
-// Search listing (/s?i=...) with products and the category filter: the path
-// from the root to the current category, then its children
+// Search listing (/s?i=...) with products; empty is a search without results
 export const plpPage = ({
   asins = [] as string[],
-  path = [] as string[],
-  subcategories = [] as string[],
-  next = false,
+  lastPage = 1,
+  empty = false,
 } = {}) => `
-  <div class="s-main-slot">
+  <div data-component-type="s-search-results" class="s-main-slot">
+    ${empty ? noResults : ""}
     ${asins
       .map(
         (asin) => `
@@ -78,15 +84,7 @@ export const plpPage = ({
       )
       .join("")}
   </div>
-  <ul id="filter-n">
-    ${path
-      .map((id, index) =>
-        categoryItem(id, index === path.length - 1 ? 1 : undefined)
-      )
-      .join("")}
-    ${subcategories.map((id) => categoryItem(id, 2)).join("")}
-  </ul>
-  ${pagination(next)}
+  ${pagination(lastPage)}
 `;
 
 // New releases ranking (gp/new-releases/<category>[/<node>]): products, the

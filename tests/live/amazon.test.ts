@@ -136,16 +136,16 @@ describe("live Amazon", () => {
   });
 
 
-  it("finds products and subcategories on an amazon.pl listing", async () => {
+  it("finds products and the last page on an amazon.pl listing", async () => {
     const builder = new AmazonPlpBuilder();
     let built: ReturnType<AmazonPlpBuilder["build"]> | undefined;
 
     // A listing without products counts as blocked, so it is asked again
     await scrape("pl/s?i=electronics&s=date-desc-rank", "pl/b?node=1", (html) => {
       built = builder.build(parseDocument(html), "electronics");
-      return { isCaptcha: !built.ads.length };
+      return { isCaptcha: !built.isValid || !built.ads.length };
     });
-    console.info("pl listing:", built?.ads.length, "ads,", built?.subcategories.length, "subcategories");
+    console.info("pl listing:", built?.ads.length, "ads,", built?.lastPage, "pages");
 
     expect(built?.ads.length).toBeGreaterThan(0);
     expect(built?.ads[0]).toMatchObject({
@@ -153,6 +153,6 @@ describe("live Amazon", () => {
       name: expect.any(String),
       image: expect.stringMatching(/^https:\/\//),
     });
-    expect(built?.subcategories.length).toBeGreaterThan(0);
+    expect(built?.lastPage).toBeGreaterThan(1);
   });
 });
