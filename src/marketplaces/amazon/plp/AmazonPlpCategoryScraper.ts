@@ -1,4 +1,5 @@
 import { AmazonNewReleasesScraper } from "@/marketplaces/amazon/plp/AmazonNewReleasesScraper";
+import { AmazonPlpCrawl } from "@/marketplaces/amazon/plp/AmazonPlpCrawl";
 import { AmazonPlpPageScraper } from "@/marketplaces/amazon/plp/AmazonPlpPageScraper";
 import { AmazonAdCategory } from "@/marketplaces/amazon/types/amazon.types";
 
@@ -15,7 +16,8 @@ export class AmazonPlpCategoryScraper {
   }
 
   async execute(category: AmazonAdCategory) {
-    await this.newReleasesScraper.execute(category.name);
+    const crawl = new AmazonPlpCrawl(category.name, !category.scrapedAt);
+    await this.newReleasesScraper.execute(crawl);
     this.pageScraper.executeCategory(category.name, !category.scrapedAt);
   }
 }
