@@ -138,6 +138,21 @@ describe("ScrapingClient", () => {
       expect(callback.onSuccess).not.toHaveBeenCalled();
     });
 
+    it("passes an error thrown before the request to onError and still finishes the queued task", async () => {
+      const { service, proxy, requests } = setup();
+      const error = new Error("no proxy");
+      vi.mocked(proxy.getAgent).mockImplementation(() => {
+        throw error;
+      });
+      const callback = { onSuccess: vi.fn(), onError: vi.fn() };
+
+      service.get("https://www.amazon.de/dp/B0TESTASIN", "https://www.amazon.de", callback);
+      await expect(Promise.all(requests)).resolves.toBeDefined();
+
+      expect(callback.onError).toHaveBeenCalledWith(error);
+      expect(get).not.toHaveBeenCalled();
+    });
+
     describe("metrics", () => {
       const setupMetrics = () => {
         const metrics = { increment: vi.fn() };

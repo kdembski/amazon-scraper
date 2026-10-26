@@ -35,6 +35,20 @@ describe("AmazonPlpPriceRange", () => {
     ]);
   });
 
+  it.each([[{ min: 0 }], [{ min: 100000000 }], [{ min: 200000000 }]])(
+    "does not split the open range %o",
+    (range) => {
+      expect(splitPriceRange(range)).toBeUndefined();
+    }
+  );
+
+  it("splits the open range just below a million zloty", () => {
+    expect(splitPriceRange({ min: 99999999 })).toEqual([
+      { min: 99999999, max: 199999997 },
+      { min: 199999998 },
+    ]);
+  });
+
   it("does not split a single grosz", () => {
     expect(splitPriceRange({ min: 7, max: 7 })).toBeUndefined();
   });

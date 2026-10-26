@@ -56,7 +56,13 @@ export class ScrapingClient {
     this.queueService.request(async () => {
       if (callback?.isCancelled?.()) return;
 
-      const httpsAgent = this.proxyService.getAgent(new URL(url).hostname, proxyType);
+      let httpsAgent;
+      try {
+        httpsAgent = this.proxyService.getAgent(new URL(url).hostname, proxyType);
+      } catch (e) {
+        callback?.onError?.(e);
+        return;
+      }
       const userAgent = _.sample(this.userAgents);
 
       const startedAt = Date.now();
