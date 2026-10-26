@@ -7,7 +7,7 @@ import type { ItemOutcome } from "@/shared/metrics/metrics.types";
 import { buildAd, buildAmazonCountry } from "@@tests/support/factories";
 import { fakeApiService } from "@@tests/support/fakes";
 
-const setup = (count: number) => {
+const setup = (count: number, priorities: number[] = []) => {
   const api = fakeApiService();
   const runs: {
     price: AmazonAdPrice;
@@ -26,7 +26,7 @@ const setup = (count: number) => {
   );
   const ad = buildAd({ id: 7 });
   const countries = Array.from({ length: count }, (_, i) =>
-    buildAmazonCountry({ countryId: i + 1, tld: `c${i + 1}` })
+    buildAmazonCountry({ countryId: i + 1, tld: `c${i + 1}`, priority: priorities[i] ?? 0 })
   );
   const done = vi.fn();
   scraper.execute(ad, countries).then(done);
@@ -177,6 +177,63 @@ describe("AmazonPdpAdScraper", () => {
 
       expect(api.put).not.toHaveBeenCalled();
       expect(api.delete).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("priorities", () => {
+    const started = (runs: { price: AmazonAdPrice }[]) =>
+      runs.map((run) => run.price.country.tld);
+
+    it("starts lower priority countries only after the higher ones finish", async () => {
+      const { api, runs, done, withPrice } = setup(3, [0, 1, 1]);
+
+      expect(started(runs)).toEqual(["c2", "c3"]);
+
+      withPrice(0);
+      await flush();
+      expect(started(runs)).toEqual(["c2", "c3"]);
+
+      runs[1].finish("no_data");
+      await flush();
+      expect(started(runs)).toEqual(["c2", "c3", "c1"]);
+      expect(api.put).not.toHaveBeenCalled();
+
+      withPrice(2);
+      await flush();
+      expect(api.put).toHaveBeenCalledWith("amazon/ads/7", sent([1, 2]));
+      expect(done).toHaveBeenCalledTimes(1);
+    });
+
+    it("never starts lower priority countries once 4 have a price", async () => {
+      const { api, runs, done, withPrice } = setup(6, [2, 2, 1, 1, 1, 0]);
+
+      withPrice(0);
+      withPrice(1);
+      await flush();
+      expect(started(runs)).toEqual(["c1", "c2", "c3", "c4", "c5"]);
+
+      withPrice(2);
+      withPrice(3);
+      await flush();
+
+      expect(api.put).toHaveBeenCalledWith("amazon/ads/7", sent([1, 2, 3, 4]));
+      expect(done).toHaveBeenCalledTimes(1);
+      expect(runs[4].isCancelled()).toBe(true);
+
+      runs[4].finish("no_data");
+      await flush();
+      expect(started(runs)).toHaveLength(5);
+    });
+
+    it("deletes the ad without starting lower priority countries", async () => {
+      const { api, runs, done } = setup(5, [1, 1, 1, 0, 0]);
+
+      [0, 1, 2].forEach((i) => runs[i].finish("deleted"));
+      await flush();
+
+      expect(api.delete).toHaveBeenCalledWith("amazon/ads/7");
+      expect(done).toHaveBeenCalledTimes(1);
+      expect(started(runs)).toHaveLength(3);
     });
   });
 });

@@ -9,6 +9,7 @@ export const buildAmazonCountry = (overrides: Partial<AmazonCountry> = {}): Amaz
   countryId: 1,
   tld: "de",
   proxyType: "datacenter",
+  priority: 0,
   ...overrides,
 });
 

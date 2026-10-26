@@ -4,6 +4,7 @@ export interface AmazonCountry {
   countryId: number;
   tld: string;
   proxyType: string;
+  priority: number;
 }
 
 export interface AmazonAdCategory {

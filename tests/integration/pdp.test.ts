@@ -215,6 +215,30 @@ describe("PDP", () => {
     expect(world.amazon.requests).toHaveLength(4);
   });
 
+  it("asks lower priority countries only for the prices still missing", async () => {
+    world.backend.on("GET", "scrapers/it/config", { concurrency: 1, rps: 0, batchSize: 10 });
+    world.backend.on(
+      "GET",
+      "amazon/countries/scrap",
+      sixCountries.map((country, i) => ({ ...country, priority: i < 3 ? 0 : 1 }))
+    );
+    world.amazon.respondPerCountry({
+      de: [aodPage({ price: "1,00" })],
+      fr: [aodPage({ price: "2,00" })],
+      it: [aodPage({ price: "3,00" })],
+      es: [aodPage({ price: "4,00" })],
+      nl: [aodPage()],
+      se: [aodPage({ price: "6,00" })],
+    });
+    scrape();
+
+    const put = await world.backend.waitFor("PUT", "amazon/ads/7");
+    await sleep(100);
+
+    expect(put.body.prices.map((price: { countryId: number }) => price.countryId)).toEqual([1, 2, 4, 6]);
+    expect(world.amazon.requests.map((request) => request.country)).toEqual(["es", "nl", "se", "de", "fr"]);
+  });
+
   it("starts at most rps requests per second", async () => {
     world.backend.on("GET", "scrapers/it/config", { concurrency: 10, rps: 2, batchSize: 10 });
     world.backend.on("GET", "amazon/countries/scrap", sixCountries);
