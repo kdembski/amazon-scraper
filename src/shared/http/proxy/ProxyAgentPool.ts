@@ -20,6 +20,7 @@ export class ProxyAgentPool {
       // constructor never reaches http.Agent, which reads it from there to
       // close idle sockets
       agent.options.timeout = this.idleTimeout;
+      agent.protocol = "https:";
       this.agents.set(url, agent);
     }
 

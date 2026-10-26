@@ -156,6 +156,18 @@ describe("RequestQueueService", () => {
       await vi.advanceTimersByTimeAsync(1);
       expect(queue.pending).toBe(15);
     });
+
+    it("does not try to start requests on a tick while no slot is free", async () => {
+      const queue = setup({ concurrency: 1 });
+      queue.request(deferred().callback);
+      queue.request(deferred().callback);
+      const next = vi.spyOn(queue as unknown as { next: () => void }, "next");
+
+      queue.start();
+      await vi.advanceTimersByTimeAsync(10);
+
+      expect(next).not.toHaveBeenCalled();
+    });
   });
 
   describe("rps limit", () => {

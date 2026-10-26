@@ -39,6 +39,15 @@ describe("ProxyAgentPool", () => {
       expect(agent.options.timeout).toBe(15 * 1000);
     });
 
+    it("serves https without inspecting the call stack", () => {
+      const agent = new ProxyAgentPool(vi.fn()).get(first);
+      const isSecureEndpoint = vi.spyOn(agent, "isSecureEndpoint");
+
+      expect(agent.protocol).toBe("https:");
+      expect(agent.defaultPort).toBe(443);
+      expect(isSecureEndpoint).not.toHaveBeenCalled();
+    });
+
     it("passes every new connection to onConnect", async () => {
       const onConnect = vi.fn();
       const socket = { bytesRead: 0 };

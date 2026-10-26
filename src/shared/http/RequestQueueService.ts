@@ -25,7 +25,7 @@ export class RequestQueueService {
 
   start() {
     setTimeout(() => {
-      for (let i = 0; i < 10; i++) {
+      for (let i = 0; i < 10 && this.queue.length && this.canStart(); i++) {
         this.next();
       }
       this.start();
