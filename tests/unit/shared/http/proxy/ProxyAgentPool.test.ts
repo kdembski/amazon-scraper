@@ -1,3 +1,6 @@
+import http from "node:http";
+import type { AddressInfo } from "node:net";
+import net from "node:net";
 import { HttpsProxyAgent } from "https-proxy-agent";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MeteredProxyAgent } from "@/shared/http/proxy/MeteredProxyAgent";
@@ -76,6 +79,99 @@ describe("ProxyAgentPool", () => {
       expect(pool.hasFreeSocket(first, "www.amazon.fr")).toBe(false);
       expect(pool.hasFreeSocket(first, "www.amazon.d")).toBe(false);
       expect(pool.hasFreeSocket(second, "www.amazon.de")).toBe(false);
+    });
+  });
+
+  describe("takeLastFree", () => {
+    type Pool = Record<string, unknown[]>;
+    const de = "www.amazon.de";
+    const third = "http://u3:p3@3.3.3.3:8082";
+    const accept = () => true;
+
+    // Idle connection to the host, as http.Agent leaves it before our `free`
+    // listener runs
+    const free = (pool: ProxyAgentPool, url: string, host = de) => {
+      const agent = pool.get(url);
+      (agent.freeSockets as unknown as Pool)[`${host}:443:::::`] = [{}];
+      agent.listeners("free").at(-1)?.({}, { host });
+    };
+
+    it("returns the proxy whose connection to the host was freed last", () => {
+      const pool = new ProxyAgentPool(vi.fn());
+      free(pool, first);
+      free(pool, second);
+      free(pool, third, "www.amazon.fr");
+
+      expect(pool.takeLastFree(de, accept)).toBe(second);
+    });
+
+    it("moves a proxy freed again to the end", () => {
+      const pool = new ProxyAgentPool(vi.fn());
+      free(pool, first);
+      free(pool, second);
+      free(pool, first);
+
+      expect(pool.takeLastFree(de, accept)).toBe(first);
+    });
+
+    it("takes the proxy so the next call returns the one freed before", () => {
+      const pool = new ProxyAgentPool(vi.fn());
+      free(pool, first);
+      free(pool, second);
+
+      expect(pool.takeLastFree(de, accept)).toBe(second);
+      expect(pool.takeLastFree(de, accept)).toBe(first);
+      expect(pool.takeLastFree(de, accept)).toBeUndefined();
+    });
+
+    it("drops proxies whose idle connection has closed", () => {
+      const pool = new ProxyAgentPool(vi.fn());
+      free(pool, first);
+      free(pool, second);
+      (pool.get(second).freeSockets as unknown as Pool)[`${de}:443:::::`] = [];
+
+      expect(pool.takeLastFree(de, accept)).toBe(first);
+      (pool.get(second).freeSockets as unknown as Pool)[`${de}:443:::::`] = [{}];
+      expect(pool.takeLastFree(de, accept)).toBeUndefined();
+    });
+
+    it("skips proxies the caller does not accept and keeps them for later", () => {
+      const pool = new ProxyAgentPool(vi.fn());
+      free(pool, first);
+      free(pool, second);
+
+      expect(pool.takeLastFree(de, (url) => url === first)).toBe(first);
+      expect(pool.takeLastFree(de, accept)).toBe(second);
+    });
+
+    it("returns undefined for a host without freed connections", () => {
+      expect(new ProxyAgentPool(vi.fn()).takeLastFree(de, accept)).toBeUndefined();
+    });
+
+    it("learns the host from a real request whose connection is kept alive", async () => {
+      const server = http.createServer((_req, res) => res.end("ok"));
+      await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+      const { port } = server.address() as AddressInfo;
+      const pool = new ProxyAgentPool(vi.fn());
+      const agent = pool.get(first);
+      vi.spyOn(agent, "connect").mockImplementation(async () =>
+        net.connect(port, "127.0.0.1")
+      );
+      agent.protocol = "http:";
+
+      await new Promise<void>((resolve, reject) => {
+        http
+          .get({ host: "localhost", port, agent }, (res) => {
+            res.resume();
+            res.on("end", resolve);
+          })
+          .on("error", reject);
+      });
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(pool.takeLastFree("localhost", accept)).toBe(first);
+      pool.retain([]);
+      server.close();
     });
   });
 

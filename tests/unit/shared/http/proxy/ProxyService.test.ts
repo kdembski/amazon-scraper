@@ -16,7 +16,10 @@ const setup = () => {
   const pool = {
     get: vi.fn((url: string) => ({ url })),
     retain: vi.fn(),
-    hasFreeSocket: vi.fn((_url: string, _host: string) => false),
+    takeLastFree: vi.fn(
+      (_host: string, _accept: (url: string) => boolean): string | undefined =>
+        undefined
+    ),
     countConnections: vi.fn(() => 7),
   };
   const list = { load: vi.fn().mockResolvedValue({ datacenter: urls, isp: ispUrls }) };
@@ -123,25 +126,28 @@ describe("ProxyService", () => {
       expect(pool.get).toHaveBeenCalledTimes(2);
     });
 
-    it("returns the first random proxy with an idle connection to the host", async () => {
+    it("returns the proxy whose idle connection to the host was freed last", async () => {
       const { service, pool } = setup();
       await service.loadProxies();
-      pool.hasFreeSocket.mockImplementation(
-        (url: string, host: string) => url === urls[1] && host === "www.amazon.de"
-      );
-
-      vi.spyOn(Math, "random").mockReturnValueOnce(0).mockReturnValueOnce(0.99);
-      expect(service.getAgent("www.amazon.de")).toEqual({ url: urls[1] });
-      expect(pool.hasFreeSocket).toHaveBeenCalledTimes(2);
-    });
-
-    it("checks at most 20 random proxies for an idle connection", async () => {
-      const { service, pool } = setup();
-      await service.loadProxies();
+      pool.takeLastFree.mockReturnValue(urls[1]);
 
       vi.spyOn(Math, "random").mockReturnValue(0);
-      expect(service.getAgent("www.amazon.fr")).toEqual({ url: urls[0] });
-      expect(pool.hasFreeSocket).toHaveBeenCalledTimes(20);
+      expect(service.getAgent("www.amazon.de")).toEqual({ url: urls[1] });
+      expect(pool.takeLastFree).toHaveBeenCalledWith("www.amazon.de", expect.any(Function));
+    });
+
+    it.each([
+      ["datacenter", urls[0], ispUrls[0]],
+      ["isp", ispUrls[0], urls[0]],
+    ])("accepts only idle proxies of the %s pool", async (proxyType, accepted, rejected) => {
+      const { service, pool } = setup();
+      await service.loadProxies();
+
+      service.getAgent("www.amazon.de", proxyType);
+      const accept = pool.takeLastFree.mock.calls[0][1];
+
+      expect(accept(accepted)).toBe(true);
+      expect(accept(rejected)).toBe(false);
     });
 
     it("picks from the pool of the proxy type", async () => {

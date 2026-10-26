@@ -3,6 +3,8 @@ import { MeteredProxyAgent } from "@/shared/http/proxy/MeteredProxyAgent";
 
 export class ProxyAgentPool {
   private agents = new Map<string, MeteredProxyAgent>();
+  // Per host, proxies in the order their idle connection was last freed
+  private freed = new Map<string, Set<string>>();
   private idleTimeout = 15 * 1000;
 
   constructor(private onConnect: (socket: net.Socket) => void) {}
@@ -21,6 +23,9 @@ export class ProxyAgentPool {
       // close idle sockets
       agent.options.timeout = this.idleTimeout;
       agent.protocol = "https:";
+      agent.on("free", (_socket, options: { host: string }) => {
+        this.markFree(url, options.host);
+      });
       this.agents.set(url, agent);
     }
 
@@ -34,6 +39,31 @@ export class ProxyAgentPool {
     return Object.entries(freeSockets).some(
       ([name, sockets]) => name.startsWith(`${host}:`) && !!sockets?.length
     );
+  }
+
+  // Proxy with the most recently freed idle connection to the host, removed
+  // from the order so the next caller gets another one
+  takeLastFree(host: string, accept: (url: string) => boolean) {
+    const urls = this.freed.get(host);
+    if (!urls) return;
+
+    for (const url of [...urls].reverse()) {
+      if (!this.hasFreeSocket(url, host)) {
+        urls.delete(url);
+        continue;
+      }
+      if (!accept(url)) continue;
+
+      urls.delete(url);
+      return url;
+    }
+  }
+
+  private markFree(url: string, host: string) {
+    const urls = this.freed.get(host) ?? new Set<string>();
+    urls.delete(url);
+    urls.add(url);
+    this.freed.set(host, urls);
   }
 
   retain(urls: string[]) {

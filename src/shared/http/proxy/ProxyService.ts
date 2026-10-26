@@ -8,7 +8,6 @@ export class ProxyService {
   private static instance: ProxyService;
   private pools: Record<string, string[]> = {};
   private loading?: Promise<void>;
-  private idleSearchSize = 20;
 
   private constructor(
     private meter = new ProxyTrafficMeter(),
@@ -28,16 +27,15 @@ export class ProxyService {
     return ProxyService.instance;
   }
 
-  // Random proxy of the pool, preferring one with an idle connection to the
-  // host among a few random picks
+  // Proxy of the pool whose idle connection to the host was freed last, else
+  // a random one
   getAgent(host: string, proxyType = "datacenter") {
     const proxies = this.getProxies(proxyType);
-    for (let i = 0; i < this.idleSearchSize; i++) {
-      const url = this.getRandomProxy(proxies);
-      if (this.pool.hasFreeSocket(url, host)) return this.pool.get(url);
-    }
+    const url =
+      this.pool.takeLastFree(host, (url) => proxies.includes(url)) ??
+      this.getRandomProxy(proxies);
 
-    return this.pool.get(this.getRandomProxy(proxies));
+    return this.pool.get(url);
   }
 
   private getProxies(proxyType: string) {
