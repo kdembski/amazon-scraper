@@ -2,7 +2,7 @@ import { MarketplaceScraper } from "@/shared/interfaces/MarketplaceScraper";
 import { AmazonPlpCategoryScraper } from "@/marketplaces/amazon/plp/AmazonPlpCategoryScraper";
 import { AmazonAdCategory } from "@/marketplaces/amazon/types/amazon.types";
 import { ApiService } from "@/shared/backend/ApiService";
-import { CronJob } from "cron";
+import { sleep } from "@/shared/utils/sleep";
 
 const CATEGORY_RETRY_DELAY = 60 * 1000;
 
@@ -15,8 +15,9 @@ export class AmazonPlpScraper implements MarketplaceScraper {
   ) {}
 
   async execute() {
-    this.scrape();
-    new CronJob("0 0 */1 * * *", () => this.scrape()).start();
+    while (true) {
+      await this.scrape();
+    }
   }
 
   async scrape() {
@@ -26,7 +27,7 @@ export class AmazonPlpScraper implements MarketplaceScraper {
       );
       await this.categoryScraper.execute(category);
     } catch {
-      setTimeout(() => this.scrape(), CATEGORY_RETRY_DELAY);
+      await sleep(CATEGORY_RETRY_DELAY);
     }
   }
 }

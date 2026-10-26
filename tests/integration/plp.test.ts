@@ -212,6 +212,25 @@ describe("PLP", () => {
     expect(posted().map((ad: { asin: string }) => ad.asin).sort()).toEqual(["B0LIST", "B0SAME"]);
   });
 
+  it("scrapes the next category once the previous one is done", async () => {
+    world.backend.onSequence("GET", "amazon/ads/categories/scrap", [
+      { body: category() },
+      { body: { id: 2, name: "toys", scrapedAt: null } },
+      { status: 500 },
+    ]);
+    respondSearch(() => plpPage({ empty: true }));
+    scrape();
+
+    await expect.poll(() => searches().length).toBe(2 * PRICE_RANGES);
+    await sleep(200);
+
+    const toys = searches().filter(({ url }) => url.includes("i=toys"));
+    const electronics = searches().filter(({ url }) => url.includes("i=electronics"));
+    expect(toys).toHaveLength(PRICE_RANGES);
+    expect(_.max(electronics.map(({ at }) => at))).toBeLessThanOrEqual(_.min(toys.map(({ at }) => at))!);
+    expect(world.backend.find("GET", "amazon/ads/categories/scrap")).toHaveLength(3);
+  });
+
   it("reports metrics every minute", async () => {
     respondSearch(({ url }) => plpPage({ asins: [`B0${parse(url).price}`] }));
     scrape();
