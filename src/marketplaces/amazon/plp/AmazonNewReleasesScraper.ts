@@ -6,7 +6,7 @@ import { MetricsService } from "@/shared/metrics/MetricsService";
 import { ItemOutcome } from "@/shared/metrics/metrics.types";
 import { getRetryDelay, MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
 import { sleep } from "@/shared/utils/sleep";
-import { parseHTML } from "linkedom";
+import { parseDocument } from "htmlparser2";
 
 type Crawl = { category: string; nodes: Set<string>; asins: Set<string> };
 
@@ -88,7 +88,7 @@ export class AmazonNewReleasesScraper {
   }
 
   private parse(html: string) {
-    return parseHTML(html).document as unknown as Document;
+    return parseDocument(html);
   }
 
   private countPage(outcome: ItemOutcome) {

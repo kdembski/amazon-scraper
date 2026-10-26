@@ -69,7 +69,7 @@ The bottleneck is open connections (home router NAT, host conntrack), not bandwi
 
 ## HTML parsing (fragile)
 
-Builders in `src/marketplaces/amazon/pdp/` and `src/marketplaces/amazon/plp/` use `linkedom` and Amazon's DOM selectors; layout changes break them silently.
+Builders in `src/marketplaces/amazon/pdp/` and `src/marketplaces/amazon/plp/` get an `htmlparser2` document (`parseDocument`) and query it with Amazon's DOM selectors through `find`/`findAll`/`text` (`@/shared/utils/html`, `css-select` + `domutils`); layout changes break them silently. No full DOM (`linkedom` was 3-4x slower).
 - `cleanUpPrice` assumes a comma decimal separator (EU format).
 - `AmazonAodAdBuilder` reads only `#aod-pinned-offer` (= PDP buybox); no price element means no offer. Price comes from `.a-price-whole` + `.a-price-fraction`. `Amazon.nl` etc. is normalized to `Amazon` (backend checks `dispatchFrom === "Amazon"`).
 

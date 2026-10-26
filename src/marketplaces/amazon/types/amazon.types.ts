@@ -1,3 +1,5 @@
+import type { Document } from "domhandler";
+
 export interface AmazonCountry {
   countryId: number;
   tld: string;

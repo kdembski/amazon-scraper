@@ -9,7 +9,7 @@ import { MetricsService } from "@/shared/metrics/MetricsService";
 import { ItemOutcome, ResponseOutcome } from "@/shared/metrics/metrics.types";
 import { getRetryDelay, MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
 import { sleep } from "@/shared/utils/sleep";
-import { parseHTML } from "linkedom";
+import { parseDocument } from "htmlparser2";
 import _ from "lodash";
 
 type FetchResult = { ok: true; data: string } | { ok: false; status?: number };
@@ -77,8 +77,7 @@ export class AmazonPdpCountryScraper {
     }
 
     try {
-      const { document } = parseHTML(this.builder.trimHtml(result.data));
-      const ad = this.builder.build(document);
+      const ad = this.builder.build(parseDocument(this.builder.trimHtml(result.data)));
 
       if (ad.isCaptcha) {
         this.countResponse(price, "captcha");

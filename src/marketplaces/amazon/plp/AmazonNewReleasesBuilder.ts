@@ -1,9 +1,11 @@
+import type { Document, Element } from "domhandler";
 import { AmazonPlpAd } from "@/marketplaces/amazon/types/amazon.types";
+import { find, findAll, text } from "@/shared/utils/html";
 
 export class AmazonNewReleasesBuilder {
   build(document: Document, category: string) {
-    const isValid = !!document.querySelector("[class*='zg-browse-group']");
-    const items = [...document.querySelectorAll("#gridItemRoot [data-asin]")];
+    const isValid = !!find("[class*='zg-browse-group']", document);
+    const items = findAll("#gridItemRoot [data-asin]", document);
 
     const ads = items.reduce((accum: AmazonPlpAd[], item) => {
       const ad = this.buildItem(item, category);
@@ -15,16 +17,14 @@ export class AmazonNewReleasesBuilder {
       isValid,
       ads,
       nodes: this.buildNodes(document, category),
-      hasNextPage: !!document.querySelector("a[href*='pg=2']"),
+      hasNextPage: !!find("a[href*='pg=2']", document),
     };
   }
 
   private buildItem(item: Element, category: string) {
-    const asin = item.getAttribute("data-asin");
-    const image = item.querySelector("img")?.getAttribute("src");
-    const name = item
-      .querySelector("[class*='p13n-sc-css-line-clamp']")
-      ?.textContent?.trim();
+    const asin = item.attribs["data-asin"];
+    const image = find("img", item)?.attribs.src;
+    const name = text(find("[class*='p13n-sc-css-line-clamp']", item))?.trim();
 
     if (!asin || !image || !name) return;
 
@@ -33,10 +33,10 @@ export class AmazonNewReleasesBuilder {
 
   private buildNodes(document: Document, category: string) {
     const prefix = `/gp/new-releases/${category}/`;
-    const links = document.querySelectorAll(`a[href^='${prefix}']`);
+    const links = findAll(`a[href^='${prefix}']`, document);
 
-    return [...links]
-      .map((link) => link.getAttribute("href")!.slice(prefix.length))
+    return links
+      .map((link) => link.attribs.href.slice(prefix.length))
       .map((path) => path.match(/^\d+/)?.[0])
       .filter((node): node is string => !!node);
   }
