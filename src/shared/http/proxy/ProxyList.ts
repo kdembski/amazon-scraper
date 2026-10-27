@@ -1,4 +1,7 @@
 import axios from "axios";
+import { sleep } from "@/shared/utils/sleep";
+
+type Pools = Record<string, string[]>;
 
 interface WebsharePlan {
   id: number;
@@ -10,34 +13,32 @@ export class ProxyList {
   private retryDelay = 2 * 60 * 1000;
   private webshareUrl = "https://proxy.webshare.io/api/v2";
 
-  load() {
-    return new Promise<Record<string, string[]>>((resolve) => this.download(resolve));
-  }
-
-  private download(resolve: (pools: Record<string, string[]>) => void) {
-    this.downloadPools()
-      .then(resolve)
-      .catch((e) => {
+  async load(): Promise<Pools> {
+    while (true) {
+      try {
+        return await this.downloadPools();
+      } catch (e) {
         console.log("Proxy error: " + e);
-        setTimeout(() => this.download(resolve), this.retryDelay);
-      });
+        await sleep(this.retryDelay);
+      }
+    }
   }
 
-  private async downloadPools() {
+  private async downloadPools(): Promise<Pools> {
     // PROXY_LIST_URL points the list at another source (used by e2e tests)
     if (process.env.PROXY_LIST_URL) {
       return { datacenter: await this.downloadList(process.env.PROXY_LIST_URL) };
     }
+    return this.downloadWebsharePools();
+  }
 
-    const pools: Record<string, string[]> = {};
+  private async downloadWebsharePools() {
+    const pools: Pools = {};
     for (const plan of await this.getActivePlans()) {
-      const type = plan.proxy_subtype === "default" ? "datacenter" : plan.proxy_subtype;
-      const urls = await this.downloadList(
-        `${this.webshareUrl}/proxy/list/download/${process.env.PROXY_LIST_TOKEN}/-/any/username/direct/-/?plan_id=${plan.id}`
-      );
-      pools[type] = [...(pools[type] ?? []), ...urls];
+      const pool = this.getPoolName(plan);
+      const urls = await this.downloadList(this.getPlanListUrl(plan));
+      pools[pool] = [...(pools[pool] ?? []), ...urls];
     }
-
     return pools;
   }
 
@@ -49,17 +50,25 @@ export class ProxyList {
     return response.data.results.filter((plan) => plan.status === "active");
   }
 
+  private getPoolName(plan: WebsharePlan) {
+    return plan.proxy_subtype === "default" ? "datacenter" : plan.proxy_subtype;
+  }
+
+  private getPlanListUrl(plan: WebsharePlan) {
+    const token = process.env.PROXY_LIST_TOKEN;
+    return `${this.webshareUrl}/proxy/list/download/${token}/-/any/username/direct/-/?plan_id=${plan.id}`;
+  }
+
   private async downloadList(url: string) {
-    return this.parse((await axios.get<string>(url)).data);
+    const { data } = await axios.get<string>(url);
+    return data
+      .split(/\r?\n/)
+      .filter((line) => !!line)
+      .map((line) => this.toUrl(line));
   }
 
-  private parse(data: string) {
-    const lines = data.includes("\r\n") ? data.split("\r\n") : data.split("\n");
-    return lines.filter((line) => !!line).map((line) => this.toUrl(line));
-  }
-
-  private toUrl(proxy: string) {
-    const parts = proxy.split(":");
-    return `http://${parts[2]}:${parts[3]}@${parts[0]}:${parts[1]}`;
+  private toUrl(line: string) {
+    const [host, port, username, password] = line.split(":");
+    return `http://${username}:${password}@${host}:${port}`;
   }
 }
