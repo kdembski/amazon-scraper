@@ -86,12 +86,12 @@ describe("ScrapingClient", () => {
         headers: {
           "User-Agent": expect.stringMatching(/\S+/),
           Referer: "https://www.amazon.de/s?k=B0TESTASIN",
-          "Referrer-Policy": "strict-origin-when-cross-origin",
+          "Accept-Encoding": "gzip, deflate, br",
         },
       });
     });
 
-    it("sends only desktop User-Agents", async () => {
+    it("sends only desktop Chrome User-Agents", async () => {
       const { service, requests } = setup();
       get.mockResolvedValue({ data: "<html>" });
 
@@ -103,7 +103,8 @@ describe("ScrapingClient", () => {
       );
       expect(userAgents).toHaveLength(50);
       userAgents.forEach((userAgent) => {
-        expect(userAgent).not.toMatch(/Mobile|Android|iPhone|iPad/);
+        expect(userAgent).not.toMatch(/Mobile|Android|iPhone|iPad|Edg|Firefox/);
+        expect(userAgent).toMatch(/Windows NT 10\.0.* Chrome\/\d+\.0\.0\.0 Safari/);
       });
     });
 

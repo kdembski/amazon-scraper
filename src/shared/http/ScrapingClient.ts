@@ -1,6 +1,5 @@
 import axios from "axios";
 import _ from "lodash";
-import UserAgent from "user-agents";
 import { ScraperConfigService } from "@/shared/backend/ScraperConfigService";
 import { ProxyService } from "@/shared/http/proxy/ProxyService";
 import { RequestQueueService } from "@/shared/http/RequestQueueService";
@@ -10,8 +9,9 @@ import type { MetricLabels, RequestOutcome } from "@/shared/metrics/metrics.type
 export class ScrapingClient {
   private static instance: ScrapingClient;
   private timeout = 20 * 1000;
-  private userAgents = Array.from({ length: 500 }, () =>
-    new UserAgent({ deviceCategory: "desktop" }).toString()
+  private userAgents = [138, 139, 140, 141].map(
+    (version) =>
+      `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${version}.0.0.0 Safari/537.36`
   );
   private proxyService;
   private metricsService;
@@ -88,7 +88,7 @@ export class ScrapingClient {
             headers: {
               "User-Agent": userAgent,
               Referer: referer,
-              "Referrer-Policy": "strict-origin-when-cross-origin",
+              "Accept-Encoding": "gzip, deflate, br",
             },
           })
           .then((response) => {
