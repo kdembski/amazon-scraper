@@ -2,6 +2,7 @@ import { configDotenv } from "dotenv";
 import { parseDocument } from "htmlparser2";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { AmazonAodAdBuilder } from "@/marketplaces/amazon/pdp/AmazonAodAdBuilder";
+import { AmazonAwdAdBuilder } from "@/marketplaces/amazon/pdp/AmazonAwdAdBuilder";
 import { AmazonTwisterAdBuilder } from "@/marketplaces/amazon/pdp/AmazonTwisterAdBuilder";
 import { AmazonPlpBuilder } from "@/marketplaces/amazon/plp/AmazonPlpBuilder";
 import { AmazonService } from "@/marketplaces/amazon/AmazonService";
@@ -154,6 +155,19 @@ describe("live Amazon", () => {
     expect(priced.length).toBeGreaterThanOrEqual(answered.length * 0.75);
   });
 
+  it("finds the buy box offer through gp/aw/d", async () => {
+    const awdMarkets = markets.filter((code) => ["de", "fr"].includes(code));
+    const results = await scrapeAll(new AmazonAwdAdBuilder(), awdMarkets, true);
+    console.info(summarize(results).join("\n"));
+
+    const answered = answeredOf(results);
+    const priced = answered.filter(
+      (result) => result.price! > 0 && result.dispatchFrom
+    );
+
+    expect(answered.length, "every request was blocked").toBeGreaterThan(0);
+    expect(priced.length).toBeGreaterThanOrEqual(answered.length * 0.75);
+  });
 
   it("finds products and the last page on an amazon.pl listing", async () => {
     const builder = new AmazonPlpBuilder();

@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AmazonPdpCountryScraper } from "@/marketplaces/amazon/pdp/AmazonPdpCountryScraper";
+import {
+  AmazonPdpCountryScraper,
+  NOT_FOUND_TO_DELETE,
+} from "@/marketplaces/amazon/pdp/AmazonPdpCountryScraper";
 import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
 import { AmazonAdBuildResult } from "@/marketplaces/amazon/types/amazon.types";
 import type { MetricsService } from "@/shared/metrics/MetricsService";
@@ -216,16 +219,29 @@ describe("AmazonPdpCountryScraper", () => {
     });
   });
 
-  it("returns deleted on 404 without retrying", async () => {
-    const { amazon, price, outcome, run } = setup();
+  it("retries a 404 and returns deleted after NOT_FOUND_TO_DELETE of them", async () => {
+    const { amazon, price, outcome, run, failLast } = setup();
     run();
 
-    amazon.fail(0, notFound);
-    await vi.runAllTimersAsync();
+    for (let i = 0; i < NOT_FOUND_TO_DELETE; i++) await failLast(notFound);
 
-    expect(price.failed).toBe(0);
-    expect(amazon.get).toHaveBeenCalledTimes(1);
+    expect(price.notFound).toBe(NOT_FOUND_TO_DELETE);
+    expect(price.failed).toBe(NOT_FOUND_TO_DELETE - 1);
+    expect(amazon.get).toHaveBeenCalledTimes(NOT_FOUND_TO_DELETE);
     expect(outcome).toHaveBeenCalledWith("deleted");
+  });
+
+  it("keeps the price when a retry after a 404 succeeds", async () => {
+    const { amazon, price, outcome, run, failLast } = setup();
+    run();
+
+    await failLast(notFound);
+    amazon.respond(1, html);
+    await flush();
+
+    expect(price.notFound).toBe(1);
+    expect(price.value).toBe(10);
+    expect(outcome).toHaveBeenCalledWith("data");
   });
 
   describe("metrics", () => {
@@ -278,15 +294,14 @@ describe("AmazonPdpCountryScraper", () => {
     });
 
     it("counts a deleted item", async () => {
-      const { amazon, run, increment } = setup();
+      const { run, failLast, increment } = setup();
       run();
 
-      amazon.fail(0, notFound);
-      await flush();
+      for (let i = 0; i < NOT_FOUND_TO_DELETE; i++) await failLast(notFound);
 
       const labels = { country: "c1", outcome: "deleted" };
       expect(increment).toHaveBeenCalledWith("items", labels);
-      expect(increment).toHaveBeenCalledWith("item_attempts", labels, 1);
+      expect(increment).toHaveBeenCalledWith("item_attempts", labels, NOT_FOUND_TO_DELETE);
     });
 
     it("counts a given up country with the failed attempts", async () => {
@@ -311,18 +326,79 @@ describe("AmazonPdpCountryScraper", () => {
         referer: `${country.tld}/dp/${ad.asin}`,
       }));
       twister.builder.stopAt = ["a", "b"];
+      twister.builder.notFoundIsNoData = true;
+      const awd = fakeAdBuilder({ price: 30 });
+      awd.buildUrl.mockImplementation((country, ad) => ({
+        url: `${country.tld}/awd/${ad.asin}`,
+        referer: `${country.tld}/`,
+      }));
       const metrics = { increment: vi.fn() } as unknown as MetricsService;
       const scraper = new AmazonPdpCountryScraper(
         amazon.service,
-        { aod: aod.builder, twister: twister.builder },
+        { aod: aod.builder, twister: twister.builder, awd: awd.builder },
         metrics
       );
       const price = buildPrice({ country: buildAmazonCountry({ tld: "c1", pdpSource }) });
       const outcome = vi.fn();
       const run = () => scraper.execute(price, buildAd(), () => false).then(outcome);
 
-      return { amazon, aod, twister, price, outcome, run };
+      return { amazon, aod, twister, awd, price, outcome, run };
     };
+
+    it("moves to the next source on a 404 without counting a failure", async () => {
+      const { amazon, awd, price, outcome, run } = setupSources("twister,awd");
+      run();
+
+      amazon.fail(0, notFound);
+      await flush();
+
+      expect(amazon.requests[1].url).toBe("c1/awd/B0TESTASIN");
+      expect(price.failed).toBe(0);
+      amazon.respond(1, html);
+      await flush();
+
+      expect(awd.build).toHaveBeenCalled();
+      expect(price.value).toBe(30);
+      expect(outcome).toHaveBeenCalledWith("data");
+    });
+
+    it("retries the fallback source, not the first one", async () => {
+      const { amazon, run } = setupSources("twister,awd");
+      run();
+
+      amazon.fail(0, notFound);
+      await flush();
+      amazon.fail(1, { status: 503 });
+      await flush();
+      await vi.runAllTimersAsync();
+
+      expect(amazon.requests[2].url).toBe("c1/awd/B0TESTASIN");
+    });
+
+    it("deletes the country after NOT_FOUND_TO_DELETE 404s from the last source", async () => {
+      const { amazon, price, outcome, run } = setupSources("twister,awd");
+      run();
+
+      amazon.fail(0, notFound);
+      await flush();
+      for (let i = 1; i <= NOT_FOUND_TO_DELETE; i++) {
+        amazon.fail(i, notFound);
+        await vi.runAllTimersAsync();
+      }
+
+      expect(amazon.requests.slice(1).map((request) => request.url)).toEqual(
+        Array(NOT_FOUND_TO_DELETE).fill("c1/awd/B0TESTASIN")
+      );
+      expect(price.notFound).toBe(NOT_FOUND_TO_DELETE);
+      expect(outcome).toHaveBeenCalledWith("deleted");
+    });
+
+    it("skips unknown sources in the list", () => {
+      const { amazon, run } = setupSources("x, twister");
+      run();
+
+      expect(amazon.requests[0].url).toBe("c1/twister/B0TESTASIN");
+    });
 
     it("scrapes a twister country through twister with its stop markers", async () => {
       const { amazon, twister, price, outcome, run } = setupSources("twister");
@@ -346,33 +422,16 @@ describe("AmazonPdpCountryScraper", () => {
       expect(amazon.get.mock.calls[0][4]).toBeUndefined();
     });
 
-    it("falls back to AOD on a twister 404", async () => {
-      const { amazon, aod, price, outcome, run } = setupSources("twister");
+    it("finishes a twister country without a price on a 404", async () => {
+      const { amazon, price, outcome, run } = setupSources("twister");
       run();
 
       amazon.fail(0, notFound);
       await flush();
 
-      expect(amazon.requests[1].url).toBe("c1/dp/B0TESTASIN");
-      expect(price.failed).toBe(0);
-      amazon.respond(1, html);
-      await flush();
-
-      expect(aod.build).toHaveBeenCalled();
-      expect(price.value).toBe(10);
-      expect(outcome).toHaveBeenCalledWith("data");
-    });
-
-    it("deletes the country on an AOD 404 after the fallback", async () => {
-      const { amazon, outcome, run } = setupSources("twister");
-      run();
-
-      amazon.fail(0, notFound);
-      await flush();
-      amazon.fail(1, notFound);
-      await flush();
-
-      expect(outcome).toHaveBeenCalledWith("deleted");
+      expect(amazon.requests).toHaveLength(1);
+      expect(price.value).toBeUndefined();
+      expect(outcome).toHaveBeenCalledWith("no_data");
     });
   });
 

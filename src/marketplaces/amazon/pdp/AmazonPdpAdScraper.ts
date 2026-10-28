@@ -41,6 +41,7 @@ export class AmazonPdpAdScraper {
       complete: false,
       deleted: false,
       failed: 0,
+      notFound: 0,
     }));
   }
 

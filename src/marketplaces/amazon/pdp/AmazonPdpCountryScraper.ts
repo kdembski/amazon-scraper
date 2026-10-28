@@ -1,5 +1,6 @@
 import { AmazonService } from "@/marketplaces/amazon/AmazonService";
 import { AmazonAodAdBuilder } from "@/marketplaces/amazon/pdp/AmazonAodAdBuilder";
+import { AmazonAwdAdBuilder } from "@/marketplaces/amazon/pdp/AmazonAwdAdBuilder";
 import { AmazonTwisterAdBuilder } from "@/marketplaces/amazon/pdp/AmazonTwisterAdBuilder";
 import {
   AmazonAd,
@@ -13,6 +14,8 @@ import { sleep } from "@/shared/utils/sleep";
 import { parseDocument } from "htmlparser2";
 import _ from "lodash";
 
+export const NOT_FOUND_TO_DELETE = 2;
+
 type FetchResult = { ok: true; data: string } | { ok: false; status?: number };
 
 export class AmazonPdpCountryScraper {
@@ -21,6 +24,7 @@ export class AmazonPdpCountryScraper {
     private builders: Record<string, AmazonAdBuilder> = {
       aod: new AmazonAodAdBuilder(),
       twister: new AmazonTwisterAdBuilder(),
+      awd: new AmazonAwdAdBuilder(),
     },
     private metricsService = MetricsService.getInstance()
   ) {}
@@ -30,14 +34,15 @@ export class AmazonPdpCountryScraper {
     ad: AmazonAd,
     isCancelled: () => boolean
   ): Promise<ItemOutcome | undefined> {
-    let builder = this.builders[price.country.pdpSource] ?? this.builders.aod;
+    const sources = this.getSources(price.country.pdpSource);
+    let builder = sources.shift()!;
 
     while (!isCancelled()) {
       const result = await this.fetch(builder, ad, price, isCancelled);
       if (isCancelled()) return;
 
-      if (!result.ok && result.status === 404 && builder !== this.builders.aod) {
-        builder = this.builders.aod;
+      if (!result.ok && result.status === 404 && sources.length) {
+        builder = sources.shift()!;
         continue;
       }
 
@@ -55,6 +60,14 @@ export class AmazonPdpCountryScraper {
 
       await sleep(getRetryDelay(price.failed));
     }
+  }
+
+  // "twister,awd": the next source is asked on a 404
+  private getSources(pdpSource: string) {
+    const sources = _.compact(
+      pdpSource.split(",").map((source) => this.builders[source.trim()])
+    );
+    return sources.length ? sources : [this.builders.aod];
   }
 
   private fetch(
@@ -85,7 +98,12 @@ export class AmazonPdpCountryScraper {
     price: AmazonAdPrice,
     builder: AmazonAdBuilder
   ): ItemOutcome | undefined {
-    if (!result.ok) return result.status === 404 ? "deleted" : undefined;
+    if (!result.ok) {
+      if (result.status !== 404) return;
+      if (builder.notFoundIsNoData) return "no_data";
+      price.notFound++;
+      return price.notFound >= NOT_FOUND_TO_DELETE ? "deleted" : undefined;
+    }
 
     if (!result.data.length) {
       this.countResponse(price, "empty");

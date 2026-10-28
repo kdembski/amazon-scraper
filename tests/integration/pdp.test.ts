@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
+import { NOT_FOUND_TO_DELETE } from "@/marketplaces/amazon/pdp/AmazonPdpCountryScraper";
 import { AmazonPdpScraper } from "@/marketplaces/amazon/pdp/AmazonPdpScraper";
 import { cronJobs } from "@@tests/support/cron";
 import { buildAd, buildAmazonCountry } from "@@tests/support/factories";
-import { aodPage, captchaPage, twisterBuybox, twisterResponse } from "@@tests/support/html";
+import { aodPage, awdPage, captchaPage, twisterBuybox, twisterResponse } from "@@tests/support/html";
 import {
   bootScraper,
   sleep,
@@ -89,7 +90,7 @@ describe("PDP", () => {
   });
 
 
-  it("scrapes twister countries and falls back to AOD on a 404", async () => {
+  it("scrapes twister countries and leaves out one with a 404", async () => {
     world.backend.on("GET", "amazon/countries/scrap", [
       buildAmazonCountry({ countryId: 1, tld: "de", pdpSource: "twister" }),
       buildAmazonCountry({ countryId: 2, tld: "fr", pdpSource: "twister" }),
@@ -109,18 +110,38 @@ describe("PDP", () => {
     expect(put.body).toEqual({
       prices: [
         price(1, 24.99, "Amazon"),
-        price(2, 25.49, "Amazon"),
         price(3, 26, "Some Seller"),
       ],
     });
     expect(world.backend.find("DELETE", "amazon/ads/7")).toHaveLength(0);
     expect(world.amazon.requestsTo("fr").map((request) => request.url)).toEqual([
       "fr/gp/twister/ajaxv2?asinList=B0TESTASIN&id=B0TESTASIN&parentAsin=B0TESTASIN&mType=full&json=1&isUDPFlag=1&dpxAjaxFlag=1&isFlushing=2&psc=1",
-      "fr/gp/product/ajax/aodAjaxMain/?asin=B0TESTASIN&pc=dp",
     ]);
     expect(world.amazon.requestsTo("de")[0].headers.referer).toBe(
       "https://www.amazon.de/dp/B0TESTASIN"
     );
+  });
+
+  it("asks gp/aw/d after a twister 404", async () => {
+    world.backend.on("GET", "amazon/countries/scrap", [
+      buildAmazonCountry({ countryId: 1, tld: "de" }),
+      buildAmazonCountry({ countryId: 2, tld: "fr", pdpSource: "twister,awd" }),
+      buildAmazonCountry({ countryId: 3, tld: "it" }),
+    ]);
+    world.amazon.respond(({ country, url }) => {
+      if (country !== "fr") return offers[country as keyof typeof offers][0];
+      if (url.includes("gp/twister/ajaxv2")) return { status: 404 };
+      return awdPage(twisterBuybox({ price: "25,49", soldBy: "Amazon.fr" }));
+    });
+    scrape();
+
+    const put = await world.backend.waitFor("PUT", "amazon/ads/7");
+
+    expect(put.body.prices[1]).toEqual(price(2, 25.49, "Amazon"));
+    expect(world.amazon.requestsTo("fr").map((request) => request.url)[1]).toBe(
+      "fr/gp/aw/d/B0TESTASIN?th=1&psc=1"
+    );
+    expect(world.amazon.requestsTo("fr")[1].headers.referer).toBe("https://www.amazon.fr/");
   });
 
   it("leaves out a country without an offer", async () => {
@@ -175,17 +196,32 @@ describe("PDP", () => {
 
     const put = await world.backend.waitFor("PUT", "amazon/ads/7");
 
-    expect(world.amazon.requestsTo("it")).toHaveLength(1);
+    expect(world.amazon.requestsTo("it")).toHaveLength(NOT_FOUND_TO_DELETE);
     expect(put.body.prices.map((p: any) => p.countryId)).toEqual([1, 2, 4]);
   });
 
-  it("deletes the ad when at most two countries are left", async () => {
-    world.amazon.respondPerCountry({ ...offers, de: [{ status: 404 }] });
+  it("keeps the price of a country whose 404 was not repeated", async () => {
+    world.amazon.respondPerCountry({ ...offers, it: [{ status: 404 }, offers.it[0]] });
+    scrape();
+
+    const put = await world.backend.waitFor("PUT", "amazon/ads/7");
+
+    expect(world.amazon.requestsTo("it")).toHaveLength(2);
+    expect(put.body.prices.map((p: any) => p.countryId)).toEqual([1, 2, 3]);
+  });
+
+  it("deletes the ad when every active country is gone", async () => {
+    world.backend.on("GET", "amazon/countries/scrap", [
+      buildAmazonCountry({ countryId: 1, tld: "de" }),
+      buildAmazonCountry({ countryId: 2, tld: "fr", active: false }),
+    ]);
+    world.amazon.respondPerCountry({ de: [{ status: 404 }], fr: offers.fr });
     scrape();
 
     await world.backend.waitFor("DELETE", "amazon/ads/7");
     await sleep(200);
 
+    expect(world.amazon.requestsTo("de")).toHaveLength(NOT_FOUND_TO_DELETE);
     expect(world.backend.find("PUT", "amazon/ads/7")).toHaveLength(0);
   });
 

@@ -3,6 +3,7 @@ import type { Document } from "domhandler";
 export interface AmazonCountry {
   countryId: number;
   tld: string;
+  active: boolean;
   proxyType: string;
   pdpSource: string;
   priority: number;
@@ -37,6 +38,8 @@ export interface AmazonAdBuildResult {
 export interface AmazonAdBuilder {
   // Markers that must arrive in this order; the response is not needed past the last one
   stopAt?: string[];
+  // A 404 means only that this source has no data, not that the product is gone
+  notFoundIsNoData?: boolean;
   trimHtml(html: string): string;
   build(document: Document): AmazonAdBuildResult;
   buildUrl(country: AmazonCountry, ad: AmazonAd): { url: string; referer: string };
@@ -49,4 +52,5 @@ export interface AmazonAdPrice {
   complete: boolean;
   deleted: boolean;
   failed: number;
+  notFound: number;
 }

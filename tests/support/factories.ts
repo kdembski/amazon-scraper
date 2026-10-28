@@ -7,6 +7,7 @@ import { AmazonCountry } from "@/marketplaces/amazon/types/amazon.types";
 export const buildAmazonCountry = (overrides: Partial<AmazonCountry> = {}): AmazonCountry => ({
   countryId: 1,
   tld: "de",
+  active: true,
   proxyType: "datacenter",
   pdpSource: "aod",
   priority: 0,
@@ -26,6 +27,7 @@ export const buildPrice = (
   complete: false,
   deleted: false,
   failed: 0,
+  notFound: 0,
   ...overrides,
 });
 
