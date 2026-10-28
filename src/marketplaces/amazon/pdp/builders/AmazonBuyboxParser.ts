@@ -10,8 +10,8 @@ const CART_PRICE = "input[name='items[0.base][customerVisiblePrice][amount]']";
 // Product page buy box (twister fragment, gp/aw/d)
 export class AmazonBuyboxParser {
   constructor(
-    private readonly priceParser = new AmazonPriceParser(),
-    private readonly dispatchFromNormalizer = new AmazonDispatchFromNormalizer()
+    private priceParser = new AmazonPriceParser(),
+    private dispatchFromNormalizer = new AmazonDispatchFromNormalizer()
   ) {}
 
   parse(buybox: Element | null | undefined): AmazonAdBuildResult {

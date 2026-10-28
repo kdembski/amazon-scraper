@@ -12,9 +12,9 @@ import { find, text } from "@/shared/utils/html";
 
 export class AmazonAodAdBuilder implements AmazonAdBuilder {
   constructor(
-    private readonly captchaDetector = new AmazonCaptchaDetector(),
-    private readonly priceParser = new AmazonPriceParser(),
-    private readonly dispatchFromNormalizer = new AmazonDispatchFromNormalizer()
+    private captchaDetector = new AmazonCaptchaDetector(),
+    private priceParser = new AmazonPriceParser(),
+    private dispatchFromNormalizer = new AmazonDispatchFromNormalizer()
   ) {}
 
   // Cuts the filters and the other offers that follow the pinned offer

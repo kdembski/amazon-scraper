@@ -14,17 +14,12 @@ const MIN_VALUES: ScraperConfig = { concurrency: 1, rps: 0, batchSize: 1 };
 
 export class ScraperConfigService {
   private static instance: ScraperConfigService;
-  private apiService;
-  private getQueue;
   private config: ScraperConfig = { concurrency: 10, rps: 0, batchSize: 50 };
 
   private constructor(
-    apiService = ApiService.getInstance(),
-    getQueue = () => ScrapingClient.getInstance().queueService
-  ) {
-    this.apiService = apiService;
-    this.getQueue = getQueue;
-  }
+    private apiService = ApiService.getInstance(),
+    private getQueue = () => ScrapingClient.getInstance().queueService
+  ) {}
 
   public static getInstance(): ScraperConfigService {
     if (!ScraperConfigService.instance) {

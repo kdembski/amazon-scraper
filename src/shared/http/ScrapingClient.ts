@@ -14,24 +14,18 @@ export class ScrapingClient {
     (version) =>
       `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${version}.0.0.0 Safari/537.36`
   );
-  private proxyService;
-  private metricsService;
-  queueService;
 
   private constructor(
     configService = ScraperConfigService.getInstance(),
-    proxyService = ProxyService.getInstance(),
-    queueService = new RequestQueueService(
+    private proxyService = ProxyService.getInstance(),
+    public queueService = new RequestQueueService(
       configService.get().concurrency,
       configService.get().rps,
       true,
       () => proxyService.countConnections()
     ),
-    metricsService = MetricsService.getInstance()
+    private metricsService = MetricsService.getInstance()
   ) {
-    this.metricsService = metricsService;
-    this.queueService = queueService;
-    this.proxyService = proxyService;
     queueService.start();
   }
 

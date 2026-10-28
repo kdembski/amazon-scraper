@@ -4,16 +4,11 @@ import { ThrottledQueue } from "@/shared/http/ThrottledQueue";
 
 export class ApiService {
   private static instance: ApiService;
-  private writeQueue;
-  private agent;
 
   private constructor(
-    writeQueue = new ThrottledQueue(5, 25),
-    agent = new http.Agent({ keepAlive: true })
-  ) {
-    this.writeQueue = writeQueue;
-    this.agent = agent;
-  }
+    private writeQueue = new ThrottledQueue(5, 25),
+    private agent = new http.Agent({ keepAlive: true })
+  ) {}
 
   public static getInstance(): ApiService {
     if (!ApiService.instance) {

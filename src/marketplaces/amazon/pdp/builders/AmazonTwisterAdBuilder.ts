@@ -18,8 +18,8 @@ export class AmazonTwisterAdBuilder implements AmazonAdBuilder {
   notFoundIsNoData = true;
 
   constructor(
-    private readonly captchaDetector = new AmazonCaptchaDetector(),
-    private readonly buyboxParser = new AmazonBuyboxParser()
+    private captchaDetector = new AmazonCaptchaDetector(),
+    private buyboxParser = new AmazonBuyboxParser()
   ) {}
 
   // Takes the buy box out of the JSON parts of the response

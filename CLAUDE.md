@@ -84,7 +84,7 @@ Builders in `src/marketplaces/amazon/pdp/builders/` (with their parsers) and `sr
 - Imports via `@/` (`src/`) and, in tests, `@@tests/` (`tests/`).
 - Logic lives in classes, one per file; plain exported functions only for small helpers (like `@/shared/utils`).
 - Method names do not repeat the class name: `AmazonPriceParser.parse()`, not `getOfferPrice()`.
-- Shared services are singletons with `getInstance()`; other classes take dependencies as defaulted constructor params.
+- Shared services are singletons with `getInstance()`; other classes take dependencies as defaulted constructor params. Dependencies and stored constructor args are parameter properties (`constructor(private apiService = ApiService.getInstance()) {}`), not fields assigned in the body; no `readonly`.
 - Style: 2 spaces, double quotes, semicolons, `lodash` as `_`. Comments in English.
 - Arrow functions without braces only when the whole function fits on one line; otherwise use a block body.
 - No `else if` (and no `else` after a branch that returns): use inverted ifs with early returns.

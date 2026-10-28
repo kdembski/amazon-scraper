@@ -1,22 +1,16 @@
 export class RequestQueueService {
   queue: (() => any)[] = [];
   pending = 0;
-  concurrency;
-  rps;
   private tokens;
   private lastRefill = Date.now();
-  private countConnections;
 
   constructor(
-    concurrency: number,
-    rps = 0,
+    public concurrency: number,
+    public rps = 0,
     enableLogs = false,
-    countConnections?: () => number
+    private countConnections?: () => number
   ) {
-    this.concurrency = concurrency;
-    this.rps = rps;
     this.tokens = rps;
-    this.countConnections = countConnections;
 
     if (enableLogs) {
       setInterval(() => this.logState(), 1000);

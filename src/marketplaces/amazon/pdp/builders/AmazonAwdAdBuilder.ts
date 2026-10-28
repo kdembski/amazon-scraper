@@ -13,8 +13,8 @@ const BUYBOX = 'id="buybox"';
 
 export class AmazonAwdAdBuilder implements AmazonAdBuilder {
   constructor(
-    private readonly captchaDetector = new AmazonCaptchaDetector(),
-    private readonly buyboxParser = new AmazonBuyboxParser()
+    private captchaDetector = new AmazonCaptchaDetector(),
+    private buyboxParser = new AmazonBuyboxParser()
   ) {}
 
   // Cuts the header and the related products that come before the buy box

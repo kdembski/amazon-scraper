@@ -14,16 +14,6 @@ const PING_TIMEOUT_MS = 2000;
 
 export class MetricsReporter {
   private static instance: MetricsReporter;
-  private argsService;
-  private apiService;
-  private metricsService;
-  private scrapingClient;
-  private proxyService;
-  private now;
-  private eventLoopDelay;
-  private cpuUsage;
-  private memoryRss;
-  private ping;
   private marketplace = "";
   private periodStart = new Date();
   private cpu: NodeJS.CpuUsage = { user: 0, system: 0 };
@@ -31,30 +21,19 @@ export class MetricsReporter {
   private timeout = 30 * 1000;
 
   private constructor(
-    argsService = ArgsService.getInstance(),
-    apiService = ApiService.getInstance(),
-    metricsService = MetricsService.getInstance(),
-    scrapingClient = ScrapingClient.getInstance(),
-    proxyService = ProxyService.getInstance(),
-    now = () => new Date(),
-    eventLoopDelay = monitorEventLoopDelay({
+    private argsService = ArgsService.getInstance(),
+    private apiService = ApiService.getInstance(),
+    private metricsService = MetricsService.getInstance(),
+    private scrapingClient = ScrapingClient.getInstance(),
+    private proxyService = ProxyService.getInstance(),
+    private now = () => new Date(),
+    private eventLoopDelay = monitorEventLoopDelay({
       resolution: EVENT_LOOP_RESOLUTION_MS,
     }),
-    cpuUsage = () => process.cpuUsage(),
-    memoryRss = () => process.memoryUsage.rss(),
-    ping = () => tcpPing(PING_HOST, PING_PORT, PING_TIMEOUT_MS)
-  ) {
-    this.argsService = argsService;
-    this.apiService = apiService;
-    this.metricsService = metricsService;
-    this.scrapingClient = scrapingClient;
-    this.proxyService = proxyService;
-    this.now = now;
-    this.eventLoopDelay = eventLoopDelay;
-    this.cpuUsage = cpuUsage;
-    this.memoryRss = memoryRss;
-    this.ping = ping;
-  }
+    private cpuUsage = () => process.cpuUsage(),
+    private memoryRss = () => process.memoryUsage.rss(),
+    private ping = () => tcpPing(PING_HOST, PING_PORT, PING_TIMEOUT_MS)
+  ) {}
 
   public static getInstance(): MetricsReporter {
     if (!MetricsReporter.instance) {
