@@ -3,6 +3,7 @@ import type { Document } from "domhandler";
 export interface AmazonCountry {
   countryId: number;
   tld: string;
+  active: boolean;
   proxyType: string;
   pdpSource: string;
   priority: number;
@@ -51,4 +52,5 @@ export interface AmazonAdPrice {
   complete: boolean;
   deleted: boolean;
   failed: number;
+  notFound: number;
 }

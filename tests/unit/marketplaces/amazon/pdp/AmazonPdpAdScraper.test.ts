@@ -7,7 +7,7 @@ import type { ItemOutcome } from "@/shared/metrics/metrics.types";
 import { buildAd, buildAmazonCountry } from "@@tests/support/factories";
 import { fakeApiService } from "@@tests/support/fakes";
 
-const setup = (count: number, priorities: number[] = []) => {
+const setup = (count: number, priorities: number[] = [], active: boolean[] = []) => {
   const api = fakeApiService();
   const runs: {
     price: AmazonAdPrice;
@@ -26,7 +26,12 @@ const setup = (count: number, priorities: number[] = []) => {
   );
   const ad = buildAd({ id: 7 });
   const countries = Array.from({ length: count }, (_, i) =>
-    buildAmazonCountry({ countryId: i + 1, tld: `c${i + 1}`, priority: priorities[i] ?? 0 })
+    buildAmazonCountry({
+      countryId: i + 1,
+      tld: `c${i + 1}`,
+      priority: priorities[i] ?? 0,
+      active: active[i] ?? true,
+    })
   );
   const done = vi.fn();
   scraper.execute(ad, countries).then(done);
@@ -57,7 +62,7 @@ describe("AmazonPdpAdScraper", () => {
     expect(execute).toHaveBeenCalledTimes(2);
     countries.forEach((country, i) =>
       expect(execute.mock.calls[i]).toEqual([
-        { country, complete: false, deleted: false, failed: 0 },
+        { country, complete: false, deleted: false, failed: 0, notFound: 0 },
         ad,
         expect.any(Function),
       ])
@@ -160,19 +165,35 @@ describe("AmazonPdpAdScraper", () => {
       expect(done).toHaveBeenCalledTimes(1);
     });
 
-    it("deletes the ad when at most 2 countries are left and cancels the rest", async () => {
+    it("sends the remaining price when one active country is not deleted", async () => {
       const { api, runs, done, withPrice } = setup(5);
 
-      [0, 1, 2].forEach((i) => runs[i].finish("deleted"));
+      [0, 1, 2, 3].forEach((i) => runs[i].finish("deleted"));
+      withPrice(4);
+      await flush();
+
+      expect(api.delete).not.toHaveBeenCalled();
+      expect(api.put).toHaveBeenCalledWith("amazon/ads/7", sent([5]));
+      expect(done).toHaveBeenCalledTimes(1);
+    });
+
+    it("deletes the ad when every active country is deleted and cancels the inactive ones", async () => {
+      const { api, runs, done, withPrice } = setup(5, [], [true, true, false, false, false]);
+
+      runs[0].finish("deleted");
+      await flush();
+      expect(api.delete).not.toHaveBeenCalled();
+
+      runs[1].finish("deleted");
       await flush();
 
       expect(api.delete).toHaveBeenCalledTimes(1);
       expect(api.delete).toHaveBeenCalledWith("amazon/ads/7");
       expect(done).toHaveBeenCalledTimes(1);
-      expect(runs[3].isCancelled()).toBe(true);
+      expect(runs[2].isCancelled()).toBe(true);
 
-      withPrice(3);
-      runs[4].finish("deleted");
+      withPrice(2);
+      runs[3].finish("deleted");
       await flush();
 
       expect(api.put).not.toHaveBeenCalled();
@@ -225,8 +246,8 @@ describe("AmazonPdpAdScraper", () => {
       expect(started(runs)).toHaveLength(5);
     });
 
-    it("deletes the ad without starting lower priority countries", async () => {
-      const { api, runs, done } = setup(5, [1, 1, 1, 0, 0]);
+    it("deletes the ad without starting lower priority inactive countries", async () => {
+      const { api, runs, done } = setup(5, [1, 1, 1, 0, 0], [true, true, true, false, false]);
 
       [0, 1, 2].forEach((i) => runs[i].finish("deleted"));
       await flush();
@@ -234,6 +255,20 @@ describe("AmazonPdpAdScraper", () => {
       expect(api.delete).toHaveBeenCalledWith("amazon/ads/7");
       expect(done).toHaveBeenCalledTimes(1);
       expect(started(runs)).toHaveLength(3);
+    });
+
+    it("starts lower priority active countries before deleting the ad", async () => {
+      const { api, runs, done } = setup(3, [1, 1, 0]);
+
+      [0, 1].forEach((i) => runs[i].finish("deleted"));
+      await flush();
+      expect(api.delete).not.toHaveBeenCalled();
+      expect(started(runs)).toEqual(["c1", "c2", "c3"]);
+
+      runs[2].finish("deleted");
+      await flush();
+      expect(api.delete).toHaveBeenCalledWith("amazon/ads/7");
+      expect(done).toHaveBeenCalledTimes(1);
     });
   });
 });

@@ -14,6 +14,8 @@ import { sleep } from "@/shared/utils/sleep";
 import { parseDocument } from "htmlparser2";
 import _ from "lodash";
 
+export const NOT_FOUND_TO_DELETE = 2;
+
 type FetchResult = { ok: true; data: string } | { ok: false; status?: number };
 
 export class AmazonPdpCountryScraper {
@@ -98,7 +100,9 @@ export class AmazonPdpCountryScraper {
   ): ItemOutcome | undefined {
     if (!result.ok) {
       if (result.status !== 404) return;
-      return builder.notFoundIsNoData ? "no_data" : "deleted";
+      if (builder.notFoundIsNoData) return "no_data";
+      price.notFound++;
+      return price.notFound >= NOT_FOUND_TO_DELETE ? "deleted" : undefined;
     }
 
     if (!result.data.length) {

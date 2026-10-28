@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
+import { NOT_FOUND_TO_DELETE } from "@/marketplaces/amazon/pdp/AmazonPdpCountryScraper";
 import { AmazonPdpScraper } from "@/marketplaces/amazon/pdp/AmazonPdpScraper";
 import { cronJobs } from "@@tests/support/cron";
 import { buildAd, buildAmazonCountry } from "@@tests/support/factories";
@@ -195,17 +196,32 @@ describe("PDP", () => {
 
     const put = await world.backend.waitFor("PUT", "amazon/ads/7");
 
-    expect(world.amazon.requestsTo("it")).toHaveLength(1);
+    expect(world.amazon.requestsTo("it")).toHaveLength(NOT_FOUND_TO_DELETE);
     expect(put.body.prices.map((p: any) => p.countryId)).toEqual([1, 2, 4]);
   });
 
-  it("deletes the ad when at most two countries are left", async () => {
-    world.amazon.respondPerCountry({ ...offers, de: [{ status: 404 }] });
+  it("keeps the price of a country whose 404 was not repeated", async () => {
+    world.amazon.respondPerCountry({ ...offers, it: [{ status: 404 }, offers.it[0]] });
+    scrape();
+
+    const put = await world.backend.waitFor("PUT", "amazon/ads/7");
+
+    expect(world.amazon.requestsTo("it")).toHaveLength(2);
+    expect(put.body.prices.map((p: any) => p.countryId)).toEqual([1, 2, 3]);
+  });
+
+  it("deletes the ad when every active country is gone", async () => {
+    world.backend.on("GET", "amazon/countries/scrap", [
+      buildAmazonCountry({ countryId: 1, tld: "de" }),
+      buildAmazonCountry({ countryId: 2, tld: "fr", active: false }),
+    ]);
+    world.amazon.respondPerCountry({ de: [{ status: 404 }], fr: offers.fr });
     scrape();
 
     await world.backend.waitFor("DELETE", "amazon/ads/7");
     await sleep(200);
 
+    expect(world.amazon.requestsTo("de")).toHaveLength(NOT_FOUND_TO_DELETE);
     expect(world.backend.find("PUT", "amazon/ads/7")).toHaveLength(0);
   });
 

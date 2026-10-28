@@ -43,27 +43,25 @@ describe("AmazonPdpPriceHelper", () => {
 
   describe("isDeleted", () => {
     const { helper } = setup();
-    const withDeleted = (total: number, deleted: number) =>
-      Array.from({ length: total }, (_, i) =>
-        buildPrice({ deleted: i < deleted })
-      );
+    const country = (active: boolean, deleted: boolean) =>
+      buildPrice({ country: buildAmazonCountry({ active }), deleted });
 
-    it("is false while more than 2 countries are not deleted", () => {
-      expect(helper.isDeleted(withDeleted(5, 2))).toBe(false);
+    it("is true when every active country is deleted", () => {
+      expect(helper.isDeleted([country(true, true), country(true, true)])).toBe(true);
+      expect(helper.isDeleted([country(true, true)])).toBe(true);
     });
 
-    it("is true when at most 2 countries are not deleted", () => {
-      expect(helper.isDeleted(withDeleted(5, 3))).toBe(true);
-      expect(helper.isDeleted(withDeleted(5, 5))).toBe(true);
+    it("is false while an active country is not deleted", () => {
+      expect(helper.isDeleted([country(true, true), country(true, false)])).toBe(false);
     });
 
-    it("is false while no country is deleted, even with 2 countries", () => {
-      expect(helper.isDeleted(withDeleted(2, 0))).toBe(false);
-      expect(helper.isDeleted(withDeleted(1, 0))).toBe(false);
+    it("ignores inactive countries", () => {
+      expect(helper.isDeleted([country(true, true), country(false, false)])).toBe(true);
+      expect(helper.isDeleted([country(true, false), country(false, true)])).toBe(false);
     });
 
-    it("is true for an ad with 2 countries when one is deleted", () => {
-      expect(helper.isDeleted(withDeleted(2, 1))).toBe(true);
+    it("is false without an active country", () => {
+      expect(helper.isDeleted([country(false, true)])).toBe(false);
     });
   });
 
