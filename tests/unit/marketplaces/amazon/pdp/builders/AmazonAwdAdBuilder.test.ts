@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AmazonAwdAdBuilder } from "@/marketplaces/amazon/pdp/AmazonAwdAdBuilder";
+import { AmazonAwdAdBuilder } from "@/marketplaces/amazon/pdp/builders/AmazonAwdAdBuilder";
 import type { AmazonAdBuilder } from "@/marketplaces/amazon/types/amazon.types";
 import { buildAd, buildAmazonCountry } from "@@tests/support/factories";
 import {

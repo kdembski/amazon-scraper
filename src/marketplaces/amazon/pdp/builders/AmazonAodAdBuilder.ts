@@ -5,10 +5,18 @@ import {
   AmazonAdBuildResult,
 } from "@/marketplaces/amazon/types/amazon.types";
 import { AmazonCountry } from "@/marketplaces/amazon/types/amazon.types";
-import { getOfferPrice, isCaptchaPage, normalizeDispatchFrom } from "@/marketplaces/amazon/pdp/amazonOffer";
+import { AmazonCaptchaDetector } from "@/marketplaces/amazon/pdp/builders/AmazonCaptchaDetector";
+import { AmazonDispatchFromNormalizer } from "@/marketplaces/amazon/pdp/builders/AmazonDispatchFromNormalizer";
+import { AmazonPriceParser } from "@/marketplaces/amazon/pdp/builders/AmazonPriceParser";
 import { find, text } from "@/shared/utils/html";
 
 export class AmazonAodAdBuilder implements AmazonAdBuilder {
+  constructor(
+    private readonly captchaDetector = new AmazonCaptchaDetector(),
+    private readonly priceParser = new AmazonPriceParser(),
+    private readonly dispatchFromNormalizer = new AmazonDispatchFromNormalizer()
+  ) {}
+
   // Cuts the filters and the other offers that follow the pinned offer
   trimHtml(html: string) {
     const filter = html.indexOf('id="aod-filter"');
@@ -18,10 +26,9 @@ export class AmazonAodAdBuilder implements AmazonAdBuilder {
   }
 
   build(document: Document): AmazonAdBuildResult {
-    const isCaptcha = isCaptchaPage(document);
+    const isCaptcha = this.captchaDetector.detect(document);
 
     if (isCaptcha) {
-      console.warn("Warning: Captcha triggered!");
       return { isCaptcha };
     }
 
@@ -37,7 +44,7 @@ export class AmazonAodAdBuilder implements AmazonAdBuilder {
     return {
       isCaptcha,
       isValid,
-      price: getOfferPrice(priceBox),
+      price: this.priceParser.parse(priceBox),
       dispatchFrom: this.getDispatchFrom(pinned),
     };
   }
@@ -59,6 +66,6 @@ export class AmazonAodAdBuilder implements AmazonAdBuilder {
       (find(".a-col-right .a-size-small", row) ??
         find(".a-col-right", row));
 
-    return normalizeDispatchFrom(text(value));
+    return this.dispatchFromNormalizer.normalize(text(value));
   }
 }

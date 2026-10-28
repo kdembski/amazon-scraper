@@ -5,7 +5,8 @@ import {
   AmazonAdBuildResult,
   AmazonCountry,
 } from "@/marketplaces/amazon/types/amazon.types";
-import { buildBuybox, isCaptchaPage } from "@/marketplaces/amazon/pdp/amazonOffer";
+import { AmazonBuyboxParser } from "@/marketplaces/amazon/pdp/builders/AmazonBuyboxParser";
+import { AmazonCaptchaDetector } from "@/marketplaces/amazon/pdp/builders/AmazonCaptchaDetector";
 import { find } from "@/shared/utils/html";
 
 const BUYBOX_PART = '"FeatureName" : "desktop_buybox"';
@@ -15,6 +16,11 @@ const CUT_RESPONSE = false;
 export class AmazonTwisterAdBuilder implements AmazonAdBuilder {
   stopAt = CUT_RESPONSE ? [BUYBOX_PART, "&&&"] : undefined;
   notFoundIsNoData = true;
+
+  constructor(
+    private readonly captchaDetector = new AmazonCaptchaDetector(),
+    private readonly buyboxParser = new AmazonBuyboxParser()
+  ) {}
 
   // Takes the buy box out of the JSON parts of the response
   trimHtml(html: string) {
@@ -32,12 +38,11 @@ export class AmazonTwisterAdBuilder implements AmazonAdBuilder {
   }
 
   build(document: Document): AmazonAdBuildResult {
-    if (isCaptchaPage(document)) {
-      console.warn("Warning: Captcha triggered!");
+    if (this.captchaDetector.detect(document)) {
       return { isCaptcha: true };
     }
 
-    return buildBuybox(find("#desktop_buybox", document));
+    return this.buyboxParser.parse(find("#desktop_buybox", document));
   }
 
   buildUrl(country: AmazonCountry, ad: AmazonAd) {

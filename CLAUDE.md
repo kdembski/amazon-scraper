@@ -23,7 +23,7 @@ npm run test:live                          # real Amazon via real proxies (PROXY
 docker compose up -d --build --remove-orphans # production
 ```
 
-Tests: `src/a/X.ts` → `tests/unit/a/X.test.ts` (e.g. `tests/unit/marketplaces/amazon/pdp/AmazonAodAdBuilder.test.ts`), one file per source file. Builder tests use minimal HTML fragments (`tests/support/html.ts`), not saved pages; a selector change needs a new test case.
+Tests: `src/a/X.ts` → `tests/unit/a/X.test.ts` (e.g. `tests/unit/marketplaces/amazon/pdp/builders/AmazonAodAdBuilder.test.ts`), one file per source file. Builder tests use minimal HTML fragments (`tests/support/html.ts`), not saved pages; a selector change needs a new test case.
 
 Integration (`tests/integration/`) and e2e (`tests/e2e/`) tests share fakes in `tests/support/fake/`: `FakeBackend` (HTTP server behind `API_URL`, also serves the proxy list via `PROXY_LIST_URL`) and `FakeAmazon` (proxy that accepts CONNECT to `www.amazon.<tld>`, terminates TLS with a self-signed cert and answers from a responder). Integration runs the real object graph (`bootScraper` builds it through `createScraper()`, as `index.ts` does) with cron mocked, retry delay 0, only `setInterval` faked and non-zero `sleep` (`@/shared/utils/sleep`) running on it (`tests/support/integrationSetup.ts`); e2e spawns `node dist/index.js` (or `docker run` of the image in `e2e-docker`, reaching the fakes via `host.docker.internal`) and stays on fast paths since real backoff applies. Live tests (`tests/live/`) are a manual canary for selector breakage: blocked requests (captcha, 503) are retried and skipped, assertions only cover responses that got through; `LIVE_ASINS`/`LIVE_MARKETS` override the defaults.
 
@@ -38,7 +38,7 @@ Integration (`tests/integration/`) and e2e (`tests/e2e/`) tests share fakes in `
 ## Structure
 
 - `src/shared/`: code that knows no shop — `args/` (`ArgsService`), `backend/` (`ApiService`, `MetricsReporter`, `ScraperConfigService`), `metrics/` (`MetricsService`), `http/` (`RequestQueueService`, `ThrottledQueue`, `ScrapingClient`; `proxy/`: `ProxyService` over `ProxyList`, `ProxyAgentPool`, `ProxyTrafficMeter`), `interfaces/`, `utils/`.
-- `src/marketplaces/<name>/`: one folder per shop — one scraper per flow implementing `MarketplaceScraper` (`AmazonPdpScraper`, `AmazonPlpScraper`), a thin service over `ScrapingClient`, `types/`, and one folder per flow (`amazon/pdp/`, `amazon/plp/`) holding its scrapers and builders.
+- `src/marketplaces/<name>/`: one folder per shop — one scraper per flow implementing `MarketplaceScraper` (`AmazonPdpScraper`, `AmazonPlpScraper`), a thin service over `ScrapingClient`, `types/`, and one folder per flow (`amazon/pdp/`, `amazon/plp/`) holding its scrapers and builders (PDP builders and their parsers in `amazon/pdp/builders/`).
 - `src/shared` imports nothing from `src/marketplaces`.
 - `src/marketplaces.ts` (async `createScraper()`) loads the backend config, starts its refresh, picks the scraper for `-t` from the `scrapers` registry, starts `MetricsReporter`, waits for the proxies and returns the scraper; `src/index.ts` calls `createScraper().then((scraper) => scraper.execute())`.
 - Add a shop: a `src/marketplaces/<name>/` folder with `MarketplaceScraper.marketplace` set, a `-m` flag in `ArgsService`, the choice in `createScraper()`, services in `docker-compose.yml`.
@@ -71,17 +71,19 @@ The bottleneck is open connections (home router NAT, host conntrack), not bandwi
 
 ## HTML parsing (fragile)
 
-Builders in `src/marketplaces/amazon/pdp/` and `src/marketplaces/amazon/plp/` get an `htmlparser2` document (`parseDocument`) and query it with Amazon's DOM selectors through `find`/`findAll`/`text` (`@/shared/utils/html`, `css-select` + `domutils`); layout changes break them silently. No full DOM (`linkedom` was 3-4x slower).
-- Captcha (PDP builders, `isCaptchaPage` in `amazonOffer.ts`): first `form` with action `/errors/validateCaptcha` or `/errors_page/validateCaptcha` ("Weiter shoppen" bot wall).
+Builders in `src/marketplaces/amazon/pdp/builders/` (with their parsers) and `src/marketplaces/amazon/plp/` get an `htmlparser2` document (`parseDocument`) and query it with Amazon's DOM selectors through `find`/`findAll`/`text` (`@/shared/utils/html`, `css-select` + `domutils`); layout changes break them silently. No full DOM (`linkedom` was 3-4x slower).
+- Captcha (PDP builders, `AmazonCaptchaDetector`): first `form` with action `/errors/validateCaptcha` or `/errors_page/validateCaptcha` ("Weiter shoppen" bot wall).
 - `cleanUpPrice` assumes a comma decimal separator (EU format).
 - `AmazonPlpBuilder`: a page is valid with `[data-component-type='s-search-results']` and either products or `[data-csa-c-content-id='messaging-messages-no-results']` (empty range, not retried); `lastPage` is the highest number in `.s-pagination-item`, 400 means the range is cut off.
 - `AmazonAodAdBuilder` reads only `#aod-pinned-offer` (= PDP buybox); no price element means no offer. Price comes from `.a-price-whole` + `.a-price-fraction`. `Amazon.nl` etc. is normalized to `Amazon` (backend checks `dispatchFrom === "Amazon"`).
-- `AmazonTwisterAdBuilder`: `trimHtml` takes the `"FeatureName" : "desktop_buybox"` JSON part and wraps its HTML in `#desktop_buybox`; `#priceNotAvailable` (degraded buy box) is invalid; price is the first `.apex-pricetopay-value` outside `#snsAccordionRowMiddle`/`#subscriptionPrice` (Subscribe & Save), else the first `items[0.base][customerVisiblePrice][amount]` input (single-offer buy box, one-time price); `dispatchFrom` from the `desktop-fulfiller-info` row, else `desktop-merchant-info`. This buy box reading is `buildBuybox` in `amazonOffer.ts`, together with price parsing and the `Amazon` normalization shared with AOD.
-- `AmazonAwdAdBuilder`: `trimHtml` cuts everything before `id="buybox"` (related products with their own prices come first), then `buildBuybox` on `#buybox`; "Derzeit nicht verfügbar" pages are valid without a price.
+- `AmazonTwisterAdBuilder`: `trimHtml` takes the `"FeatureName" : "desktop_buybox"` JSON part and wraps its HTML in `#desktop_buybox`; `#priceNotAvailable` (degraded buy box) is invalid; price is the first `.apex-pricetopay-value` outside `#snsAccordionRowMiddle`/`#subscriptionPrice` (Subscribe & Save), else the first `items[0.base][customerVisiblePrice][amount]` input (single-offer buy box, one-time price); `dispatchFrom` from the `desktop-fulfiller-info` row, else `desktop-merchant-info`. This buy box reading is `AmazonBuyboxParser`, over `AmazonPriceParser` and `AmazonDispatchFromNormalizer` (the `Amazon` normalization), both shared with AOD.
+- `AmazonAwdAdBuilder`: `trimHtml` cuts everything before `id="buybox"` (related products with their own prices come first), then `AmazonBuyboxParser` on `#buybox`; "Derzeit nicht verfügbar" pages are valid without a price.
 
 ## Conventions
 
 - Imports via `@/` (`src/`) and, in tests, `@@tests/` (`tests/`).
+- Logic lives in classes, one per file; plain exported functions only for small helpers (like `@/shared/utils`).
+- Method names do not repeat the class name: `AmazonPriceParser.parse()`, not `getOfferPrice()`.
 - Shared services are singletons with `getInstance()`; other classes take dependencies as defaulted constructor params.
 - Style: 2 spaces, double quotes, semicolons, `lodash` as `_`. Comments in English.
 - Arrow functions without braces only when the whole function fits on one line; otherwise use a block body.
