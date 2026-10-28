@@ -34,6 +34,8 @@ export interface AmazonAdBuildResult {
 }
 
 export interface AmazonAdBuilder {
+  // Markers that must arrive in this order; the response is not needed past the last one
+  stopAt?: string[];
   trimHtml(html: string): string;
   build(document: Document): AmazonAdBuildResult;
   buildUrl(country: AmazonCountry, ad: AmazonAd): { url: string; referer: string };

@@ -46,6 +46,60 @@ export const aodPage = ({
   `;
 };
 
+const offerRow = (name: string, value?: string) =>
+  value
+    ? `<div offer-display-feature-name="${name}"><span class="offer-display-feature-text-message">${value}</span></div>`
+    : "";
+
+const priceToPay = (price: string) => {
+  const [whole, fraction] = price.split(",");
+  return `
+    <span class="a-price apex-pricetopay-value">
+      <span class="a-offscreen"></span>
+      <span aria-hidden="true">
+        <span class="a-price-whole">${whole}<span class="a-price-decimal">,</span></span>
+        <span class="a-price-fraction">${fraction}</span>
+      </span>
+    </span>
+  `;
+};
+
+// Inner HTML of the desktop_buybox part of a twister response; the
+// Subscribe & Save row comes first, as on the product page
+export const twisterBuybox = ({
+  price,
+  snsPrice,
+  shipsFrom,
+  soldBy = "Amazon",
+  hidden = false,
+}: {
+  price?: string;
+  snsPrice?: string;
+  shipsFrom?: string;
+  soldBy?: string;
+  hidden?: boolean;
+} = {}) => `
+  ${snsPrice ? `<div id="snsAccordionRowMiddle"><span id="subscriptionPrice">${priceToPay(snsPrice)}</span></div>` : ""}
+  ${price ? `<div id="corePrice_feature_div">${priceToPay(price)}</div>` : ""}
+  ${hidden ? `<div id="priceNotAvailable"><span>Add to cart to see the price</span></div>` : ""}
+  ${offerRow("desktop-fulfiller-info", shipsFrom)}
+  ${offerRow("desktop-merchant-info", soldBy)}
+`;
+
+// gp/twister/ajaxv2 response: JSON parts separated by "&&&"; without
+// `closed` it ends right after the buy box part, as a cut stream does
+export const twisterResponse = (buybox: string, { closed = true } = {}) => {
+  const part = (name: string, content: string) =>
+    `{ "FeatureName" : "${name}", "Value" : { "content" : { "${name}" : ${JSON.stringify(content)} } } }`;
+  const parts = [
+    `{ "FeatureName" : "request-id-expose", "requestId" : "ABC" }`,
+    part("desktop_buybox", buybox),
+    ...(closed ? [part("olpLinkWidget_feature_div", "<div>olp</div>")] : []),
+  ];
+
+  return parts.join("&&&") + (closed ? "&&&" : "");
+};
+
 // Pagination of a search listing as Amazon renders it on page 1: the first
 // pages, an ellipsis, the last page and "next"; none for a single page
 export const pagination = (lastPage: number) =>
