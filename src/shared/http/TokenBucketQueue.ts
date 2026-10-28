@@ -1,4 +1,4 @@
-export class RequestQueueService {
+export class TokenBucketQueue {
   queue: (() => any)[] = [];
   pending = 0;
   private tokens;

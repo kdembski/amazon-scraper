@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { RequestQueueService } from "@/shared/http/RequestQueueService";
+import { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
 
 const setup = ({ concurrency = 2, rps = 0, enableLogs = false } = {}) =>
-  new RequestQueueService(concurrency, rps, enableLogs);
+  new TokenBucketQueue(concurrency, rps, enableLogs);
 
 // A request that stays pending until finish() is called
 const deferred = () => {
@@ -12,7 +12,7 @@ const deferred = () => {
   return { callback, finish };
 };
 
-describe("RequestQueueService", () => {
+describe("TokenBucketQueue", () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -281,7 +281,7 @@ describe("RequestQueueService", () => {
 
     it("logs open connections after pending when they are counted", async () => {
       const log = vi.spyOn(console, "log").mockImplementation(() => {});
-      new RequestQueueService(5, 3, true, () => 42);
+      new TokenBucketQueue(5, 3, true, () => 42);
 
       await vi.advanceTimersByTimeAsync(1000);
 

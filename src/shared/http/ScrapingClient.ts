@@ -3,7 +3,7 @@ import type { Readable } from "node:stream";
 import _ from "lodash";
 import { ScraperConfigService } from "@/shared/backend/ScraperConfigService";
 import { ProxyService } from "@/shared/http/proxy/ProxyService";
-import { RequestQueueService } from "@/shared/http/RequestQueueService";
+import { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
 import { MetricsService } from "@/shared/metrics/MetricsService";
 import type { MetricLabels, RequestOutcome } from "@/shared/metrics/metrics.types";
 
@@ -18,7 +18,7 @@ export class ScrapingClient {
   private constructor(
     configService = ScraperConfigService.getInstance(),
     private proxyService = ProxyService.getInstance(),
-    public queueService = new RequestQueueService(
+    public queueService = new TokenBucketQueue(
       configService.get().concurrency,
       configService.get().rps,
       true,

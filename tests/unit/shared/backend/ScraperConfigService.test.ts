@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ScraperConfigService } from "@/shared/backend/ScraperConfigService";
-import type { RequestQueueService } from "@/shared/http/RequestQueueService";
+import type { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
 import { cronJobs } from "@@tests/support/cron";
 import { fakeApiService } from "@@tests/support/fakes";
 
@@ -17,7 +17,7 @@ const setup = () => {
   ) => ScraperConfigService;
   const service = new Service(
     api.service,
-    () => queue as unknown as RequestQueueService
+    () => queue as unknown as TokenBucketQueue
   );
   return { service, get: api.get, queue };
 };
