@@ -9,13 +9,16 @@ import { getOfferPrice, normalizeDispatchFrom } from "@/marketplaces/amazon/pdp/
 import { find, findAll, text } from "@/shared/utils/html";
 
 const SUBSCRIPTION_ROWS = ["snsAccordionRowMiddle", "subscriptionPrice"];
+const BUYBOX_PART = '"FeatureName" : "desktop_buybox"';
+// shortcut: whole response downloaded (~320 KB vs ~90 KB cut) to keep keep-alive; set true to cut after the buy box
+const CUT_RESPONSE = false;
 
 export class AmazonTwisterAdBuilder implements AmazonAdBuilder {
-  stopAt = ['"FeatureName" : "desktop_buybox"', "&&&"];
+  stopAt = CUT_RESPONSE ? [BUYBOX_PART, "&&&"] : undefined;
 
   // Takes the buy box out of the JSON parts of the response
   trimHtml(html: string) {
-    const start = html.indexOf(this.stopAt[0]);
+    const start = html.indexOf(BUYBOX_PART);
     if (start === -1) return html;
 
     const end = html.indexOf("&&&", start);

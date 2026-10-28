@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Node.js/TypeScript (ESM) worker that scrapes Amazon through rotating proxies. No own state: it fetches work from a backend (`API_URL`) and sends results back. Two modes:
 
-- **PDP** (default): price and shipper for a batch of ASINs in every country from the backend. Source per country (`pdpSource`): AOD AJAX fragment (`gp/product/ajax/aodAjaxMain/?asin=<asin>&pc=dp`, ~9 KB) or twister (`gp/twister/ajaxv2?asinList=<asin>&id=<asin>&parentAsin=<asin>&mType=full&json=1&isUDPFlag=1&dpxAjaxFlag=1&isFlushing=2&psc=1`, the full buy box where datacenter IPs get a degraded product page and AOD 503s; cut after the buy box part, ~90 KB on the wire; 404 for products without variations, then AOD).
+- **PDP** (default): price and shipper for a batch of ASINs in every country from the backend. Source per country (`pdpSource`): AOD AJAX fragment (`gp/product/ajax/aodAjaxMain/?asin=<asin>&pc=dp`, ~9 KB) or twister (`gp/twister/ajaxv2?asinList=<asin>&id=<asin>&parentAsin=<asin>&mType=full&json=1&isUDPFlag=1&dpxAjaxFlag=1&isFlushing=2&psc=1`, the full buy box where datacenter IPs get a degraded product page and AOD 503s; ~320 KB on the wire; cutting after the buy box part (~90 KB) is off, `CUT_RESPONSE` in `AmazonTwisterAdBuilder`; 404 for products without variations, then AOD).
 - **PLP**: first the new releases ranking of the category on `amazon.pl` (`gp/new-releases/<category>`, every node of its browse tree, pages 1 and 2), then category listings, newest first, from 19 price ranges (`p_36`, grosze) split in half while a range has 400 pages (Amazon's limit, 9 600 results); all pages of a range below the limit when the category was never scraped (`scrapedAt` null), otherwise first page only; no subcategories. Categories run one after another; each ASIN goes to the backend once per run.
 
 ## Commands
@@ -66,7 +66,7 @@ The bottleneck is open connections (home router NAT, host conntrack), not bandwi
 - Connections = `pending` (capped by `concurrency`) + idle keep-alive sockets (`maxFreeSockets: 1` per proxy × domain, closed after 15 s).
 - Set the idle timeout via `agent.options.timeout` after construction; `HttpsProxyAgent` ignores `timeout` passed to the constructor.
 - Do not disable keep-alive or shorten the idle timeout.
-- A request with `stopAt` (twister) destroys its socket, so it never reuses a connection and leaves one closed entry in conntrack.
+- A request with `stopAt` (twister with `CUT_RESPONSE`, off for now) destroys its socket, so it never reuses a connection and leaves one closed entry in conntrack.
 - Measure with `nf_conntrack_count` on the host, or `docker exec <container> sh -c "netstat -tn | grep -c ESTABLISHED"` (not `ss` on the host).
 
 ## HTML parsing (fragile)

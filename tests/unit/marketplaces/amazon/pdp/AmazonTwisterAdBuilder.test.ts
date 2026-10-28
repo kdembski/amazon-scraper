@@ -23,8 +23,8 @@ describe("AmazonTwisterAdBuilder", () => {
     });
   });
 
-  it("stops after the part that closes the buy box", () => {
-    expect(builder.stopAt).toEqual(['"FeatureName" : "desktop_buybox"', "&&&"]);
+  it("downloads the whole response while cutting is disabled", () => {
+    expect(builder.stopAt).toBeUndefined();
   });
 
   describe("trimHtml", () => {
