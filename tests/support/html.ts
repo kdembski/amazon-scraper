@@ -46,27 +46,87 @@ export const aodPage = ({
   `;
 };
 
-// Entry of the category filter, indent 1 is the current category, 2 its child
-export const categoryItem = (id: string, indent?: 1 | 2) =>
-  `<li id="${id}" class="a-spacing-micro${
-    indent ? ` s-navigation-indent-${indent}` : ""
-  }"><a>${id}</a></li>`;
+const offerRow = (name: string, value?: string) =>
+  value
+    ? `<div offer-display-feature-name="${name}"><span class="offer-display-feature-text-message">${value}</span></div>`
+    : "";
 
-// Pagination of a search listing, "next" is a link only if there is a next page
-export const pagination = (next: boolean) =>
-  next
-    ? `<a href="/s?page=2" class="s-pagination-item s-pagination-next">Dalej</a>`
-    : `<span class="s-pagination-item s-pagination-next s-pagination-disabled">Dalej</span>`;
+const priceToPay = (price: string) => {
+  const [whole, fraction] = price.split(",");
+  return `
+    <span class="a-price apex-pricetopay-value">
+      <span class="a-offscreen"></span>
+      <span aria-hidden="true">
+        <span class="a-price-whole">${whole}<span class="a-price-decimal">,</span></span>
+        <span class="a-price-fraction">${fraction}</span>
+      </span>
+    </span>
+  `;
+};
 
-// Search listing (/s?i=...) with products and the category filter: the path
-// from the root to the current category, then its children
+// Inner HTML of the desktop_buybox part of a twister response; the
+// Subscribe & Save row comes first, as on the product page
+export const twisterBuybox = ({
+  price,
+  snsPrice,
+  shipsFrom,
+  soldBy = "Amazon",
+  hidden = false,
+}: {
+  price?: string;
+  snsPrice?: string;
+  shipsFrom?: string;
+  soldBy?: string;
+  hidden?: boolean;
+} = {}) => `
+  ${snsPrice ? `<div id="snsAccordionRowMiddle"><span id="subscriptionPrice">${priceToPay(snsPrice)}</span></div>` : ""}
+  ${price ? `<div id="corePrice_feature_div">${priceToPay(price)}</div>` : ""}
+  ${hidden ? `<div id="priceNotAvailable"><span>Add to cart to see the price</span></div>` : ""}
+  ${offerRow("desktop-fulfiller-info", shipsFrom)}
+  ${offerRow("desktop-merchant-info", soldBy)}
+`;
+
+// gp/twister/ajaxv2 response: JSON parts separated by "&&&"; without
+// `closed` it ends right after the buy box part, as a cut stream does
+export const twisterResponse = (buybox: string, { closed = true } = {}) => {
+  const part = (name: string, content: string) =>
+    `{ "FeatureName" : "${name}", "Value" : { "content" : { "${name}" : ${JSON.stringify(content)} } } }`;
+  const parts = [
+    `{ "FeatureName" : "request-id-expose", "requestId" : "ABC" }`,
+    part("desktop_buybox", buybox),
+    ...(closed ? [part("olpLinkWidget_feature_div", "<div>olp</div>")] : []),
+  ];
+
+  return parts.join("&&&") + (closed ? "&&&" : "");
+};
+
+// Pagination of a search listing as Amazon renders it on page 1: the first
+// pages, an ellipsis, the last page and "next"; none for a single page
+export const pagination = (lastPage: number) =>
+  lastPage > 1
+    ? `
+      <span class="s-pagination-item s-pagination-selected">1</span>
+      <a href="/s?page=2" class="s-pagination-item s-pagination-button">2</a>
+      <span class="s-pagination-item s-pagination-ellipsis"></span>
+      <span class="s-pagination-item s-pagination-disabled">${lastPage}</span>
+      <a href="/s?page=2" class="s-pagination-item s-pagination-next">Dalej</a>
+    `
+    : "";
+
+export const noResults = `
+  <div data-csa-c-content-id="messaging-messages-no-results">
+    <span>Brak wyników dla Twojego zapytania.</span>
+  </div>
+`;
+
+// Search listing (/s?i=...) with products; empty is a search without results
 export const plpPage = ({
   asins = [] as string[],
-  path = [] as string[],
-  subcategories = [] as string[],
-  next = false,
+  lastPage = 1,
+  empty = false,
 } = {}) => `
-  <div class="s-main-slot">
+  <div data-component-type="s-search-results" class="s-main-slot">
+    ${empty ? noResults : ""}
     ${asins
       .map(
         (asin) => `
@@ -78,15 +138,7 @@ export const plpPage = ({
       )
       .join("")}
   </div>
-  <ul id="filter-n">
-    ${path
-      .map((id, index) =>
-        categoryItem(id, index === path.length - 1 ? 1 : undefined)
-      )
-      .join("")}
-    ${subcategories.map((id) => categoryItem(id, 2)).join("")}
-  </ul>
-  ${pagination(next)}
+  ${pagination(lastPage)}
 `;
 
 // New releases ranking (gp/new-releases/<category>[/<node>]): products, the

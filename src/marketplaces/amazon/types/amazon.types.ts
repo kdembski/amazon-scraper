@@ -4,6 +4,8 @@ export interface AmazonCountry {
   countryId: number;
   tld: string;
   proxyType: string;
+  pdpSource: string;
+  priority: number;
 }
 
 export interface AmazonAdCategory {
@@ -19,19 +21,6 @@ export interface AmazonPlpAd {
   categoryName: string;
 }
 
-export interface AmazonPlpAdPage {
-  category: string;
-  allPages: boolean;
-  subcategory?: string;
-  pending: boolean;
-  complete: boolean;
-  failed: number;
-  visited: Set<string>;
-  number: number;
-  price?: string;
-  resolve?: (value?: AmazonPlpAd[] | PromiseLike<AmazonPlpAd[]>) => void;
-  reject?: (e: any) => void;
-}
 export interface AmazonAd {
   id: number;
   asin: string;
@@ -46,6 +35,8 @@ export interface AmazonAdBuildResult {
 }
 
 export interface AmazonAdBuilder {
+  // Markers that must arrive in this order; the response is not needed past the last one
+  stopAt?: string[];
   trimHtml(html: string): string;
   build(document: Document): AmazonAdBuildResult;
   buildUrl(country: AmazonCountry, ad: AmazonAd): { url: string; referer: string };

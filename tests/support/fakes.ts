@@ -36,9 +36,17 @@ export function fakeAmazonService() {
   const requests: { url: string; referer?: string; callback: GetCallback }[] =
     [];
   const queueService = { queue: [] as Function[] };
-  const get = vi.fn((url: string, referer?: string, callback?: GetCallback) => {
-    requests.push({ url, referer, callback: callback ?? {} });
-  });
+  const get = vi.fn(
+    (
+      url: string,
+      referer?: string,
+      callback?: GetCallback,
+      _proxyType?: string,
+      _stopAt?: string[]
+    ) => {
+      requests.push({ url, referer, callback: callback ?? {} });
+    }
+  );
   const service = { get, queueService } as unknown as AmazonService;
 
   const respond = (index: number, data: string) =>

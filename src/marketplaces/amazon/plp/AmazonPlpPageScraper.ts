@@ -1,199 +1,88 @@
 import { AmazonPlpBuilder } from "@/marketplaces/amazon/plp/AmazonPlpBuilder";
-import { getRetryDelay, MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
-import { AmazonService } from "@/marketplaces/amazon/AmazonService";
-import { ApiService } from "@/shared/backend/ApiService";
-import { ScraperConfigService } from "@/shared/backend/ScraperConfigService";
+import { AmazonPlpCrawl } from "@/marketplaces/amazon/plp/AmazonPlpCrawl";
+import { AmazonPlpPageFetcher } from "@/marketplaces/amazon/plp/AmazonPlpPageFetcher";
+import {
+  parsePriceRange,
+  PriceRange,
+  splitPriceRange,
+  toPriceFilter,
+} from "@/marketplaces/amazon/plp/AmazonPlpPriceRange";
 import { MetricsService } from "@/shared/metrics/MetricsService";
-import { ItemOutcome, ResponseOutcome } from "@/shared/metrics/metrics.types";
-import { AmazonPlpAdPage, AmazonPlpAd } from "@/marketplaces/amazon/types/amazon.types";
-import { parseDocument } from "htmlparser2";
-import _ from "lodash";
+import { ItemOutcome } from "@/shared/metrics/metrics.types";
+
+// Amazon shows at most this many pages of a search, a range with as many is cut off
+const MAX_PAGES = 400;
+
+const SEEDS = [
+  "-999",
+  "1000-1999",
+  "2000-2999",
+  "3000-3999",
+  "4000-4999",
+  "5000-7499",
+  "7500-9999",
+  "10000-14999",
+  "15000-19999",
+  "20000-29999",
+  "30000-39999",
+  "40000-49999",
+  "50000-74999",
+  "75000-99999",
+  "100000-149999",
+  "150000-199999",
+  "200000-299999",
+  "300000-499999",
+  "500000-",
+].map(parsePriceRange);
 
 export class AmazonPlpPageScraper {
-  private apiService;
-  private amazonService;
-  private configService;
-  private builder;
-  private metricsService;
-  private queueFullDelay = 1000;
-  // Amazon price filter (p_36) in grosze
-  private priceRanges = [
-    "-999",
-    "1000-1999",
-    "2000-2999",
-    "3000-3999",
-    "4000-4999",
-    "5000-7499",
-    "7500-9999",
-    "10000-14999",
-    "15000-19999",
-    "20000-29999",
-    "30000-39999",
-    "40000-49999",
-    "50000-74999",
-    "75000-99999",
-    "100000-149999",
-    "150000-199999",
-    "200000-299999",
-    "300000-499999",
-    "500000-",
-  ];
-
   constructor(
-    apiService = ApiService.getInstance(),
-    amazonService = AmazonService.getInstance(),
-    configService = ScraperConfigService.getInstance(),
-    builder = new AmazonPlpBuilder(),
-    metricsService = MetricsService.getInstance()
-  ) {
-    this.apiService = apiService;
-    this.amazonService = amazonService;
-    this.configService = configService;
-    this.builder = builder;
-    this.metricsService = metricsService;
+    private fetcher = new AmazonPlpPageFetcher(),
+    private builder = new AmazonPlpBuilder(),
+    private metricsService = MetricsService.getInstance()
+  ) {}
+
+  async execute(crawl: AmazonPlpCrawl) {
+    await Promise.all(SEEDS.map((range) => this.scrapeRange(crawl, range)));
   }
 
-  executeCategory(
-    category: string,
-    allPages: boolean,
-    subcategory?: string,
-    visited = new Set<string>()
-  ) {
-    this.priceRanges.forEach((price) => {
-      this.execute(
-        this.buildPage(category, allPages, subcategory, visited, 1, price)
-      );
-    });
-  }
+  private async scrapeRange(crawl: AmazonPlpCrawl, range: PriceRange) {
+    const first = await this.scrapePage(crawl, range, 1);
+    if (!first) return;
 
-  async execute(page: AmazonPlpAdPage) {
-    const { batchSize } = this.configService.get();
-    const queue = this.amazonService.queueService.queue.length;
-    if (page.complete || page.pending) return;
-
-    if (queue >= batchSize) {
-      setTimeout(() => this.execute(page), this.queueFullDelay);
+    const halves = first.lastPage >= MAX_PAGES ? splitPriceRange(range) : undefined;
+    if (halves) {
+      await Promise.all(halves.map((half) => this.scrapeRange(crawl, half)));
       return;
     }
 
-    return new Promise<AmazonPlpAd[] | undefined>((resolve, reject) => {
-      page.resolve = resolve;
-      page.reject = reject;
-
-      const url = this.getUrl(page);
-      const ref = Math.floor(Math.random() * 100000000000);
-      const referer = `pl/b?node=${ref}`;
-
-      page.pending = true;
-
-      const callback = {
-        onSuccess: (res: string) => this.onSuccess(res, page),
-        onError: () => this.onError(page),
-      };
-      this.amazonService.get<string>(url, referer, callback);
-    })
-      .then((ads) => {
-        page.pending = false;
-        page.complete = true;
-        this.countItem(page, "data");
-        if (ads) this.apiService.post("amazon/ads", ads);
-      })
-      .catch(() => {
-        page.pending = false;
-        page.failed++;
-        this.retry(page);
-      });
+    if (!crawl.allPages) return;
+    for (let number = 2; number <= first.lastPage; number++) {
+      if (!(await this.scrapePage(crawl, range, number))) return;
+    }
   }
 
-  private retry(page: AmazonPlpAdPage) {
-    if (page.failed >= MAX_FAILED_ATTEMPTS) {
-      page.complete = true;
-      this.countItem(page, "given_up");
-      return;
-    }
+  private async scrapePage(crawl: AmazonPlpCrawl, range: PriceRange, number: number) {
+    const page = number > 1 ? `&page=${number}` : "";
+    const url = `pl/s?i=${crawl.category}&rh=${toPriceFilter(range)}&s=date-desc-rank${page}`;
+    const referer = `pl/b?node=${Math.floor(Math.random() * 100000000000)}`;
 
-    setTimeout(() => this.execute(page), getRetryDelay(page.failed));
-  }
-
-  private async onSuccess(data: string, page: AmazonPlpAdPage) {
-    if (!data.length) {
-      this.countResponse("empty");
-      page.reject?.("Received empty data");
-      return;
-    }
-
-    const document = parseDocument(data);
-    const { ads, subcategories, hasNextPage } = this.builder.build(
-      document,
-      page.category
+    const result = await this.fetcher.fetch(url, referer, (document) =>
+      this.builder.build(document, crawl.category)
     );
-
-    if (ads.length === 0) {
-      this.countResponse("no_data");
-      page.reject?.("No ads found");
+    if (!result.page) {
+      this.countItem("given_up", result.failed);
       return;
     }
 
-    this.countResponse("data");
-
-    subcategories
-      .filter((sub) => !page.visited.has(sub))
-      .forEach((sub) => {
-        page.visited.add(sub);
-        this.executeCategory(page.category, page.allPages, sub, page.visited);
-      });
-
-    if (page.allPages && hasNextPage) {
-      const { category, allPages, subcategory, visited, number, price } = page;
-      this.execute(
-        this.buildPage(category, allPages, subcategory, visited, number + 1, price)
-      );
-    }
-
-    page.resolve?.(ads);
+    this.countItem(result.page.ads.length ? "data" : "no_data", result.failed + 1);
+    crawl.post(result.page.ads);
+    return result.page;
   }
 
-  private countResponse(outcome: ResponseOutcome) {
-    this.metricsService.increment("responses", { country: "pl", outcome });
-  }
-
-  private countItem(page: AmazonPlpAdPage, outcome: ItemOutcome) {
+  private countItem(outcome: ItemOutcome, attempts: number) {
     const labels = { country: "pl", outcome };
-    const attempts = outcome === "given_up" ? page.failed : page.failed + 1;
     this.metricsService.increment("items", labels);
     this.metricsService.increment("item_attempts", labels, attempts);
-  }
-
-  private onError(page: AmazonPlpAdPage) {
-    page.reject?.("Failed");
-  }
-
-  private getUrl(page: AmazonPlpAdPage) {
-    const price = page.price && `p_36%3A${page.price}`;
-    const filters = _.compact([page.subcategory, price]).join("%2C");
-    const rh = filters ? `&rh=${filters}` : "";
-    const number = page.number > 1 ? `&page=${page.number}` : "";
-    return `pl/s?i=${page.category}${rh}&s=date-desc-rank${number}`;
-  }
-
-  buildPage(
-    category: string,
-    allPages = false,
-    subcategory?: string,
-    visited = new Set<string>(),
-    number = 1,
-    price?: string
-  ): AmazonPlpAdPage {
-    return {
-      category,
-      allPages,
-      subcategory,
-      pending: false,
-      complete: false,
-      failed: 0,
-      visited,
-      number,
-      price,
-    };
   }
 }

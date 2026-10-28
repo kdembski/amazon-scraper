@@ -16,6 +16,9 @@ const gauges = [
   { metric: "open_connections", value: 5 },
   { metric: "event_loop_delay_mean_ms", value: 2.5 },
   { metric: "event_loop_delay_max_ms", value: 40 },
+  { metric: "cpu_percent", value: 8.3 },
+  { metric: "memory_rss_mb", value: 150 },
+  { metric: "ping_ms", value: 24.5 },
 ];
 
 const setup = ({ target = "pdp", traffic = { bytesIn: 0, bytesOut: 0 } } = {}) => {
@@ -46,6 +49,13 @@ const setup = ({ target = "pdp", traffic = { bytesIn: 0, bytesOut: 0 } } = {}) =
     mean: 12_500_000,
     max: 50_000_000,
   };
+  // Microseconds: 5 s of CPU between start() and the first send(), 60 s apart
+  const cpuUsage = vi
+    .fn()
+    .mockReturnValueOnce({ user: 1_000_000, system: 0 })
+    .mockReturnValue({ user: 4_000_000, system: 2_000_000 });
+  const memoryRss = vi.fn(() => 150 * 1024 * 1024);
+  const ping = vi.fn(async (): Promise<number | undefined> => 24.5);
 
   // The constructor is private, it is only called through getInstance()
   const Reporter = MetricsReporter as unknown as new (
@@ -58,10 +68,13 @@ const setup = ({ target = "pdp", traffic = { bytesIn: 0, bytesOut: 0 } } = {}) =
     client,
     proxy,
     now,
-    eventLoopDelay
+    eventLoopDelay,
+    cpuUsage,
+    memoryRss,
+    ping
   );
 
-  return { api, metrics, reporter, proxy, eventLoopDelay };
+  return { api, metrics, reporter, proxy, eventLoopDelay, ping };
 };
 
 describe("MetricsReporter", () => {
@@ -140,6 +153,34 @@ describe("MetricsReporter", () => {
     expect(api.post.mock.calls[0][1].metrics).toContainEqual({
       metric: "event_loop_delay_mean_ms",
       value: expected,
+    });
+  });
+
+  it("reports a failed ping instead of its time", async () => {
+    const { api, metrics, reporter, ping } = setup();
+    ping.mockResolvedValue(undefined);
+    metrics.increment("requests", { country: "de", outcome: "ok" });
+    reporter.start("amazon");
+
+    await reporter.send();
+
+    const sent = api.post.mock.calls[0][1].metrics;
+    expect(sent).toContainEqual({ metric: "ping_failed", value: 1 });
+    expect(sent).not.toContainEqual(expect.objectContaining({ metric: "ping_ms" }));
+  });
+
+  it("measures the CPU since the previous send", async () => {
+    const { api, metrics, reporter } = setup();
+    metrics.increment("requests", { country: "de", outcome: "ok" });
+    reporter.start("amazon");
+    await reporter.send();
+
+    metrics.increment("requests", { country: "de", outcome: "ok" });
+    await reporter.send();
+
+    expect(api.post.mock.calls[1][1].metrics).toContainEqual({
+      metric: "cpu_percent",
+      value: 0,
     });
   });
 

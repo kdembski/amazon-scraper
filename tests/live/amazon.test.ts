@@ -2,6 +2,7 @@ import { configDotenv } from "dotenv";
 import { parseDocument } from "htmlparser2";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { AmazonAodAdBuilder } from "@/marketplaces/amazon/pdp/AmazonAodAdBuilder";
+import { AmazonTwisterAdBuilder } from "@/marketplaces/amazon/pdp/AmazonTwisterAdBuilder";
 import { AmazonPlpBuilder } from "@/marketplaces/amazon/plp/AmazonPlpBuilder";
 import { AmazonService } from "@/marketplaces/amazon/AmazonService";
 import { ProxyService } from "@/shared/http/proxy/ProxyService";
@@ -50,9 +51,9 @@ let amazon: AmazonService;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const fetchPage = (url: string, referer: string) =>
+const fetchPage = (url: string, referer: string, stopAt?: string[]) =>
   new Promise<string>((resolve, reject) =>
-    amazon.get<string>(url, referer, { onSuccess: resolve, onError: reject })
+    amazon.get<string>(url, referer, { onSuccess: resolve, onError: reject }, undefined, stopAt)
   );
 
 // Asks again through another random proxy when blocked, with a growing pause
@@ -60,15 +61,16 @@ const fetchPage = (url: string, referer: string) =>
 const scrape = async (
   url: string,
   referer: string,
-  build: (html: string) => AmazonAdBuildResult
+  build: (html: string) => AmazonAdBuildResult,
+  { stopAt, retryInvalid = false }: { stopAt?: string[]; retryInvalid?: boolean } = {}
 ) => {
   let blocked = "";
 
   for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
     try {
-      const result = build(await fetchPage(url, referer));
-      if (!result.isCaptcha) return result;
-      blocked = "captcha";
+      const result = build(await fetchPage(url, referer, stopAt));
+      if (!result.isCaptcha && !(retryInvalid && result.isValid === false)) return result;
+      blocked = result.isCaptcha ? "captcha" : "invalid";
     } catch (e: any) {
       blocked = e.status ? `HTTP ${e.status}` : e.message;
     }
@@ -78,14 +80,17 @@ const scrape = async (
   return { blocked };
 };
 
-const scrapeAll = (builder: AmazonAdBuilder, codes: string[]) =>
+const scrapeAll = (builder: AmazonAdBuilder, codes: string[], retryInvalid = false) =>
   Promise.all(
     asins.flatMap((asin) =>
       codes.map(async (code): Promise<Result> => {
         const ad = buildAd({ asin });
         const { url, referer } = builder.buildUrl(buildAmazonCountry({ tld: code }), ad);
-        const result = await scrape(url, referer, (html) =>
-          builder.build(parseDocument(builder.trimHtml(html)))
+        const result = await scrape(
+          url,
+          referer,
+          (html) => builder.build(parseDocument(builder.trimHtml(html))),
+          { stopAt: builder.stopAt, retryInvalid }
         );
         return { code, asin, ...result };
       })
@@ -135,17 +140,31 @@ describe("live Amazon", () => {
     expect(priced.length).toBeGreaterThanOrEqual(answered.length * 0.75);
   });
 
+  it("finds the buy box offer through twister", async () => {
+    const twisterMarkets = markets.filter((code) => ["de", "fr"].includes(code));
+    const results = await scrapeAll(new AmazonTwisterAdBuilder(), twisterMarkets, true);
+    console.info(summarize(results).join("\n"));
 
-  it("finds products and subcategories on an amazon.pl listing", async () => {
+    const answered = answeredOf(results);
+    const priced = answered.filter(
+      (result) => result.price! > 0 && result.dispatchFrom
+    );
+
+    expect(answered.length, "every request was blocked").toBeGreaterThan(0);
+    expect(priced.length).toBeGreaterThanOrEqual(answered.length * 0.75);
+  });
+
+
+  it("finds products and the last page on an amazon.pl listing", async () => {
     const builder = new AmazonPlpBuilder();
     let built: ReturnType<AmazonPlpBuilder["build"]> | undefined;
 
     // A listing without products counts as blocked, so it is asked again
     await scrape("pl/s?i=electronics&s=date-desc-rank", "pl/b?node=1", (html) => {
       built = builder.build(parseDocument(html), "electronics");
-      return { isCaptcha: !built.ads.length };
+      return { isCaptcha: !built.isValid || !built.ads.length };
     });
-    console.info("pl listing:", built?.ads.length, "ads,", built?.subcategories.length, "subcategories");
+    console.info("pl listing:", built?.ads.length, "ads,", built?.lastPage, "pages");
 
     expect(built?.ads.length).toBeGreaterThan(0);
     expect(built?.ads[0]).toMatchObject({
@@ -153,6 +172,6 @@ describe("live Amazon", () => {
       name: expect.any(String),
       image: expect.stringMatching(/^https:\/\//),
     });
-    expect(built?.subcategories.length).toBeGreaterThan(0);
+    expect(built?.lastPage).toBeGreaterThan(1);
   });
 });

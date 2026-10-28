@@ -1,6 +1,6 @@
 import axios from "axios";
+import type { Readable } from "node:stream";
 import _ from "lodash";
-import UserAgent from "user-agents";
 import { ScraperConfigService } from "@/shared/backend/ScraperConfigService";
 import { ProxyService } from "@/shared/http/proxy/ProxyService";
 import { RequestQueueService } from "@/shared/http/RequestQueueService";
@@ -10,8 +10,9 @@ import type { MetricLabels, RequestOutcome } from "@/shared/metrics/metrics.type
 export class ScrapingClient {
   private static instance: ScrapingClient;
   private timeout = 20 * 1000;
-  private userAgents = Array.from({ length: 500 }, () =>
-    new UserAgent({ deviceCategory: "desktop" }).toString()
+  private userAgents = [138, 139, 140, 141].map(
+    (version) =>
+      `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${version}.0.0.0 Safari/537.36`
   );
   private proxyService;
   private metricsService;
@@ -51,12 +52,19 @@ export class ScrapingClient {
       isCancelled?: () => boolean;
     },
     labels: MetricLabels = {},
-    proxyType?: string
+    proxyType?: string,
+    stopAt?: string[]
   ) {
     this.queueService.request(async () => {
       if (callback?.isCancelled?.()) return;
 
-      const httpsAgent = this.proxyService.getAgent(new URL(url).hostname, proxyType);
+      let httpsAgent;
+      try {
+        httpsAgent = this.proxyService.getAgent(new URL(url).hostname, proxyType);
+      } catch (e) {
+        callback?.onError?.(e);
+        return;
+      }
       const userAgent = _.sample(this.userAgents);
 
       const startedAt = Date.now();
@@ -82,14 +90,19 @@ export class ScrapingClient {
             headers: {
               "User-Agent": userAgent,
               Referer: referer,
-              "Referrer-Policy": "strict-origin-when-cross-origin",
+              "Accept-Encoding": "gzip, deflate, br",
             },
+            ...(stopAt && { responseType: "stream" }),
           })
-          .then((response) => {
+          .then(async (response) => {
+            const data = stopAt
+              ? ((await this.read(response.data as Readable, stopAt)) as T)
+              : response.data;
             record("ok");
-            callback?.onSuccess?.(response.data);
+            callback?.onSuccess?.(data);
           })
           .catch((e) => {
+            if (stopAt) e?.response?.data?.resume?.();
             record(
               e?.response?.status
                 ? `http_${e.response.status}`
@@ -101,6 +114,33 @@ export class ScrapingClient {
           })
           .finally(() => resolve());
       });
+    });
+  }
+
+  // Text of the stream up to the chunk that completes the markers in order
+  private read(stream: Readable, stopAt: string[]) {
+    return new Promise<string>((resolve, reject) => {
+      let text = "";
+      let next = 0;
+      let from = 0;
+
+      stream.setEncoding("utf8");
+      stream.on("data", (chunk: string) => {
+        text += chunk;
+        while (next < stopAt.length) {
+          const index = text.indexOf(stopAt[next], from);
+          if (index === -1) {
+            from = Math.max(from, text.length - stopAt[next].length);
+            return;
+          }
+          from = index + stopAt[next].length;
+          next++;
+        }
+        stream.destroy();
+        resolve(text);
+      });
+      stream.on("end", () => resolve(text));
+      stream.on("error", reject);
     });
   }
 }
