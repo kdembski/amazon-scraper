@@ -3,7 +3,7 @@ import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
 import { AmazonPdpScraper } from "@/marketplaces/amazon/pdp/AmazonPdpScraper";
 import { cronJobs } from "@@tests/support/cron";
 import { buildAd, buildAmazonCountry } from "@@tests/support/factories";
-import { aodPage, captchaPage, twisterBuybox, twisterResponse } from "@@tests/support/html";
+import { aodPage, awdPage, captchaPage, twisterBuybox, twisterResponse } from "@@tests/support/html";
 import {
   bootScraper,
   sleep,
@@ -119,6 +119,28 @@ describe("PDP", () => {
     expect(world.amazon.requestsTo("de")[0].headers.referer).toBe(
       "https://www.amazon.de/dp/B0TESTASIN"
     );
+  });
+
+  it("asks gp/aw/d after a twister 404", async () => {
+    world.backend.on("GET", "amazon/countries/scrap", [
+      buildAmazonCountry({ countryId: 1, tld: "de" }),
+      buildAmazonCountry({ countryId: 2, tld: "fr", pdpSource: "twister,awd" }),
+      buildAmazonCountry({ countryId: 3, tld: "it" }),
+    ]);
+    world.amazon.respond(({ country, url }) => {
+      if (country !== "fr") return offers[country as keyof typeof offers][0];
+      if (url.includes("gp/twister/ajaxv2")) return { status: 404 };
+      return awdPage(twisterBuybox({ price: "25,49", soldBy: "Amazon.fr" }));
+    });
+    scrape();
+
+    const put = await world.backend.waitFor("PUT", "amazon/ads/7");
+
+    expect(put.body.prices[1]).toEqual(price(2, 25.49, "Amazon"));
+    expect(world.amazon.requestsTo("fr").map((request) => request.url)[1]).toBe(
+      "fr/gp/aw/d/B0TESTASIN?th=1&psc=1"
+    );
+    expect(world.amazon.requestsTo("fr")[1].headers.referer).toBe("https://www.amazon.fr/");
   });
 
   it("leaves out a country without an offer", async () => {

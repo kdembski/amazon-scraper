@@ -28,6 +28,10 @@ describe("AmazonTwisterAdBuilder", () => {
     expect(builder.stopAt).toBeUndefined();
   });
 
+  it("treats a 404 as no data, not as a deleted product", () => {
+    expect(builder.notFoundIsNoData).toBe(true);
+  });
+
   describe("trimHtml", () => {
     it("keeps only the buy box", () => {
       const html = builder.trimHtml(twisterResponse(twisterBuybox({ price: "24,99" })));

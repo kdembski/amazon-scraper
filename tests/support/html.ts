@@ -98,6 +98,12 @@ export const twisterBuybox = ({
   ${offerRow("desktop-merchant-info", soldBy)}
 `;
 
+// gp/aw/d product page: prices of other products come before the buy box
+export const awdPage = (buybox: string) => `
+  <div id="related">${aPrice("55", "71")}</div>
+  <div id="buybox">${buybox}</div>
+`;
+
 // gp/twister/ajaxv2 response: JSON parts separated by "&&&"; without
 // `closed` it ends right after the buy box part, as a cut stream does
 export const twisterResponse = (buybox: string, { closed = true } = {}) => {

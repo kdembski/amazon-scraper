@@ -311,18 +311,73 @@ describe("AmazonPdpCountryScraper", () => {
         referer: `${country.tld}/dp/${ad.asin}`,
       }));
       twister.builder.stopAt = ["a", "b"];
+      twister.builder.notFoundIsNoData = true;
+      const awd = fakeAdBuilder({ price: 30 });
+      awd.buildUrl.mockImplementation((country, ad) => ({
+        url: `${country.tld}/awd/${ad.asin}`,
+        referer: `${country.tld}/`,
+      }));
       const metrics = { increment: vi.fn() } as unknown as MetricsService;
       const scraper = new AmazonPdpCountryScraper(
         amazon.service,
-        { aod: aod.builder, twister: twister.builder },
+        { aod: aod.builder, twister: twister.builder, awd: awd.builder },
         metrics
       );
       const price = buildPrice({ country: buildAmazonCountry({ tld: "c1", pdpSource }) });
       const outcome = vi.fn();
       const run = () => scraper.execute(price, buildAd(), () => false).then(outcome);
 
-      return { amazon, aod, twister, price, outcome, run };
+      return { amazon, aod, twister, awd, price, outcome, run };
     };
+
+    it("moves to the next source on a 404 without counting a failure", async () => {
+      const { amazon, awd, price, outcome, run } = setupSources("twister,awd");
+      run();
+
+      amazon.fail(0, notFound);
+      await flush();
+
+      expect(amazon.requests[1].url).toBe("c1/awd/B0TESTASIN");
+      expect(price.failed).toBe(0);
+      amazon.respond(1, html);
+      await flush();
+
+      expect(awd.build).toHaveBeenCalled();
+      expect(price.value).toBe(30);
+      expect(outcome).toHaveBeenCalledWith("data");
+    });
+
+    it("retries the fallback source, not the first one", async () => {
+      const { amazon, run } = setupSources("twister,awd");
+      run();
+
+      amazon.fail(0, notFound);
+      await flush();
+      amazon.fail(1, { status: 503 });
+      await flush();
+      await vi.runAllTimersAsync();
+
+      expect(amazon.requests[2].url).toBe("c1/awd/B0TESTASIN");
+    });
+
+    it("deletes the country on a 404 from the last source", async () => {
+      const { amazon, outcome, run } = setupSources("twister,awd");
+      run();
+
+      amazon.fail(0, notFound);
+      await flush();
+      amazon.fail(1, notFound);
+      await flush();
+
+      expect(outcome).toHaveBeenCalledWith("deleted");
+    });
+
+    it("skips unknown sources in the list", () => {
+      const { amazon, run } = setupSources("x, twister");
+      run();
+
+      expect(amazon.requests[0].url).toBe("c1/twister/B0TESTASIN");
+    });
 
     it("scrapes a twister country through twister with its stop markers", async () => {
       const { amazon, twister, price, outcome, run } = setupSources("twister");

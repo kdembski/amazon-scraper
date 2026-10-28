@@ -1,10 +1,60 @@
 import type { Document, Element } from "domhandler";
-import { find, text } from "@/shared/utils/html";
+import type { AmazonAdBuildResult } from "@/marketplaces/amazon/types/amazon.types";
+import { find, findAll, text } from "@/shared/utils/html";
 
 const CAPTCHA_ACTIONS = ["/errors/validateCaptcha", "/errors_page/validateCaptcha"];
+const SUBSCRIPTION_ROWS = ["snsAccordionRowMiddle", "subscriptionPrice"];
+const CART_PRICE = "input[name='items[0.base][customerVisiblePrice][amount]']";
 
 export const isCaptchaPage = (document: Document) =>
   CAPTCHA_ACTIONS.includes(find("form", document)?.attribs.action ?? "");
+
+// Product page buy box (twister fragment, gp/aw/d)
+export const buildBuybox = (buybox: Element | null | undefined): AmazonAdBuildResult => {
+  const isValid = !!buybox && !find("#priceNotAvailable", buybox);
+  const price = buybox && getBuyboxPrice(buybox);
+
+  if (!isValid || !price) {
+    return { isCaptcha: false, isValid };
+  }
+
+  return {
+    isCaptcha: false,
+    isValid,
+    price,
+    dispatchFrom: getBuyboxDispatchFrom(buybox),
+  };
+};
+
+const getBuyboxPrice = (buybox: Element) => {
+  const priceToPay = findAll(".apex-pricetopay-value", buybox).find(
+    (element) => !isSubscription(element, buybox)
+  );
+  if (priceToPay) return getOfferPrice(priceToPay.parent as Element);
+
+  return Number(find(CART_PRICE, buybox)?.attribs.value) || undefined;
+};
+
+const isSubscription = (element: Element, buybox: Element) => {
+  for (let node = element.parent; node && node !== buybox; node = node.parent) {
+    if (SUBSCRIPTION_ROWS.includes((node as Element).attribs?.id)) return true;
+  }
+  return false;
+};
+
+const getBuyboxDispatchFrom = (buybox: Element) => {
+  const message = (name: string) =>
+    text(
+      find(
+        `[offer-display-feature-name='${name}'] .offer-display-feature-text-message`,
+        buybox
+      )
+    );
+
+  return normalizeDispatchFrom(
+    message("desktop-fulfiller-info") || message("desktop-merchant-info")
+  );
+};
 
 export const getOfferPrice = (priceBox: Element) => {
   const container =

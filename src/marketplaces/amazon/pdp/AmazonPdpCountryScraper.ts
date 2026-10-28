@@ -1,5 +1,6 @@
 import { AmazonService } from "@/marketplaces/amazon/AmazonService";
 import { AmazonAodAdBuilder } from "@/marketplaces/amazon/pdp/AmazonAodAdBuilder";
+import { AmazonAwdAdBuilder } from "@/marketplaces/amazon/pdp/AmazonAwdAdBuilder";
 import { AmazonTwisterAdBuilder } from "@/marketplaces/amazon/pdp/AmazonTwisterAdBuilder";
 import {
   AmazonAd,
@@ -21,6 +22,7 @@ export class AmazonPdpCountryScraper {
     private builders: Record<string, AmazonAdBuilder> = {
       aod: new AmazonAodAdBuilder(),
       twister: new AmazonTwisterAdBuilder(),
+      awd: new AmazonAwdAdBuilder(),
     },
     private metricsService = MetricsService.getInstance()
   ) {}
@@ -30,11 +32,17 @@ export class AmazonPdpCountryScraper {
     ad: AmazonAd,
     isCancelled: () => boolean
   ): Promise<ItemOutcome | undefined> {
-    const builder = this.builders[price.country.pdpSource] ?? this.builders.aod;
+    const sources = this.getSources(price.country.pdpSource);
+    let builder = sources.shift()!;
 
     while (!isCancelled()) {
       const result = await this.fetch(builder, ad, price, isCancelled);
       if (isCancelled()) return;
+
+      if (!result.ok && result.status === 404 && sources.length) {
+        builder = sources.shift()!;
+        continue;
+      }
 
       const outcome = this.toOutcome(result, price, builder);
       if (outcome) {
@@ -50,6 +58,14 @@ export class AmazonPdpCountryScraper {
 
       await sleep(getRetryDelay(price.failed));
     }
+  }
+
+  // "twister,awd": the next source is asked on a 404
+  private getSources(pdpSource: string) {
+    const sources = _.compact(
+      pdpSource.split(",").map((source) => this.builders[source.trim()])
+    );
+    return sources.length ? sources : [this.builders.aod];
   }
 
   private fetch(
@@ -82,7 +98,7 @@ export class AmazonPdpCountryScraper {
   ): ItemOutcome | undefined {
     if (!result.ok) {
       if (result.status !== 404) return;
-      return builder === this.builders.aod ? "deleted" : "no_data";
+      return builder.notFoundIsNoData ? "no_data" : "deleted";
     }
 
     if (!result.data.length) {
