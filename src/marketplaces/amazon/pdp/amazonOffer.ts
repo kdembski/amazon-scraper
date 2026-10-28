@@ -1,5 +1,10 @@
-import type { Element } from "domhandler";
+import type { Document, Element } from "domhandler";
 import { find, text } from "@/shared/utils/html";
+
+const CAPTCHA_ACTIONS = ["/errors/validateCaptcha", "/errors_page/validateCaptcha"];
+
+export const isCaptchaPage = (document: Document) =>
+  CAPTCHA_ACTIONS.includes(find("form", document)?.attribs.action ?? "");
 
 export const getOfferPrice = (priceBox: Element) => {
   const container =

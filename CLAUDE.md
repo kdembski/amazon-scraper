@@ -72,6 +72,7 @@ The bottleneck is open connections (home router NAT, host conntrack), not bandwi
 ## HTML parsing (fragile)
 
 Builders in `src/marketplaces/amazon/pdp/` and `src/marketplaces/amazon/plp/` get an `htmlparser2` document (`parseDocument`) and query it with Amazon's DOM selectors through `find`/`findAll`/`text` (`@/shared/utils/html`, `css-select` + `domutils`); layout changes break them silently. No full DOM (`linkedom` was 3-4x slower).
+- Captcha (PDP builders, `isCaptchaPage` in `amazonOffer.ts`): first `form` with action `/errors/validateCaptcha` or `/errors_page/validateCaptcha` ("Weiter shoppen" bot wall).
 - `cleanUpPrice` assumes a comma decimal separator (EU format).
 - `AmazonPlpBuilder`: a page is valid with `[data-component-type='s-search-results']` and either products or `[data-csa-c-content-id='messaging-messages-no-results']` (empty range, not retried); `lastPage` is the highest number in `.s-pagination-item`, 400 means the range is cut off.
 - `AmazonAodAdBuilder` reads only `#aod-pinned-offer` (= PDP buybox); no price element means no offer. Price comes from `.a-price-whole` + `.a-price-fraction`. `Amazon.nl` etc. is normalized to `Amazon` (backend checks `dispatchFrom === "Amazon"`).

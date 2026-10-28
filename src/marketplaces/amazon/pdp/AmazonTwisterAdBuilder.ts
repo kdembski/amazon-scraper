@@ -5,7 +5,7 @@ import {
   AmazonAdBuildResult,
   AmazonCountry,
 } from "@/marketplaces/amazon/types/amazon.types";
-import { getOfferPrice, normalizeDispatchFrom } from "@/marketplaces/amazon/pdp/amazonOffer";
+import { getOfferPrice, isCaptchaPage, normalizeDispatchFrom } from "@/marketplaces/amazon/pdp/amazonOffer";
 import { find, findAll, text } from "@/shared/utils/html";
 
 const SUBSCRIPTION_ROWS = ["snsAccordionRowMiddle", "subscriptionPrice"];
@@ -33,8 +33,7 @@ export class AmazonTwisterAdBuilder implements AmazonAdBuilder {
   }
 
   build(document: Document): AmazonAdBuildResult {
-    const form = find("form", document);
-    const isCaptcha = form?.attribs.action === "/errors/validateCaptcha";
+    const isCaptcha = isCaptchaPage(document);
 
     if (isCaptcha) {
       console.warn("Warning: Captcha triggered!");

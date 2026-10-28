@@ -10,6 +10,13 @@ export const captchaPage = `
   </form>
 `;
 
+// "Weiter shoppen" bot wall, the other captcha variant
+export const botWallPage = `
+  <form method="get" action="/errors_page/validateCaptcha" name="">
+    <button type="submit">Weiter shoppen</button>
+  </form>
+`;
+
 // Price markup as Amazon renders it inside .a-price
 export const aPrice = (whole: string, fraction: string, offscreen = "") => `
   <span class="a-price">

@@ -5,7 +5,7 @@ import {
   AmazonAdBuildResult,
 } from "@/marketplaces/amazon/types/amazon.types";
 import { AmazonCountry } from "@/marketplaces/amazon/types/amazon.types";
-import { getOfferPrice, normalizeDispatchFrom } from "@/marketplaces/amazon/pdp/amazonOffer";
+import { getOfferPrice, isCaptchaPage, normalizeDispatchFrom } from "@/marketplaces/amazon/pdp/amazonOffer";
 import { find, text } from "@/shared/utils/html";
 
 export class AmazonAodAdBuilder implements AmazonAdBuilder {
@@ -18,8 +18,7 @@ export class AmazonAodAdBuilder implements AmazonAdBuilder {
   }
 
   build(document: Document): AmazonAdBuildResult {
-    const form = find("form", document);
-    const isCaptcha = form?.attribs.action === "/errors/validateCaptcha";
+    const isCaptcha = isCaptchaPage(document);
 
     if (isCaptcha) {
       console.warn("Warning: Captcha triggered!");

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { AmazonTwisterAdBuilder } from "@/marketplaces/amazon/pdp/AmazonTwisterAdBuilder";
 import { buildAd, buildAmazonCountry } from "@@tests/support/factories";
 import {
+  botWallPage,
   captchaPage,
   toDocument,
   twisterBuybox,
@@ -101,6 +102,7 @@ describe("AmazonTwisterAdBuilder", () => {
 
     it("detects a captcha", () => {
       expect(build(captchaPage)).toEqual({ isCaptcha: true });
+      expect(build(botWallPage)).toEqual({ isCaptcha: true });
     });
 
     it("rejects a response without the buy box part", () => {

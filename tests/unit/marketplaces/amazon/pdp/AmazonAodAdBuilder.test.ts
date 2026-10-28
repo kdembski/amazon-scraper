@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AmazonAodAdBuilder } from "@/marketplaces/amazon/pdp/AmazonAodAdBuilder";
-import { captchaPage, toDocument } from "@@tests/support/html";
+import { botWallPage, captchaPage, toDocument } from "@@tests/support/html";
 import { AmazonCountry } from "@/marketplaces/amazon/types/amazon.types";
 import { AmazonAd } from "@/marketplaces/amazon/types/amazon.types";
 
@@ -63,6 +63,7 @@ describe("AmazonAodAdBuilder", () => {
 
   it("detects a captcha page", () => {
     expect(build(captchaPage)).toEqual({ isCaptcha: true });
+    expect(build(botWallPage)).toEqual({ isCaptcha: true });
   });
 
   it("marks a response without the aod container as invalid", () => {
