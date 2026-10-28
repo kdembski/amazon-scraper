@@ -3,7 +3,7 @@ import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
 import { AmazonPdpScraper } from "@/marketplaces/amazon/pdp/AmazonPdpScraper";
 import { cronJobs } from "@@tests/support/cron";
 import { buildAd, buildAmazonCountry } from "@@tests/support/factories";
-import { aodPage, captchaPage } from "@@tests/support/html";
+import { aodPage, captchaPage, twisterBuybox, twisterResponse } from "@@tests/support/html";
 import {
   bootScraper,
   sleep,
@@ -88,6 +88,40 @@ describe("PDP", () => {
     expect(de.headers["user-agent"]).toMatch(/Mozilla/);
   });
 
+
+  it("scrapes twister countries and falls back to AOD on a 404", async () => {
+    world.backend.on("GET", "amazon/countries/scrap", [
+      buildAmazonCountry({ countryId: 1, tld: "de", pdpSource: "twister" }),
+      buildAmazonCountry({ countryId: 2, tld: "fr", pdpSource: "twister" }),
+      buildAmazonCountry({ countryId: 3, tld: "it" }),
+    ]);
+    const twister = twisterResponse(twisterBuybox({ price: "24,99", soldBy: "Amazon" }));
+    world.amazon.respond(({ country, url }) => {
+      const isTwister = url.includes("gp/twister/ajaxv2");
+      if (country === "de" && isTwister) return twister + "x".repeat(200_000);
+      if (country === "fr" && isTwister) return { status: 404 };
+      return offers[country as keyof typeof offers][0];
+    });
+    scrape();
+
+    const put = await world.backend.waitFor("PUT", "amazon/ads/7");
+
+    expect(put.body).toEqual({
+      prices: [
+        price(1, 24.99, "Amazon"),
+        price(2, 25.49, "Amazon"),
+        price(3, 26, "Some Seller"),
+      ],
+    });
+    expect(world.backend.find("DELETE", "amazon/ads/7")).toHaveLength(0);
+    expect(world.amazon.requestsTo("fr").map((request) => request.url)).toEqual([
+      "fr/gp/twister/ajaxv2?asinList=B0TESTASIN&id=B0TESTASIN&parentAsin=B0TESTASIN&mType=full&json=1&isUDPFlag=1&dpxAjaxFlag=1&isFlushing=2&psc=1",
+      "fr/gp/product/ajax/aodAjaxMain/?asin=B0TESTASIN&pc=dp",
+    ]);
+    expect(world.amazon.requestsTo("de")[0].headers.referer).toBe(
+      "https://www.amazon.de/dp/B0TESTASIN"
+    );
+  });
 
   it("leaves out a country without an offer", async () => {
     world.amazon.respondPerCountry({ ...offers, it: [aodPage()] });

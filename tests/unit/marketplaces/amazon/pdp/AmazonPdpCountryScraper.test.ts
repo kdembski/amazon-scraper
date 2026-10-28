@@ -14,7 +14,7 @@ const setup = (result: AmazonAdBuildResult = { price: 10 }) => {
   const builder = fakeAdBuilder(result);
   const increment = vi.fn();
   const metrics = { increment } as unknown as MetricsService;
-  const scraper = new AmazonPdpCountryScraper(amazon.service, builder.builder, metrics);
+  const scraper = new AmazonPdpCountryScraper(amazon.service, { aod: builder.builder }, metrics);
   const ad = buildAd({ id: 7 });
   const price = buildPrice({ country: buildAmazonCountry({ countryId: 1, tld: "c1" }) });
   let cancelled = false;
@@ -63,7 +63,8 @@ describe("AmazonPdpCountryScraper", () => {
         onError: expect.any(Function),
         isCancelled: expect.any(Function),
       },
-      "isp"
+      "isp",
+      undefined
     );
   });
 
@@ -297,6 +298,81 @@ describe("AmazonPdpCountryScraper", () => {
       const labels = { country: "c1", outcome: "given_up" };
       expect(increment).toHaveBeenCalledWith("items", labels);
       expect(increment).toHaveBeenCalledWith("item_attempts", labels, MAX_FAILED_ATTEMPTS);
+    });
+  });
+
+  describe("pdpSource", () => {
+    const setupSources = (pdpSource: string) => {
+      const amazon = fakeAmazonService();
+      const aod = fakeAdBuilder({ price: 10 });
+      const twister = fakeAdBuilder({ price: 20 });
+      twister.buildUrl.mockImplementation((country, ad) => ({
+        url: `${country.tld}/twister/${ad.asin}`,
+        referer: `${country.tld}/dp/${ad.asin}`,
+      }));
+      twister.builder.stopAt = ["a", "b"];
+      const metrics = { increment: vi.fn() } as unknown as MetricsService;
+      const scraper = new AmazonPdpCountryScraper(
+        amazon.service,
+        { aod: aod.builder, twister: twister.builder },
+        metrics
+      );
+      const price = buildPrice({ country: buildAmazonCountry({ tld: "c1", pdpSource }) });
+      const outcome = vi.fn();
+      const run = () => scraper.execute(price, buildAd(), () => false).then(outcome);
+
+      return { amazon, aod, twister, price, outcome, run };
+    };
+
+    it("scrapes a twister country through twister with its stop markers", async () => {
+      const { amazon, twister, price, outcome, run } = setupSources("twister");
+      run();
+
+      expect(amazon.requests[0].url).toBe("c1/twister/B0TESTASIN");
+      expect(amazon.get.mock.calls[0][4]).toEqual(["a", "b"]);
+      amazon.respond(0, html);
+      await flush();
+
+      expect(twister.build).toHaveBeenCalled();
+      expect(price.value).toBe(20);
+      expect(outcome).toHaveBeenCalledWith("data");
+    });
+
+    it("scrapes a country with an unknown pdpSource through AOD", () => {
+      const { amazon, run } = setupSources("x");
+      run();
+
+      expect(amazon.requests[0].url).toBe("c1/dp/B0TESTASIN");
+      expect(amazon.get.mock.calls[0][4]).toBeUndefined();
+    });
+
+    it("falls back to AOD on a twister 404", async () => {
+      const { amazon, aod, price, outcome, run } = setupSources("twister");
+      run();
+
+      amazon.fail(0, notFound);
+      await flush();
+
+      expect(amazon.requests[1].url).toBe("c1/dp/B0TESTASIN");
+      expect(price.failed).toBe(0);
+      amazon.respond(1, html);
+      await flush();
+
+      expect(aod.build).toHaveBeenCalled();
+      expect(price.value).toBe(10);
+      expect(outcome).toHaveBeenCalledWith("data");
+    });
+
+    it("deletes the country on an AOD 404 after the fallback", async () => {
+      const { amazon, outcome, run } = setupSources("twister");
+      run();
+
+      amazon.fail(0, notFound);
+      await flush();
+      amazon.fail(1, notFound);
+      await flush();
+
+      expect(outcome).toHaveBeenCalledWith("deleted");
     });
   });
 
