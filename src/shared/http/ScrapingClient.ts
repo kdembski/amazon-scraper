@@ -1,4 +1,5 @@
 import axios from "axios";
+import type { Readable } from "node:stream";
 import _ from "lodash";
 import { ScraperConfigService } from "@/shared/backend/ScraperConfigService";
 import { ProxyService } from "@/shared/http/proxy/ProxyService";
@@ -51,7 +52,8 @@ export class ScrapingClient {
       isCancelled?: () => boolean;
     },
     labels: MetricLabels = {},
-    proxyType?: string
+    proxyType?: string,
+    stopAt?: string[]
   ) {
     this.queueService.request(async () => {
       if (callback?.isCancelled?.()) return;
@@ -90,10 +92,14 @@ export class ScrapingClient {
               Referer: referer,
               "Accept-Encoding": "gzip, deflate, br",
             },
+            ...(stopAt && { responseType: "stream" }),
           })
-          .then((response) => {
+          .then(async (response) => {
+            const data = stopAt
+              ? ((await this.read(response.data as Readable, stopAt)) as T)
+              : response.data;
             record("ok");
-            callback?.onSuccess?.(response.data);
+            callback?.onSuccess?.(data);
           })
           .catch((e) => {
             record(
@@ -107,6 +113,33 @@ export class ScrapingClient {
           })
           .finally(() => resolve());
       });
+    });
+  }
+
+  // Text of the stream up to the chunk that completes the markers in order
+  private read(stream: Readable, stopAt: string[]) {
+    return new Promise<string>((resolve, reject) => {
+      let text = "";
+      let next = 0;
+      let from = 0;
+
+      stream.setEncoding("utf8");
+      stream.on("data", (chunk: string) => {
+        text += chunk;
+        while (next < stopAt.length) {
+          const index = text.indexOf(stopAt[next], from);
+          if (index === -1) {
+            from = Math.max(from, text.length - stopAt[next].length);
+            return;
+          }
+          from = index + stopAt[next].length;
+          next++;
+        }
+        stream.destroy();
+        resolve(text);
+      });
+      stream.on("end", () => resolve(text));
+      stream.on("error", reject);
     });
   }
 }

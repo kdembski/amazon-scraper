@@ -1,4 +1,5 @@
 import axios from "axios";
+import { Readable } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ScrapingClient } from "@/shared/http/ScrapingClient";
 import type { ScraperConfigService } from "@/shared/backend/ScraperConfigService";
@@ -252,6 +253,101 @@ describe("ScrapingClient", () => {
           ([name]) => name === "requests"
         );
         expect(counted).toEqual([["requests", { outcome: "ok" }]]);
+      });
+    });
+
+    describe("with stopAt", () => {
+      const url = "https://www.amazon.de/dp/X";
+      const stopAt = ["<b>", "&&&"];
+
+      const setupStream = (chunks: (string | Buffer)[], error?: Error) => {
+        const metrics = { increment: vi.fn() };
+        const requests: Promise<unknown>[] = [];
+        const queue = {
+          start: vi.fn(),
+          request: vi.fn((cb: () => Promise<unknown>) => {
+            requests.push(cb());
+          }),
+        };
+        const service = new Client({} as ScraperConfigService, { getAgent: vi.fn() }, queue, metrics);
+        const stream = Readable.from(
+          (async function* () {
+            for (const chunk of chunks) yield Buffer.from(chunk);
+            if (error) throw error;
+          })()
+        );
+        get.mockResolvedValue({ data: stream });
+        const callback = { onSuccess: vi.fn(), onError: vi.fn() };
+        const run = async (markers: string[] = stopAt) => {
+          service.get(url, undefined, callback, {}, undefined, markers);
+          await Promise.all(requests);
+        };
+
+        return { run, callback, metrics, stream };
+      };
+
+      it("reads the response as a stream and cuts it after the last marker", async () => {
+        const { run, callback, metrics, stream } = setupStream(["<a>", "<b>x&&&y", "rest"]);
+
+        await run();
+
+        expect(get.mock.calls[0][1]).toMatchObject({ responseType: "stream" });
+        expect(callback.onSuccess).toHaveBeenCalledTimes(1);
+        expect(callback.onSuccess).toHaveBeenCalledWith("<a><b>x&&&y");
+        expect(stream.destroyed).toBe(true);
+        expect(metrics.increment).toHaveBeenCalledWith("requests", { outcome: "ok" });
+      });
+
+      it("cuts at markers split across chunks", async () => {
+        const { run, callback } = setupStream(["<a><", "b>x&&", "&y", "rest"]);
+
+        await run();
+
+        expect(callback.onSuccess).toHaveBeenCalledWith("<a><b>x&&&y");
+      });
+
+      it("ignores a later marker seen before the earlier one", async () => {
+        const { run, callback } = setupStream(["&&&", "<b>", "x&&&", "rest"]);
+
+        await run();
+
+        expect(callback.onSuccess).toHaveBeenCalledWith("&&&<b>x&&&");
+      });
+
+      it("passes the whole response when the markers never arrive", async () => {
+        const { run, callback } = setupStream(["<a>", "<b>"]);
+
+        await run();
+
+        expect(callback.onSuccess).toHaveBeenCalledWith("<a><b>");
+      });
+
+      it("decodes a character split across chunks", async () => {
+        const euro = Buffer.from("€");
+        const { run, callback } = setupStream([euro.subarray(0, 1), euro.subarray(1)]);
+
+        await run(["x"]);
+
+        expect(callback.onSuccess).toHaveBeenCalledWith("€");
+      });
+
+      it("reports a stream error once", async () => {
+        const { run, callback, metrics } = setupStream(["<a>"], new Error("reset"));
+
+        await run();
+
+        expect(callback.onError).toHaveBeenCalledTimes(1);
+        expect(callback.onSuccess).not.toHaveBeenCalled();
+        expect(metrics.increment).toHaveBeenCalledWith("requests", { outcome: "network" });
+      });
+
+      it("counts a stream cancelled by the timeout as timeout", async () => {
+        const error = Object.assign(new Error("canceled"), { code: "ERR_CANCELED" });
+        const { run, metrics } = setupStream(["<a>"], error);
+
+        await run();
+
+        expect(metrics.increment).toHaveBeenCalledWith("requests", { outcome: "timeout" });
       });
     });
 

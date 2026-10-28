@@ -29,14 +29,16 @@ export class AmazonService {
       onError?: (e: any) => void;
       isCancelled?: () => boolean;
     },
-    proxyType?: string
+    proxyType?: string,
+    stopAt?: string[]
   ) {
     this.scrapingClient.get<T>(
       `${this.baseUrl}${url}`,
       `${this.baseUrl}${referer}`,
       callback,
       { country: url.split("/")[0] },
-      proxyType
+      proxyType,
+      stopAt
     );
   }
 }

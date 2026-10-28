@@ -25,7 +25,24 @@ describe("AmazonService", () => {
       "https://www.amazon.de/s?k=B0TESTASIN",
       callback,
       { country: "de" },
-      "isp"
+      "isp",
+      undefined
+    );
+  });
+
+  it("passes the stop markers to the scraping client", () => {
+    const { service, client } = setup();
+    const callback = { onSuccess: vi.fn() };
+
+    service.get("de/x", "de/", callback, "isp", ["a"]);
+
+    expect(client.get).toHaveBeenCalledWith(
+      "https://www.amazon.de/x",
+      "https://www.amazon.de/",
+      callback,
+      { country: "de" },
+      "isp",
+      ["a"]
     );
   });
 
