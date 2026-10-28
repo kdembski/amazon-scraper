@@ -346,33 +346,16 @@ describe("AmazonPdpCountryScraper", () => {
       expect(amazon.get.mock.calls[0][4]).toBeUndefined();
     });
 
-    it("falls back to AOD on a twister 404", async () => {
-      const { amazon, aod, price, outcome, run } = setupSources("twister");
+    it("finishes a twister country without a price on a 404", async () => {
+      const { amazon, price, outcome, run } = setupSources("twister");
       run();
 
       amazon.fail(0, notFound);
       await flush();
 
-      expect(amazon.requests[1].url).toBe("c1/dp/B0TESTASIN");
-      expect(price.failed).toBe(0);
-      amazon.respond(1, html);
-      await flush();
-
-      expect(aod.build).toHaveBeenCalled();
-      expect(price.value).toBe(10);
-      expect(outcome).toHaveBeenCalledWith("data");
-    });
-
-    it("deletes the country on an AOD 404 after the fallback", async () => {
-      const { amazon, outcome, run } = setupSources("twister");
-      run();
-
-      amazon.fail(0, notFound);
-      await flush();
-      amazon.fail(1, notFound);
-      await flush();
-
-      expect(outcome).toHaveBeenCalledWith("deleted");
+      expect(amazon.requests).toHaveLength(1);
+      expect(price.value).toBeUndefined();
+      expect(outcome).toHaveBeenCalledWith("no_data");
     });
   });
 

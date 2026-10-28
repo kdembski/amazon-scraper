@@ -89,7 +89,7 @@ describe("PDP", () => {
   });
 
 
-  it("scrapes twister countries and falls back to AOD on a 404", async () => {
+  it("scrapes twister countries and leaves out one with a 404", async () => {
     world.backend.on("GET", "amazon/countries/scrap", [
       buildAmazonCountry({ countryId: 1, tld: "de", pdpSource: "twister" }),
       buildAmazonCountry({ countryId: 2, tld: "fr", pdpSource: "twister" }),
@@ -109,14 +109,12 @@ describe("PDP", () => {
     expect(put.body).toEqual({
       prices: [
         price(1, 24.99, "Amazon"),
-        price(2, 25.49, "Amazon"),
         price(3, 26, "Some Seller"),
       ],
     });
     expect(world.backend.find("DELETE", "amazon/ads/7")).toHaveLength(0);
     expect(world.amazon.requestsTo("fr").map((request) => request.url)).toEqual([
       "fr/gp/twister/ajaxv2?asinList=B0TESTASIN&id=B0TESTASIN&parentAsin=B0TESTASIN&mType=full&json=1&isUDPFlag=1&dpxAjaxFlag=1&isFlushing=2&psc=1",
-      "fr/gp/product/ajax/aodAjaxMain/?asin=B0TESTASIN&pc=dp",
     ]);
     expect(world.amazon.requestsTo("de")[0].headers.referer).toBe(
       "https://www.amazon.de/dp/B0TESTASIN"

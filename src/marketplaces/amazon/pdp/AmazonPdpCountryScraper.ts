@@ -30,16 +30,11 @@ export class AmazonPdpCountryScraper {
     ad: AmazonAd,
     isCancelled: () => boolean
   ): Promise<ItemOutcome | undefined> {
-    let builder = this.builders[price.country.pdpSource] ?? this.builders.aod;
+    const builder = this.builders[price.country.pdpSource] ?? this.builders.aod;
 
     while (!isCancelled()) {
       const result = await this.fetch(builder, ad, price, isCancelled);
       if (isCancelled()) return;
-
-      if (!result.ok && result.status === 404 && builder !== this.builders.aod) {
-        builder = this.builders.aod;
-        continue;
-      }
 
       const outcome = this.toOutcome(result, price, builder);
       if (outcome) {
@@ -85,7 +80,10 @@ export class AmazonPdpCountryScraper {
     price: AmazonAdPrice,
     builder: AmazonAdBuilder
   ): ItemOutcome | undefined {
-    if (!result.ok) return result.status === 404 ? "deleted" : undefined;
+    if (!result.ok) {
+      if (result.status !== 404) return;
+      return builder === this.builders.aod ? "deleted" : "no_data";
+    }
 
     if (!result.data.length) {
       this.countResponse(price, "empty");
