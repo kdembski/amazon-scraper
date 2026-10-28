@@ -102,6 +102,7 @@ export class ScrapingClient {
             callback?.onSuccess?.(data);
           })
           .catch((e) => {
+            if (stopAt) e?.response?.data?.resume?.();
             record(
               e?.response?.status
                 ? `http_${e.response.status}`

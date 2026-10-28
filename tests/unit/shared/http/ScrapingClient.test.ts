@@ -341,6 +341,19 @@ describe("ScrapingClient", () => {
         expect(metrics.increment).toHaveBeenCalledWith("requests", { outcome: "network" });
       });
 
+      it("drains the body of an error response so the connection is freed", async () => {
+        const { run, callback } = setupStream([]);
+        const body = Readable.from([Buffer.from("not found")]);
+        get.mockReset();
+        get.mockRejectedValue({ response: { status: 404, data: body } });
+
+        await run();
+        await new Promise((resolve) => body.once("end", resolve));
+
+        expect(body.readableEnded).toBe(true);
+        expect(callback.onError).toHaveBeenCalledTimes(1);
+      });
+
       it("counts a stream cancelled by the timeout as timeout", async () => {
         const error = Object.assign(new Error("canceled"), { code: "ERR_CANCELED" });
         const { run, metrics } = setupStream(["<a>"], error);
