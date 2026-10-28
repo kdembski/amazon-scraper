@@ -69,6 +69,17 @@ describe("AmazonTwisterAdBuilder", () => {
       expect(build(snsOnly)).toEqual({ isCaptcha: false, isValid: true });
     });
 
+    it("falls back to the add-to-cart price of a single-offer buy box", () => {
+      const response = twisterResponse(twisterBuybox({ cartPrice: "30.07", soldBy: "HLSHMHY" }));
+
+      expect(build(response)).toEqual({
+        isCaptcha: false,
+        isValid: true,
+        price: 30.07,
+        dispatchFrom: "HLSHMHY",
+      });
+    });
+
     it("takes the seller when no shipper is shown", () => {
       expect(build(twisterResponse(twisterBuybox({ price: "1,00", soldBy: "Amazon.de" }))).dispatchFrom).toBe("Amazon");
       expect(build(twisterResponse(twisterBuybox({ price: "1,00", soldBy: "Some Seller" }))).dispatchFrom).toBe("Some Seller");

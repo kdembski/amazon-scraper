@@ -69,18 +69,23 @@ const priceToPay = (price: string) => {
 export const twisterBuybox = ({
   price,
   snsPrice,
+  cartPrice,
   shipsFrom,
   soldBy = "Amazon",
   hidden = false,
 }: {
   price?: string;
   snsPrice?: string;
+  // Single-offer buy box: price without .apex-pricetopay-value, the
+  // add-to-cart form holds it as a decimal ("30.07")
+  cartPrice?: string;
   shipsFrom?: string;
   soldBy?: string;
   hidden?: boolean;
 } = {}) => `
   ${snsPrice ? `<div id="snsAccordionRowMiddle"><span id="subscriptionPrice">${priceToPay(snsPrice)}</span></div>` : ""}
   ${price ? `<div id="corePrice_feature_div">${priceToPay(price)}</div>` : ""}
+  ${cartPrice ? `<div id="corePrice_feature_div"><span class="a-price a-text-price"><span class="a-offscreen">${cartPrice.replace(".", ",")}€</span></span></div><input type="hidden" name="items[0.base][customerVisiblePrice][amount]" value="${cartPrice}">` : ""}
   ${hidden ? `<div id="priceNotAvailable"><span>Add to cart to see the price</span></div>` : ""}
   ${offerRow("desktop-fulfiller-info", shipsFrom)}
   ${offerRow("desktop-merchant-info", soldBy)}

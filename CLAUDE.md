@@ -75,7 +75,7 @@ Builders in `src/marketplaces/amazon/pdp/` and `src/marketplaces/amazon/plp/` ge
 - `cleanUpPrice` assumes a comma decimal separator (EU format).
 - `AmazonPlpBuilder`: a page is valid with `[data-component-type='s-search-results']` and either products or `[data-csa-c-content-id='messaging-messages-no-results']` (empty range, not retried); `lastPage` is the highest number in `.s-pagination-item`, 400 means the range is cut off.
 - `AmazonAodAdBuilder` reads only `#aod-pinned-offer` (= PDP buybox); no price element means no offer. Price comes from `.a-price-whole` + `.a-price-fraction`. `Amazon.nl` etc. is normalized to `Amazon` (backend checks `dispatchFrom === "Amazon"`).
-- `AmazonTwisterAdBuilder`: `trimHtml` takes the `"FeatureName" : "desktop_buybox"` JSON part and wraps its HTML in `#desktop_buybox`; `#priceNotAvailable` (degraded buy box) is invalid; price is the first `.apex-pricetopay-value` outside `#snsAccordionRowMiddle`/`#subscriptionPrice` (Subscribe & Save); `dispatchFrom` from the `desktop-fulfiller-info` row, else `desktop-merchant-info`. Price parsing and the `Amazon` normalization are shared with AOD in `amazonOffer.ts`.
+- `AmazonTwisterAdBuilder`: `trimHtml` takes the `"FeatureName" : "desktop_buybox"` JSON part and wraps its HTML in `#desktop_buybox`; `#priceNotAvailable` (degraded buy box) is invalid; price is the first `.apex-pricetopay-value` outside `#snsAccordionRowMiddle`/`#subscriptionPrice` (Subscribe & Save), else the first `items[0.base][customerVisiblePrice][amount]` input (single-offer buy box, one-time price); `dispatchFrom` from the `desktop-fulfiller-info` row, else `desktop-merchant-info`. Price parsing and the `Amazon` normalization are shared with AOD in `amazonOffer.ts`.
 
 ## Conventions
 

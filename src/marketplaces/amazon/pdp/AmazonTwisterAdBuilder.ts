@@ -10,6 +10,7 @@ import { find, findAll, text } from "@/shared/utils/html";
 
 const SUBSCRIPTION_ROWS = ["snsAccordionRowMiddle", "subscriptionPrice"];
 const BUYBOX_PART = '"FeatureName" : "desktop_buybox"';
+const CART_PRICE = "input[name='items[0.base][customerVisiblePrice][amount]']";
 // shortcut: whole response downloaded (~320 KB vs ~90 KB cut) to keep keep-alive; set true to cut after the buy box
 const CUT_RESPONSE = false;
 
@@ -42,16 +43,16 @@ export class AmazonTwisterAdBuilder implements AmazonAdBuilder {
 
     const buybox = find("#desktop_buybox", document);
     const isValid = !!buybox && !find("#priceNotAvailable", buybox);
-    const priceToPay = buybox && this.getPriceToPay(buybox);
+    const price = buybox && this.getPrice(buybox);
 
-    if (!isValid || !priceToPay) {
+    if (!isValid || !price) {
       return { isCaptcha, isValid };
     }
 
     return {
       isCaptcha,
       isValid,
-      price: getOfferPrice(priceToPay.parent as Element),
+      price,
       dispatchFrom: this.getDispatchFrom(buybox),
     };
   }
@@ -70,10 +71,13 @@ export class AmazonTwisterAdBuilder implements AmazonAdBuilder {
     };
   }
 
-  private getPriceToPay(buybox: Element) {
-    return findAll(".apex-pricetopay-value", buybox).find(
+  private getPrice(buybox: Element) {
+    const priceToPay = findAll(".apex-pricetopay-value", buybox).find(
       (element) => !this.isSubscription(element, buybox)
     );
+    if (priceToPay) return getOfferPrice(priceToPay.parent as Element);
+
+    return Number(find(CART_PRICE, buybox)?.attribs.value) || undefined;
   }
 
   private isSubscription(element: Element, buybox: Element) {
