@@ -70,7 +70,7 @@ export class MetricsReporter {
     const pingMs = await this.ping();
 
     const response = await this.apiService.post(
-      `scrapers/${this.argsService.getScraperName()}/metrics`,
+      `scrapers/${await this.argsService.getScraperName()}/metrics`,
       {
         marketplace: this.marketplace,
         flow: this.argsService.getTargetFlag(),

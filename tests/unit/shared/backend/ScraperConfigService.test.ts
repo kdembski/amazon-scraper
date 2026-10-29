@@ -17,7 +17,8 @@ const setup = () => {
   ) => ScraperConfigService;
   const service = new Service(
     api.service,
-    () => queue as unknown as TokenBucketQueue
+    () => queue as unknown as TokenBucketQueue,
+    { getScraperName: async () => "amazon-pdp-1" }
   );
   return { service, get: api.get, queue };
 };
@@ -25,7 +26,6 @@ const setup = () => {
 describe("ScraperConfigService", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    vi.stubEnv("name", "amazon-pdp-1");
     cronJobs.length = 0;
     vi.spyOn(console, "log").mockImplementation(() => {});
     vi.spyOn(console, "warn").mockImplementation(() => {});

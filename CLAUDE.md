@@ -20,7 +20,7 @@ npm run test:integration                   # whole app in-process against fakes
 npm run test:e2e                           # builds dist/ and runs it as a process
 npm run test:e2e:docker                    # same tests against the built Docker image
 npm run test:live                          # real Amazon via real proxies (PROXY_API_KEY, PROXY_LIST_TOKEN in .env)
-docker compose up -d --build --remove-orphans # production
+docker compose up -d --build --remove-orphans # PDP_COUNT and PLP_COUNT replicas from .env (required)
 ```
 
 Tests: `src/a/X.ts` → `tests/unit/a/X.test.ts` (e.g. `tests/unit/marketplaces/amazon/pdp/builders/AmazonAodAdBuilder.test.ts`), one file per source file. Builder tests use minimal HTML fragments (`tests/support/html.ts`), not saved pages; a selector change needs a new test case.
@@ -29,7 +29,7 @@ Integration (`tests/integration/`) and e2e (`tests/e2e/`) tests share fakes in `
 
 ## Configuration
 
-- Env: `API_URL`, `API_TOKEN` (sent as `Authorization: Bearer` with every backend request by `ApiService`), `PROXY_API_KEY` (webshare.io API, reads the plans), `PROXY_LIST_TOKEN` (webshare.io list download), `PROXY_LIST_URL` (one list as the `datacenter` pool instead of webshare, used by e2e), `name` (set in docker-compose.yml, used in `scrapers/<name>/...`), `NAME_PREFIX` (the name becomes `<NAME_PREFIX>-<name>`, e.g. `home-amazon-pdp-1`; for local runs against the production backend; `ArgsService.getScraperName()`).
+- Env: `API_URL`, `API_TOKEN` (sent as `Authorization: Bearer` with every backend request by `ApiService`), `PROXY_API_KEY` (webshare.io API, reads the plans), `PROXY_LIST_TOKEN` (webshare.io list download), `PROXY_LIST_URL` (one list as the `datacenter` pool instead of webshare, used by e2e), `name` (set in docker-compose.yml to the service name, used in `scrapers/<name>/...`), `NAME_PREFIX` (for local runs against the production backend). `ArgsService.getScraperName()` builds `[<NAME_PREFIX>-]<name>[-<replica>]`, e.g. `home-amazon-pdp-2`; the replica number comes from the PTR record of the container's own `eth0` address (Docker DNS answers `<project>-<service>-<n>.<network>`), none outside Compose.
 - Flag (`ArgsService`): only `-t pdp|plp`.
 - Backend config (`ScraperConfigService`): `ScraperConfig` row of `name` in amazon-server, the only source of `concurrency` (max requests in flight, default 10), `rps` (max requests/s per process, 0 = unlimited, default 0) and `batchSize` (ads per batch in PDP / max queue length in PLP, default 50). Edited by hand in SQL; `createScraper()` waits for `GET scrapers/<name>/config` (retried until it answers), then polls it every minute and applies changes to the running queue; a failed poll keeps the last values, an invalid field is ignored.
 - Flags and backend config configure the scraper as a whole, never one marketplace: every parameter must take effect in every mode (`-t`) and every marketplace. Do not add one that is ignored in some mode or marketplace; put marketplace-specific behaviour in the marketplace code.
