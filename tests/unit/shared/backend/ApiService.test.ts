@@ -87,6 +87,29 @@ describe("ApiService", () => {
     });
   });
 
+  describe("send", () => {
+    it("posts with the token and returns the data", async () => {
+      const service = setup();
+      mocked.post.mockResolvedValue({ data: { count: 2 } });
+
+      await expect(service.send("amazon/ads", [{ a: 1 }])).resolves.toEqual({ count: 2 });
+      expect(mocked.post).toHaveBeenCalledWith(
+        "http://api.test/amazon/ads",
+        [{ a: 1 }],
+        withAgent
+      );
+    });
+
+    it("throws when the request fails", async () => {
+      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      const service = setup();
+      mocked.post.mockRejectedValue(new Error("down"));
+
+      await expect(service.send("amazon/ads", [])).rejects.toThrow("down");
+      expect(error).not.toHaveBeenCalled();
+    });
+  });
+
   describe.each([
     ["post", (s: ApiService) => s.post("amazon/ads", { a: 1 }), [{ a: 1 }]],
     ["put", (s: ApiService) => s.put("amazon/ads/1", { a: 1 }), [{ a: 1 }]],

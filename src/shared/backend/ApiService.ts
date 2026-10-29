@@ -34,6 +34,10 @@ export class ApiService {
     return (await axios.get<T>(this.url(path), this.config(config))).data;
   }
 
+  async send<T>(path: string, data: unknown) {
+    return (await axios.post<T>(this.url(path), data, this.config())).data;
+  }
+
   async post<T>(path: string, data: unknown, config: AxiosRequestConfig = {}) {
     return axios
       .post<T>(this.url(path), data, this.config(config))
