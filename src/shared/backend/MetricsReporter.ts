@@ -32,6 +32,7 @@ export class MetricsReporter {
     }),
     private cpuUsage = () => process.cpuUsage(),
     private memoryRss = () => process.memoryUsage.rss(),
+    private heapUsed = () => process.memoryUsage().heapUsed,
     private ping = () => tcpPing(PING_HOST, PING_PORT, PING_TIMEOUT_MS)
   ) {}
 
@@ -88,6 +89,10 @@ export class MetricsReporter {
           {
             metric: "memory_rss_mb",
             value: Math.round(this.memoryRss() / 1024 / 1024),
+          },
+          {
+            metric: "heap_used_mb",
+            value: Math.round(this.heapUsed() / 1024 / 1024),
           },
           pingMs === undefined
             ? { metric: "ping_failed", value: 1 }

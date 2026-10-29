@@ -18,6 +18,7 @@ const gauges = [
   { metric: "event_loop_delay_max_ms", value: 40 },
   { metric: "cpu_percent", value: 8.3 },
   { metric: "memory_rss_mb", value: 150 },
+  { metric: "heap_used_mb", value: 90 },
   { metric: "ping_ms", value: 24.5 },
 ];
 
@@ -56,6 +57,7 @@ const setup = ({ target = "pdp", traffic = { bytesIn: 0, bytesOut: 0 } } = {}) =
     .mockReturnValueOnce({ user: 1_000_000, system: 0 })
     .mockReturnValue({ user: 4_000_000, system: 2_000_000 });
   const memoryRss = vi.fn(() => 150 * 1024 * 1024);
+  const heapUsed = vi.fn(() => 90 * 1024 * 1024);
   const ping = vi.fn(async (): Promise<number | undefined> => 24.5);
 
   // The constructor is private, it is only called through getInstance()
@@ -72,6 +74,7 @@ const setup = ({ target = "pdp", traffic = { bytesIn: 0, bytesOut: 0 } } = {}) =
     eventLoopDelay,
     cpuUsage,
     memoryRss,
+    heapUsed,
     ping
   );
 
