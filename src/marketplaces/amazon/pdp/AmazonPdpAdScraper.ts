@@ -5,7 +5,7 @@ import {
   AmazonAdPrice,
   AmazonCountry,
 } from "@/marketplaces/amazon/types/amazon.types";
-import { ApiService } from "@/shared/backend/ApiService";
+import { AmazonPdpResultSender } from "@/marketplaces/amazon/pdp/AmazonPdpResultSender";
 import { ItemOutcome } from "@/shared/metrics/metrics.types";
 import _ from "lodash";
 
@@ -13,7 +13,7 @@ export class AmazonPdpAdScraper {
   constructor(
     private countryScraper = new AmazonPdpCountryScraper(),
     private priceHelper = new AmazonPdpPriceHelper(),
-    private apiService = ApiService.getInstance()
+    private resultSender = AmazonPdpResultSender.getInstance()
   ) {}
 
   execute(ad: AmazonAd, countries: AmazonCountry[]) {
@@ -74,7 +74,7 @@ export class AmazonPdpAdScraper {
     price.deleted = outcome === "deleted";
 
     if (this.priceHelper.isDeleted(prices)) {
-      this.apiService.delete("amazon/ads/" + ad.id);
+      this.resultSender.deleted(ad.id);
       return true;
     }
 

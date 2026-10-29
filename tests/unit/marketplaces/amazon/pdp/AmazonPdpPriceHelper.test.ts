@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { AmazonPdpPriceHelper } from "@/marketplaces/amazon/pdp/AmazonPdpPriceHelper";
 import { buildAd, buildAmazonCountry, buildPrice } from "@@tests/support/factories";
-import { fakeApiService } from "@@tests/support/fakes";
+import { fakeAmazonPdpResultSender } from "@@tests/support/fakes";
 
 const setup = () => {
-  const api = fakeApiService();
-  const helper = new AmazonPdpPriceHelper(api.service);
-  return { api, helper };
+  const sender = fakeAmazonPdpResultSender();
+  const helper = new AmazonPdpPriceHelper(sender.service);
+  return { sender, helper };
 };
 
 describe("AmazonPdpPriceHelper", () => {
@@ -69,7 +69,7 @@ describe("AmazonPdpPriceHelper", () => {
     const ad = buildAd({ id: 7 });
 
     it("sends prices of countries that have a value", () => {
-      const { api, helper } = setup();
+      const { sender, helper } = setup();
       const prices = [
         buildPrice({
           country: buildAmazonCountry({ countryId: 1 }),
@@ -82,25 +82,23 @@ describe("AmazonPdpPriceHelper", () => {
 
       helper.sendCompletedPrices(prices, ad);
 
-      expect(api.put).toHaveBeenCalledWith("amazon/ads/7", {
-        prices: [
-          { adId: 7, countryId: 1, value: 19.99, dispatchFrom: "Amazon" },
-          { adId: 7, countryId: 3, value: 21.5, dispatchFrom: undefined },
-        ],
-      });
+      expect(sender.prices).toHaveBeenCalledWith(7, [
+        { adId: 7, countryId: 1, value: 19.99, dispatchFrom: "Amazon" },
+        { adId: 7, countryId: 3, value: 21.5, dispatchFrom: undefined },
+      ]);
     });
 
-    // The backend logs every PUT as a scraped ad in its stats
+    // The backend counts every ad with prices as scraped in its stats
     it("sends an empty list when no country has a price", () => {
-      const { api, helper } = setup();
+      const { sender, helper } = setup();
       helper.sendCompletedPrices([buildPrice(), buildPrice()], ad);
-      expect(api.put).toHaveBeenCalledWith("amazon/ads/7", { prices: [] });
+      expect(sender.prices).toHaveBeenCalledWith(7, []);
     });
 
     it("sends nothing for an ad without countries", () => {
-      const { api, helper } = setup();
+      const { sender, helper } = setup();
       helper.sendCompletedPrices([], ad);
-      expect(api.put).not.toHaveBeenCalled();
+      expect(sender.prices).not.toHaveBeenCalled();
     });
   });
 });

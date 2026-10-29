@@ -29,7 +29,7 @@ describe("PDP process", () => {
       });
     });
 
-    const put = await scraper.backend.waitFor("PUT", "amazon/ads/7", 30 * 1000);
+    const put = await scraper.backend.waitForPrices(7, 30 * 1000);
 
     expect(put.body).toEqual({
       prices: [
@@ -48,8 +48,8 @@ describe("PDP process", () => {
       amazon.respond(() => ({ status: 404 }));
     });
 
-    await scraper.backend.waitFor("DELETE", "amazon/ads/7", 30 * 1000);
-    expect(scraper.backend.find("PUT", "amazon/ads/7")).toHaveLength(0);
+    await scraper.backend.waitForDeleted(7, 30 * 1000);
+    expect(scraper.backend.findPrices(7)).toHaveLength(0);
   });
 
   it("keeps running and loads the batch again after the backend fails", async () => {
@@ -65,7 +65,7 @@ describe("PDP process", () => {
     });
 
     // The next attempt comes with the 5 s PDP loop
-    await scraper.backend.waitFor("PUT", "amazon/ads/7", 30 * 1000);
+    await scraper.backend.waitForPrices(7, 30 * 1000);
     expect(scraper.child.exitCode).toBeNull();
   });
 });

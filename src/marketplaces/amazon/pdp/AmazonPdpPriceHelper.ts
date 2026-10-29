@@ -1,10 +1,10 @@
-import { ApiService } from "@/shared/backend/ApiService";
+import { AmazonPdpResultSender } from "@/marketplaces/amazon/pdp/AmazonPdpResultSender";
 import { AmazonAd, AmazonAdPrice } from "@/marketplaces/amazon/types/amazon.types";
 
 export const PRICES_TO_COMPLETE = 4;
 
 export class AmazonPdpPriceHelper {
-  constructor(private apiService = ApiService.getInstance()) {}
+  constructor(private resultSender = AmazonPdpResultSender.getInstance()) {}
 
   isComplete(prices: AmazonAdPrice[]) {
     return prices.every((price) => price.complete);
@@ -31,6 +31,6 @@ export class AmazonPdpPriceHelper {
         dispatchFrom: price.dispatchFrom,
       }));
 
-    this.apiService.put("amazon/ads/" + ad.id, { prices: prepared });
+    this.resultSender.prices(ad.id, prepared);
   }
 }

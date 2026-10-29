@@ -58,7 +58,7 @@ describe("PDP", () => {
     world.amazon.respondPerCountry(offers);
     scrape();
 
-    const put = await world.backend.waitFor("PUT", "amazon/ads/7");
+    const put = await world.backend.waitForPrices(7);
 
     expect(put.headers.authorization).toBe("Bearer it-token");
     expect(world.backend.find("GET", "amazon/ads/scrap")[0].query.get("batchSize")).toBe("10");
@@ -74,7 +74,7 @@ describe("PDP", () => {
   it("requests the offers fragment through the proxy", async () => {
     world.amazon.respondPerCountry(offers);
     scrape();
-    await world.backend.waitFor("PUT", "amazon/ads/7");
+    await world.backend.waitForPrices(7);
 
     const { requests, rejectedTunnels } = world.amazon;
     expect(rejectedTunnels).toBe(0);
@@ -105,7 +105,7 @@ describe("PDP", () => {
     });
     scrape();
 
-    const put = await world.backend.waitFor("PUT", "amazon/ads/7");
+    const put = await world.backend.waitForPrices(7);
 
     expect(put.body).toEqual({
       prices: [
@@ -113,7 +113,7 @@ describe("PDP", () => {
         price(3, 26, "Some Seller"),
       ],
     });
-    expect(world.backend.find("DELETE", "amazon/ads/7")).toHaveLength(0);
+    expect(world.backend.findDeleted(7)).toHaveLength(0);
     expect(world.amazon.requestsTo("fr").map((request) => request.url)).toEqual([
       "fr/gp/twister/ajaxv2?asinList=B0TESTASIN&id=B0TESTASIN&parentAsin=B0TESTASIN&mType=full&json=1&isUDPFlag=1&dpxAjaxFlag=1&isFlushing=2&psc=1",
     ]);
@@ -135,7 +135,7 @@ describe("PDP", () => {
     });
     scrape();
 
-    const put = await world.backend.waitFor("PUT", "amazon/ads/7");
+    const put = await world.backend.waitForPrices(7);
 
     expect(put.body.prices[1]).toEqual(price(2, 25.49, "Amazon"));
     expect(world.amazon.requestsTo("fr").map((request) => request.url)[1]).toBe(
@@ -148,7 +148,7 @@ describe("PDP", () => {
     world.amazon.respondPerCountry({ ...offers, it: [aodPage()] });
     scrape();
 
-    const put = await world.backend.waitFor("PUT", "amazon/ads/7");
+    const put = await world.backend.waitForPrices(7);
 
     expect(put.body.prices.map((p: any) => p.countryId)).toEqual([1, 2]);
   });
@@ -166,7 +166,7 @@ describe("PDP", () => {
     });
     scrape();
 
-    const put = await world.backend.waitFor("PUT", "amazon/ads/7");
+    const put = await world.backend.waitForPrices(7);
 
     expect(world.amazon.requestsTo("de")).toHaveLength(5);
     expect(put.body.prices[0]).toEqual(price(1, 24.99, "Amazon"));
@@ -176,7 +176,7 @@ describe("PDP", () => {
     world.amazon.respondPerCountry({ ...offers, de: [{ status: 503 }] });
     scrape();
 
-    const put = await world.backend.waitFor("PUT", "amazon/ads/7");
+    const put = await world.backend.waitForPrices(7);
 
     expect(world.amazon.requestsTo("de")).toHaveLength(MAX_FAILED_ATTEMPTS);
     expect(put.body.prices.map((p: any) => p.countryId)).toEqual([2, 3]);
@@ -194,7 +194,7 @@ describe("PDP", () => {
     });
     scrape();
 
-    const put = await world.backend.waitFor("PUT", "amazon/ads/7");
+    const put = await world.backend.waitForPrices(7);
 
     expect(world.amazon.requestsTo("it")).toHaveLength(NOT_FOUND_TO_DELETE);
     expect(put.body.prices.map((p: any) => p.countryId)).toEqual([1, 2, 4]);
@@ -204,7 +204,7 @@ describe("PDP", () => {
     world.amazon.respondPerCountry({ ...offers, it: [{ status: 404 }, offers.it[0]] });
     scrape();
 
-    const put = await world.backend.waitFor("PUT", "amazon/ads/7");
+    const put = await world.backend.waitForPrices(7);
 
     expect(world.amazon.requestsTo("it")).toHaveLength(2);
     expect(put.body.prices.map((p: any) => p.countryId)).toEqual([1, 2, 3]);
@@ -218,11 +218,11 @@ describe("PDP", () => {
     world.amazon.respondPerCountry({ de: [{ status: 404 }], fr: offers.fr });
     scrape();
 
-    await world.backend.waitFor("DELETE", "amazon/ads/7");
+    await world.backend.waitForDeleted(7);
     await sleep(200);
 
     expect(world.amazon.requestsTo("de")).toHaveLength(NOT_FOUND_TO_DELETE);
-    expect(world.backend.find("PUT", "amazon/ads/7")).toHaveLength(0);
+    expect(world.backend.findPrices(7)).toHaveLength(0);
   });
 
   it("loads the next batch on a later tick", async () => {
@@ -236,10 +236,10 @@ describe("PDP", () => {
       aodPage({ price: url.includes("B0NEXTASIN") ? "9,99" : "24,99" })
     );
     scrape();
-    await world.backend.waitFor("PUT", "amazon/ads/7");
+    await world.backend.waitForPrices(7);
 
     vi.advanceTimersByTime(5 * 1000);
-    const put = await world.backend.waitFor("PUT", "amazon/ads/8");
+    const put = await world.backend.waitForPrices(8);
 
     expect(put.body.prices.map((p: any) => p.value)).toEqual([9.99, 9.99, 9.99]);
     expect(world.backend.find("GET", "amazon/countries/scrap")).toHaveLength(1);
@@ -257,7 +257,7 @@ describe("PDP", () => {
     await scraper.scrape();
     await scraper.scrape();
 
-    await world.backend.waitFor("PUT", "amazon/ads/7");
+    await world.backend.waitForPrices(7);
   });
 
   it("keeps at most concurrency requests in flight", async () => {
@@ -266,7 +266,7 @@ describe("PDP", () => {
     world.amazon.respond(() => ({ body: aodPage({ price: "1,00" }), delay: 100 }));
     scrape();
 
-    const put = await world.backend.waitFor("PUT", "amazon/ads/7");
+    const put = await world.backend.waitForPrices(7);
 
     expect(put.body.prices).toHaveLength(4);
     expect(world.amazon.maxInFlight).toBe(2);
@@ -278,7 +278,7 @@ describe("PDP", () => {
     world.amazon.respond(() => aodPage({ price: "1,00" }));
     scrape();
 
-    const put = await world.backend.waitFor("PUT", "amazon/ads/7");
+    const put = await world.backend.waitForPrices(7);
     await sleep(100);
 
     expect(put.body.prices.map((price: { countryId: number }) => price.countryId)).toEqual([1, 2, 3, 4]);
@@ -302,7 +302,7 @@ describe("PDP", () => {
     });
     scrape();
 
-    const put = await world.backend.waitFor("PUT", "amazon/ads/7");
+    const put = await world.backend.waitForPrices(7);
     await sleep(100);
 
     expect(put.body.prices.map((price: { countryId: number }) => price.countryId)).toEqual([1, 2, 4, 6]);
@@ -315,7 +315,7 @@ describe("PDP", () => {
     world.amazon.respond(() => aodPage());
     scrape();
 
-    await world.backend.waitFor("PUT", "amazon/ads/7");
+    await world.backend.waitForPrices(7);
 
     // A full bucket of 2, then 2 more every second
     const times = world.amazon.requests.map((request) => request.at);
@@ -335,13 +335,13 @@ describe("PDP", () => {
     );
 
     expect(queue.concurrency).toBe(2);
-    await world.backend.waitFor("PUT", "amazon/ads/7");
+    await world.backend.waitForPrices(7);
   });
 
   it("reports metrics every minute", async () => {
     world.amazon.respondPerCountry(offers);
     scrape();
-    await world.backend.waitFor("PUT", "amazon/ads/7");
+    await world.backend.waitForPrices(7);
 
     cronJobs
       .filter((job) => job.cronTime === "0 * * * * *")
