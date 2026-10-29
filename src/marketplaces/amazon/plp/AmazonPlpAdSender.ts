@@ -1,7 +1,7 @@
 import { AmazonPlpAd } from "@/marketplaces/amazon/types/amazon.types";
 import { BatchSender } from "@/shared/backend/BatchSender";
 
-const MAX_BATCH_SIZE = 500;
+const MAX_BATCH_SIZE = 2000;
 
 export class AmazonPlpAdSender {
   private static instance: AmazonPlpAdSender;
