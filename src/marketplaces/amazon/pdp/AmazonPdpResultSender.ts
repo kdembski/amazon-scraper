@@ -3,7 +3,7 @@ import { BatchSender } from "@/shared/backend/BatchSender";
 
 type AmazonPdpResult = { id: number; prices?: AmazonPdpPrice[] };
 
-const MAX_BATCH_SIZE = 200;
+const MAX_BATCH_SIZE = 1000;
 
 export class AmazonPdpResultSender {
   private static instance: AmazonPdpResultSender;
