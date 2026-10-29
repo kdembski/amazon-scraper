@@ -1,12 +1,10 @@
 import http from "http";
 import axios, { AxiosRequestConfig } from "axios";
-import { ThrottledQueue } from "@/shared/http/ThrottledQueue";
 
 export class ApiService {
   private static instance: ApiService;
 
   private constructor(
-    private writeQueue = new ThrottledQueue(5, 25),
     private agent = new http.Agent({ keepAlive: true })
   ) {}
 
@@ -44,22 +42,6 @@ export class ApiService {
       .catch((e) => {
         this.handleError(e);
       });
-  }
-
-  async put<T>(path: string, data: unknown) {
-    return this.writeQueue.request(() =>
-      axios.put<T>(this.url(path), data, this.config()).catch((e) => {
-        this.handleError(e);
-      })
-    );
-  }
-
-  async delete<T>(path: string) {
-    return this.writeQueue.request(() =>
-      axios.delete<T>(this.url(path), this.config()).catch((e) => {
-        this.handleError(e);
-      })
-    );
   }
 
   private handleError(e: any) {

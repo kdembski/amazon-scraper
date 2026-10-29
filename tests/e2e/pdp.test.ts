@@ -29,9 +29,9 @@ describe("PDP process", () => {
       });
     });
 
-    const put = await scraper.backend.waitForPrices(7, 30 * 1000);
+    const sent = await scraper.backend.waitForPrices(7, 30 * 1000);
 
-    expect(put.body).toEqual({
+    expect(sent.body).toEqual({
       prices: [
         { adId: 7, countryId: 1, value: 24.99, dispatchFrom: "Amazon" },
         { adId: 7, countryId: 2, value: 25.49, dispatchFrom: "Amazon" },

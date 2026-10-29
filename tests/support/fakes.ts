@@ -10,15 +10,8 @@ import type { AmazonAdBuilder, AmazonAdBuildResult } from "@/marketplaces/amazon
 export function fakeApiService() {
   const get = vi.fn();
   const post = vi.fn().mockResolvedValue(undefined);
-  const put = vi.fn().mockResolvedValue(undefined);
-  const del = vi.fn().mockResolvedValue(undefined);
-  const service = {
-    get,
-    post,
-    put,
-    delete: del,
-  } as unknown as ApiService;
-  return { service, get, post, put, delete: del };
+  const service = { get, post } as unknown as ApiService;
+  return { service, get, post };
 }
 
 export function fakeAmazonPdpResultSender() {
