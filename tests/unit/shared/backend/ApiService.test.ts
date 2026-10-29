@@ -94,7 +94,7 @@ describe("ApiService", () => {
       expect(mocked.post).toHaveBeenCalledWith(
         "http://api.test/amazon/ads",
         [{ a: 1 }],
-        withAgent
+        { ...withAgent, timeout: 30_000 }
       );
     });
 

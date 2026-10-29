@@ -1,6 +1,8 @@
 import http from "http";
 import axios, { AxiosRequestConfig } from "axios";
 
+const SEND_TIMEOUT = 30 * 1000;
+
 export class ApiService {
   private static instance: ApiService;
 
@@ -33,7 +35,7 @@ export class ApiService {
   }
 
   async send<T>(path: string, data: unknown) {
-    return (await axios.post<T>(this.url(path), data, this.config())).data;
+    return (await axios.post<T>(this.url(path), data, this.config({ timeout: SEND_TIMEOUT }))).data;
   }
 
   async post<T>(path: string, data: unknown, config: AxiosRequestConfig = {}) {
