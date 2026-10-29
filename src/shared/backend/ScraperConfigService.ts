@@ -58,9 +58,9 @@ export class ScraperConfigService {
     }
   }
 
-  private fetch() {
+  private async fetch() {
     return this.apiService.get<ScraperConfig>(
-      `scrapers/${this.argsService.getScraperName()}/config`,
+      `scrapers/${await this.argsService.getScraperName()}/config`,
       { timeout: 10 * 1000 }
     );
   }

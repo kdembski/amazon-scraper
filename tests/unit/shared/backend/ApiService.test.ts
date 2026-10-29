@@ -5,14 +5,12 @@ import { ApiService } from "@/shared/backend/ApiService";
 import { resetSingleton } from "@@tests/support/singleton";
 
 vi.mock("axios", () => ({
-  default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
+  default: { get: vi.fn(), post: vi.fn() },
 }));
 
 const mocked = {
   get: vi.mocked(axios.get),
   post: vi.mocked(axios.post),
-  put: vi.mocked(axios.put),
-  delete: vi.mocked(axios.delete),
 };
 
 const setup = () => {
@@ -87,36 +85,66 @@ describe("ApiService", () => {
     });
   });
 
-  describe.each([
-    ["post", (s: ApiService) => s.post("amazon/ads", { a: 1 }), [{ a: 1 }]],
-    ["put", (s: ApiService) => s.put("amazon/ads/1", { a: 1 }), [{ a: 1 }]],
-    ["delete", (s: ApiService) => s.delete("amazon/ads/1"), []],
-  ] as const)("%s", (method, call, body) => {
-    const path = method === "post" ? "amazon/ads" : "amazon/ads/1";
+  describe("send", () => {
+    it("posts with the token and returns the data", async () => {
+      const service = setup();
+      mocked.post.mockResolvedValue({ data: { count: 2 } });
 
+      await expect(service.send("amazon/ads", [{ a: 1 }])).resolves.toEqual({ count: 2 });
+      expect(mocked.post).toHaveBeenCalledWith(
+        "http://api.test/amazon/ads",
+        [{ a: 1 }],
+        { ...withAgent, timeout: 30_000 }
+      );
+    });
+
+    it("sends the idempotency key as a header", async () => {
+      const service = setup();
+      mocked.post.mockResolvedValue({ data: {} });
+
+      await service.send("amazon/ads/batch", {}, "batch-1");
+
+      expect(mocked.post).toHaveBeenCalledWith(
+        "http://api.test/amazon/ads/batch",
+        {},
+        {
+          ...withAgent,
+          headers: { ...withAgent.headers, "Idempotency-Key": "batch-1" },
+          timeout: 30_000,
+        }
+      );
+    });
+
+    it("throws when the request fails", async () => {
+      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      const service = setup();
+      mocked.post.mockRejectedValue(new Error("down"));
+
+      await expect(service.send("amazon/ads", [])).rejects.toThrow("down");
+      expect(error).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("post", () => {
     it("sends the request", async () => {
       const service = setup();
-      mocked[method].mockResolvedValue({ data: "ok" });
+      mocked.post.mockResolvedValue({ data: "ok" });
 
-      await call(service);
-      expect(mocked[method]).toHaveBeenCalledWith(
-        `http://api.test/${path}`,
-        ...body,
-        withAgent
-      );
+      await service.post("amazon/ads", { a: 1 });
+      expect(mocked.post).toHaveBeenCalledWith("http://api.test/amazon/ads", { a: 1 }, withAgent);
     });
 
     it("logs errors instead of throwing", async () => {
       const error = vi.spyOn(console, "error").mockImplementation(() => {});
       const service = setup();
-      mocked[method].mockRejectedValue({
+      mocked.post.mockRejectedValue({
         status: 500,
         message: "Request failed",
         cause: new Error("socket hang up"),
         response: { data: "line 1\nline 2" },
       });
 
-      await expect(call(service)).resolves.toBeUndefined();
+      await expect(service.post("amazon/ads", { a: 1 })).resolves.toBeUndefined();
       expect(error.mock.calls.map((args) => args[0])).toEqual([
         "Server:",
         "  500",
@@ -127,42 +155,19 @@ describe("ApiService", () => {
     });
   });
 
-  describe.each([
-    ["put", (s: ApiService) => s.put("amazon/ads/1", {})],
-    ["delete", (s: ApiService) => s.delete("amazon/ads/1")],
-  ] as const)("%s throttling", (method, call) => {
-    it("sends at most 25 requests per second", async () => {
-      vi.useFakeTimers();
-      const service = setup();
-      mocked[method].mockResolvedValue({ data: "ok" });
-
-      call(service);
-      call(service);
-      expect(mocked[method]).toHaveBeenCalledTimes(1);
-
-      await vi.advanceTimersByTimeAsync(40);
-      expect(mocked[method]).toHaveBeenCalledTimes(2);
-      vi.useRealTimers();
-    });
-  });
-
   it("reuses one keep-alive agent for every request", async () => {
     const service = setup();
     mocked.get.mockResolvedValue({ data: {} });
     mocked.post.mockResolvedValue({ data: "ok" });
-    mocked.put.mockResolvedValue({ data: "ok" });
-    mocked.delete.mockResolvedValue({ data: "ok" });
 
     await service.get("a");
     await service.post("a", {});
-    await service.put("a", {});
-    await service.delete("a");
+    await service.send("a", {});
 
     const agents = [
       mocked.get.mock.calls[0][1]?.httpAgent,
       mocked.post.mock.calls[0][2]?.httpAgent,
-      mocked.put.mock.calls[0][2]?.httpAgent,
-      mocked.delete.mock.calls[0][1]?.httpAgent,
+      mocked.post.mock.calls[1][2]?.httpAgent,
     ];
     expect(new Set(agents).size).toBe(1);
     expect(agents[0].keepAlive).toBe(true);

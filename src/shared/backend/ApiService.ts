@@ -1,12 +1,12 @@
 import http from "http";
 import axios, { AxiosRequestConfig } from "axios";
-import { ThrottledQueue } from "@/shared/http/ThrottledQueue";
+
+const SEND_TIMEOUT = 30 * 1000;
 
 export class ApiService {
   private static instance: ApiService;
 
   private constructor(
-    private writeQueue = new ThrottledQueue(5, 25),
     private agent = new http.Agent({ keepAlive: true })
   ) {}
 
@@ -34,28 +34,18 @@ export class ApiService {
     return (await axios.get<T>(this.url(path), this.config(config))).data;
   }
 
+  async send<T>(path: string, data: unknown, idempotencyKey?: string) {
+    const headers = idempotencyKey ? { "Idempotency-Key": idempotencyKey } : undefined;
+    const config = this.config({ timeout: SEND_TIMEOUT, headers });
+    return (await axios.post<T>(this.url(path), data, config)).data;
+  }
+
   async post<T>(path: string, data: unknown, config: AxiosRequestConfig = {}) {
     return axios
       .post<T>(this.url(path), data, this.config(config))
       .catch((e) => {
         this.handleError(e);
       });
-  }
-
-  async put<T>(path: string, data: unknown) {
-    return this.writeQueue.request(() =>
-      axios.put<T>(this.url(path), data, this.config()).catch((e) => {
-        this.handleError(e);
-      })
-    );
-  }
-
-  async delete<T>(path: string) {
-    return this.writeQueue.request(() =>
-      axios.delete<T>(this.url(path), this.config()).catch((e) => {
-        this.handleError(e);
-      })
-    );
   }
 
   private handleError(e: any) {

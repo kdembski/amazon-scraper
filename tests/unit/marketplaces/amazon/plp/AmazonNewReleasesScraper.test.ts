@@ -6,11 +6,11 @@ import type { AmazonPlpPageFetcher } from "@/marketplaces/amazon/plp/AmazonPlpPa
 import type { MetricsService } from "@/shared/metrics/MetricsService";
 import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
 import { newReleasesPage, toDocument } from "@@tests/support/html";
-import { fakeApiService } from "@@tests/support/fakes";
+import { fakeAmazonPlpAdSender } from "@@tests/support/fakes";
 
 // Answers each URL with its page from the map, or gives it up when missing
 const setup = (pages: Record<string, string>) => {
-  const api = fakeApiService();
+  const sender = fakeAmazonPlpAdSender();
   const fetch = vi.fn(async (url: string, _referer: string, build: (document: any) => any) =>
     pages[url] === undefined
       ? { failed: MAX_FAILED_ATTEMPTS }
@@ -22,12 +22,12 @@ const setup = (pages: Record<string, string>) => {
     new AmazonNewReleasesBuilder(),
     { increment } as unknown as MetricsService
   );
-  const crawl = new AmazonPlpCrawl("electronics", false, api.service);
-  return { api, fetch, increment, scraper, crawl };
+  const crawl = new AmazonPlpCrawl("electronics", false, sender.service);
+  return { sender, fetch, increment, scraper, crawl };
 };
 
 const asins = (posted: unknown[][]) =>
-  posted.flatMap(([, ads]) => (ads as { asin: string }[]).map((ad) => ad.asin));
+  posted.flatMap(([ads]) => (ads as { asin: string }[]).map((ad) => ad.asin));
 
 describe("AmazonNewReleasesScraper", () => {
   it("crawls the browse tree once per node and both pages of every node", async () => {
@@ -38,26 +38,26 @@ describe("AmazonNewReleasesScraper", () => {
       "pl/gp/new-releases/electronics/2": newReleasesPage({ asins: ["B0TWO"], nodes: ["1", "2"] }),
       "pl/gp/new-releases/electronics/3": newReleasesPage({ asins: ["B0THREE"] }),
     };
-    const { api, fetch, scraper, crawl } = setup(pages);
+    const { sender, fetch, scraper, crawl } = setup(pages);
 
     await scraper.execute(crawl);
 
     expect(fetch.mock.calls.map(([url]) => url).sort()).toEqual(Object.keys(pages).sort());
     expect(fetch.mock.calls[0][1]).toBe("pl/gp/new-releases/electronics");
-    expect(asins(api.post.mock.calls).sort()).toEqual(
+    expect(asins(sender.add.mock.calls).sort()).toEqual(
       ["B0ONE", "B0ROOT", "B0ROOT2", "B0THREE", "B0TWO"].sort()
     );
   });
 
   it("sends ads through the crawl, each ASIN once", async () => {
-    const { api, increment, scraper, crawl } = setup({
+    const { sender, increment, scraper, crawl } = setup({
       "pl/gp/new-releases/electronics": newReleasesPage({ asins: ["B0SAME", "B0ROOT"], nodes: ["1"] }),
       "pl/gp/new-releases/electronics/1": newReleasesPage({ asins: ["B0SAME"] }),
     });
 
     await scraper.execute(crawl);
 
-    expect(asins(api.post.mock.calls)).toEqual(["B0SAME", "B0ROOT"]);
+    expect(asins(sender.add.mock.calls)).toEqual(["B0SAME", "B0ROOT"]);
     expect(crawl.asins).toEqual(new Set(["B0SAME", "B0ROOT"]));
     expect(increment).toHaveBeenCalledWith("new_releases_ads", { country: "pl" }, 2);
     expect(increment).toHaveBeenCalledWith("new_releases_ads", { country: "pl" }, 0);
@@ -65,12 +65,12 @@ describe("AmazonNewReleasesScraper", () => {
   });
 
   it("counts a given up page and skips its children", async () => {
-    const { api, fetch, increment, scraper, crawl } = setup({});
+    const { sender, fetch, increment, scraper, crawl } = setup({});
 
     await scraper.execute(crawl);
 
     expect(fetch).toHaveBeenCalledTimes(1);
-    expect(api.post).not.toHaveBeenCalled();
+    expect(sender.add).not.toHaveBeenCalled();
     expect(increment).toHaveBeenCalledWith("new_releases_pages", { country: "pl", outcome: "given_up" });
   });
 });

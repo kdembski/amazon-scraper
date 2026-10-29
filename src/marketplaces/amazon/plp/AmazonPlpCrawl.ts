@@ -1,5 +1,5 @@
+import { AmazonPlpAdSender } from "@/marketplaces/amazon/plp/AmazonPlpAdSender";
 import { AmazonPlpAd } from "@/marketplaces/amazon/types/amazon.types";
-import { ApiService } from "@/shared/backend/ApiService";
 
 // One run over a category: sends every ASIN to the backend once
 export class AmazonPlpCrawl {
@@ -8,13 +8,13 @@ export class AmazonPlpCrawl {
   constructor(
     readonly category: string,
     readonly allPages: boolean,
-    private apiService = ApiService.getInstance()
+    private adSender = AmazonPlpAdSender.getInstance()
   ) {}
 
   post(ads: AmazonPlpAd[]) {
     const fresh = ads.filter((ad) => !this.asins.has(ad.asin));
     fresh.forEach((ad) => this.asins.add(ad.asin));
-    if (fresh.length) this.apiService.post("amazon/ads", fresh);
+    if (fresh.length) this.adSender.add(fresh);
     return fresh.length;
   }
 }

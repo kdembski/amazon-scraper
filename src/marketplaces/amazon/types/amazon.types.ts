@@ -54,3 +54,10 @@ export interface AmazonAdPrice {
   failed: number;
   notFound: number;
 }
+
+export interface AmazonPdpPrice {
+  adId: number;
+  countryId: number;
+  value?: number;
+  dispatchFrom?: string;
+}

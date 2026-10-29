@@ -1,4 +1,4 @@
-x-amazon-pdp: &amazon-pdp
+x-amazon-scraper: &amazon-scraper
   image: amazon-scraper
   build: .
   restart: unless-stopped
@@ -7,29 +7,18 @@ x-amazon-pdp: &amazon-pdp
     - "host.docker.internal:host-gateway"
 
 services:
-  amazon-pdp-1:
-    <<: *amazon-pdp
+  amazon-pdp:
+    <<: *amazon-scraper
+    deploy:
+      replicas: ${PDP_COUNT:?set PDP_COUNT in .env}
     environment:
-      NODE_OPTIONS: --max-old-space-size=1536
-      name: amazon-pdp-1
-  amazon-pdp-2:
-    <<: *amazon-pdp
-    environment:
-      NODE_OPTIONS: --max-old-space-size=8192
-      name: amazon-pdp-2
-  amazon-pdp-3:
-    <<: *amazon-pdp
-    environment:
-      NODE_OPTIONS: --max-old-space-size=8192
-      name: amazon-pdp-3
+      NODE_OPTIONS: --max-old-space-size=1024
+      name: amazon-pdp
   amazon-plp:
-    image: amazon-scraper
-    build: .
-    restart: unless-stopped
-    env_file: .env
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    <<: *amazon-scraper
+    deploy:
+      replicas: ${PLP_COUNT:?set PLP_COUNT in .env}
     command: ["-t", "plp"]
     environment:
-      NODE_OPTIONS: --max-old-space-size=8192
+      NODE_OPTIONS: --max-old-space-size=1024
       name: amazon-plp

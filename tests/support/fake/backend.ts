@@ -65,9 +65,14 @@ export class FakeBackend {
     );
   }
 
-  waitFor(method: string, path: string, timeout = 10 * 1000) {
+  waitFor(
+    method: string,
+    path: string,
+    timeout = 10 * 1000,
+    match: (request: BackendRequest) => boolean = () => true
+  ) {
     return new Promise<BackendRequest>((resolve, reject) => {
-      const found = this.find(method, path)[0];
+      const found = this.find(method, path).find(match);
       if (found) return resolve(found);
 
       const timer = setTimeout(() => {
@@ -81,13 +86,39 @@ export class FakeBackend {
       }, timeout);
 
       const listener = (request: BackendRequest) => {
-        if (request.method !== method || request.path !== path) return;
+        if (request.method !== method || request.path !== path || !match(request)) return;
         clearTimeout(timer);
         this.events.off("request", listener);
         resolve(request);
       };
       this.events.on("request", listener);
     });
+  }
+
+  // PDP results arrive in batches; these read one ad back as PUT/DELETE did
+  findPrices(id: number) {
+    return this.find("POST", "amazon/ads/batch")
+      .map((request) => pricesOf(request, id))
+      .filter((request) => request !== undefined);
+  }
+
+  findDeleted(id: number) {
+    return this.find("POST", "amazon/ads/batch").filter((request) =>
+      request.body.deleted.includes(id)
+    );
+  }
+
+  async waitForPrices(id: number, timeout?: number) {
+    const request = await this.waitFor("POST", "amazon/ads/batch", timeout, (r) =>
+      Boolean(pricesOf(r, id))
+    );
+    return pricesOf(request, id)!;
+  }
+
+  waitForDeleted(id: number, timeout?: number) {
+    return this.waitFor("POST", "amazon/ads/batch", timeout, (r) =>
+      r.body.deleted.includes(id)
+    );
   }
 
   private async handle(req: http.IncomingMessage, res: http.ServerResponse) {
@@ -124,3 +155,9 @@ export class FakeBackend {
       .end(body === undefined ? "" : JSON.stringify(body));
   }
 }
+
+const pricesOf = (request: BackendRequest, id: number) => {
+  const entry = request.body.prices.find((item: { id: number }) => item.id === id);
+  if (!entry) return undefined;
+  return { ...request, body: { prices: entry.prices } };
+};

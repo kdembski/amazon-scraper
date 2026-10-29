@@ -25,7 +25,7 @@ const gauges = [
 const setup = ({ target = "pdp", traffic = { bytesIn: 0, bytesOut: 0 } } = {}) => {
   const args = {
     getTargetFlag: vi.fn(() => target),
-    getScraperName: vi.fn(() => "amazon-pdp"),
+    getScraperName: vi.fn(async () => "amazon-pdp"),
   } as unknown as ArgsService;
   const api = fakeApiService();
   api.post.mockResolvedValue({ status: 200 });

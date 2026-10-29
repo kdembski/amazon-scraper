@@ -10,6 +10,18 @@ vi.mock("@/shared/utils/retry", async (importOriginal) => ({
   getRetryDelay: () => 0,
 }));
 
+// Batches go out on the next tick instead of after 5 s
+vi.mock("@/shared/backend/BatchSender", async (importOriginal) => {
+  const { BatchSender } = await importOriginal<typeof import("@/shared/backend/BatchSender")>();
+  return {
+    BatchSender: class<T> extends BatchSender<T> {
+      constructor(...[path, toBody, maxSize, , ...rest]: ConstructorParameters<typeof BatchSender<T>>) {
+        super(path, toBody, maxSize, 0, ...rest);
+      }
+    },
+  };
+});
+
 // Retry sleeps (0 ms) run at once; longer ones, like the PDP loop, wait on a
 // fake interval, so a test advances them like the queue stats and they stop
 // for good once the fake timers are dropped
