@@ -27,4 +27,9 @@ export class ArgsService {
     if (value !== "pdp" && value !== "plp") throw new Error(`Unknown target: ${value}`);
     return value;
   }
+
+  getScraperName() {
+    const { name, NAME_PREFIX } = process.env;
+    return NAME_PREFIX ? `${NAME_PREFIX}-${name}` : name;
+  }
 }

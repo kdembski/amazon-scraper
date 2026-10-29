@@ -1,4 +1,5 @@
 import { CronJob } from "cron";
+import { ArgsService } from "@/shared/args/ArgsService";
 import { ApiService } from "@/shared/backend/ApiService";
 import { ScrapingClient } from "@/shared/http/ScrapingClient";
 import { getRetryDelay } from "@/shared/utils/retry";
@@ -18,7 +19,8 @@ export class ScraperConfigService {
 
   private constructor(
     private apiService = ApiService.getInstance(),
-    private getQueue = () => ScrapingClient.getInstance().queueService
+    private getQueue = () => ScrapingClient.getInstance().queueService,
+    private argsService = ArgsService.getInstance()
   ) {}
 
   public static getInstance(): ScraperConfigService {
@@ -58,7 +60,7 @@ export class ScraperConfigService {
 
   private fetch() {
     return this.apiService.get<ScraperConfig>(
-      `scrapers/${process.env.name}/config`,
+      `scrapers/${this.argsService.getScraperName()}/config`,
       { timeout: 10 * 1000 }
     );
   }

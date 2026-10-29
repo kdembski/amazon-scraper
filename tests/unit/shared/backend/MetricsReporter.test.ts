@@ -24,6 +24,7 @@ const gauges = [
 const setup = ({ target = "pdp", traffic = { bytesIn: 0, bytesOut: 0 } } = {}) => {
   const args = {
     getTargetFlag: vi.fn(() => target),
+    getScraperName: vi.fn(() => "amazon-pdp"),
   } as unknown as ArgsService;
   const api = fakeApiService();
   api.post.mockResolvedValue({ status: 200 });
@@ -79,7 +80,6 @@ const setup = ({ target = "pdp", traffic = { bytesIn: 0, bytesOut: 0 } } = {}) =
 
 describe("MetricsReporter", () => {
   beforeEach(() => {
-    vi.stubEnv("name", "amazon-pdp");
     cronJobs.length = 0;
     resetSingleton(MetricsService);
   });
