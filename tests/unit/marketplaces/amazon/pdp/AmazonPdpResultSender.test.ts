@@ -31,9 +31,10 @@ describe("AmazonPdpResultSender", () => {
     resultSender.prices(7, [price]);
     resultSender.deleted(8);
 
-    expect(send).toHaveBeenCalledWith("amazon/ads/batch", {
-      prices: [{ id: 7, prices: [price] }],
-      deleted: [8],
-    });
+    expect(send).toHaveBeenCalledWith(
+      "amazon/ads/batch",
+      { prices: [{ id: 7, prices: [price] }], deleted: [8] },
+      expect.any(String)
+    );
   });
 });

@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { ApiService } from "@/shared/backend/ApiService";
 import { MetricsService } from "@/shared/metrics/MetricsService";
 import { getRetryDelay, MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
@@ -50,10 +51,11 @@ export class BatchSender<T> {
   }
 
   private async send(items: T[]) {
+    const key = randomUUID();
     let failed = 0;
     while (true) {
       try {
-        await this.apiService.send(this.path, this.toBody(items));
+        await this.apiService.send(this.path, this.toBody(items), key);
         this.metricsService.increment("backend_items", { outcome: "sent" }, items.length);
         return;
       } catch (e: any) {

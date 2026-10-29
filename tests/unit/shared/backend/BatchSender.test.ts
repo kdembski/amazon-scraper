@@ -18,6 +18,10 @@ const setup = ({ maxSize = 10 } = {}) => {
   return { sender, send, increment };
 };
 
+const withoutKey = (send: ReturnType<typeof vi.fn>) =>
+  send.mock.calls.map(([path, body]) => [path, body]);
+const keys = (send: ReturnType<typeof vi.fn>) => send.mock.calls.map(([, , key]) => key);
+
 const networkError = () => new Error("socket hang up");
 const httpError = (status: number) => Object.assign(new Error("failed"), { response: { status } });
 
@@ -41,7 +45,7 @@ describe("BatchSender", () => {
     expect(send).not.toHaveBeenCalled();
 
     await vi.advanceTimersByTimeAsync(1);
-    expect(send.mock.calls).toEqual([["amazon/ads", { items: [1, 2, 3] }]]);
+    expect(withoutKey(send)).toEqual([["amazon/ads", { items: [1, 2, 3] }]]);
   });
 
   it("flushes at once when the buffer reaches maxSize", async () => {
@@ -51,7 +55,7 @@ describe("BatchSender", () => {
     sender.add(2);
     await vi.advanceTimersByTimeAsync(0);
 
-    expect(send.mock.calls).toEqual([["amazon/ads", { items: [1, 2] }]]);
+    expect(withoutKey(send)).toEqual([["amazon/ads", { items: [1, 2] }]]);
   });
 
   it("does not start a timer while the buffer is empty", async () => {
@@ -79,7 +83,7 @@ describe("BatchSender", () => {
 
     finish();
     await vi.advanceTimersByTimeAsync(0);
-    expect(send.mock.calls).toEqual([
+    expect(withoutKey(send)).toEqual([
       ["amazon/ads", { items: [1, 2] }],
       ["amazon/ads", { items: [3, 4] }],
     ]);
@@ -106,7 +110,7 @@ describe("BatchSender", () => {
     [1, 2, 3].forEach((item) => sender.add(item));
     await vi.advanceTimersByTimeAsync(60 * 1000);
 
-    expect(send.mock.calls).toEqual([
+    expect(withoutKey(send)).toEqual([
       ["amazon/ads", { items: [1, 2, 3] }],
       ["amazon/ads", { items: [1, 2, 3] }],
       ["amazon/ads", { items: [1, 2, 3] }],
@@ -128,7 +132,22 @@ describe("BatchSender", () => {
     send.mockResolvedValue(undefined);
     sender.add(2);
     await vi.advanceTimersByTimeAsync(5000);
-    expect(send).toHaveBeenLastCalledWith("amazon/ads", { items: [2] });
+    expect(send).toHaveBeenLastCalledWith("amazon/ads", { items: [2] }, expect.any(String));
+  });
+
+  it("sends one idempotency key for every attempt of a batch and a new one for the next batch", async () => {
+    const { sender, send } = setup();
+    send.mockRejectedValueOnce(networkError());
+
+    sender.add(1);
+    await vi.advanceTimersByTimeAsync(60 * 1000);
+    sender.add(2);
+    await vi.advanceTimersByTimeAsync(5000);
+
+    const [first, retry, next] = keys(send);
+    expect(first).toMatch(/^[0-9a-f-]{36}$/);
+    expect(retry).toBe(first);
+    expect(next).not.toBe(first);
   });
 
   it("drops the batch on a 4xx without retrying", async () => {

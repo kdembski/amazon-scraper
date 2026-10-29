@@ -34,8 +34,10 @@ export class ApiService {
     return (await axios.get<T>(this.url(path), this.config(config))).data;
   }
 
-  async send<T>(path: string, data: unknown) {
-    return (await axios.post<T>(this.url(path), data, this.config({ timeout: SEND_TIMEOUT }))).data;
+  async send<T>(path: string, data: unknown, idempotencyKey?: string) {
+    const headers = idempotencyKey ? { "Idempotency-Key": idempotencyKey } : undefined;
+    const config = this.config({ timeout: SEND_TIMEOUT, headers });
+    return (await axios.post<T>(this.url(path), data, config)).data;
   }
 
   async post<T>(path: string, data: unknown, config: AxiosRequestConfig = {}) {

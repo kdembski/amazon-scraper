@@ -98,6 +98,23 @@ describe("ApiService", () => {
       );
     });
 
+    it("sends the idempotency key as a header", async () => {
+      const service = setup();
+      mocked.post.mockResolvedValue({ data: {} });
+
+      await service.send("amazon/ads/batch", {}, "batch-1");
+
+      expect(mocked.post).toHaveBeenCalledWith(
+        "http://api.test/amazon/ads/batch",
+        {},
+        {
+          ...withAgent,
+          headers: { ...withAgent.headers, "Idempotency-Key": "batch-1" },
+          timeout: 30_000,
+        }
+      );
+    });
+
     it("throws when the request fails", async () => {
       const error = vi.spyOn(console, "error").mockImplementation(() => {});
       const service = setup();
