@@ -2,6 +2,7 @@ import { vi } from "vitest";
 import { createScraper } from "@/marketplaces";
 import { AmazonService } from "@/marketplaces/amazon/AmazonService";
 import { AmazonPdpResultSender } from "@/marketplaces/amazon/pdp/AmazonPdpResultSender";
+import { AmazonPlpAdSender } from "@/marketplaces/amazon/plp/AmazonPlpAdSender";
 import { ApiService } from "@/shared/backend/ApiService";
 import { AmazonCountryService } from "@/marketplaces/amazon/AmazonCountryService";
 import { MetricsReporter } from "@/shared/backend/MetricsReporter";
@@ -23,6 +24,7 @@ const singletons = [
   ScrapingClient,
   AmazonService,
   AmazonPdpResultSender,
+  AmazonPlpAdSender,
   MetricsService,
   MetricsReporter,
   ScraperConfigService,

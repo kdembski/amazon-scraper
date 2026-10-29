@@ -66,23 +66,21 @@ describe("PLP", () => {
   const posted = () =>
     world.backend.find("POST", "amazon/ads").flatMap((post) => post.body);
 
-  const waitForPosts = async (count: number) => {
+  const waitForAds = async (count: number) => {
     await world.backend.waitFor("POST", "amazon/ads");
-    await expect
-      .poll(() => world.backend.find("POST", "amazon/ads").length)
-      .toBe(count);
-    return world.backend.find("POST", "amazon/ads").map((post) => post.body);
+    await expect.poll(() => posted().length).toBe(count);
+    return posted();
   };
 
   it("sends the newest ads of every price range", async () => {
     respondSearch(({ url }) => plpPage({ asins: [`B0${parse(url).price}`] }));
     scrape();
 
-    const posts = await waitForPosts(PRICE_RANGES);
+    const posts = await waitForAds(PRICE_RANGES);
     await sleep(200);
 
-    expect(posts).toContainEqual([ad("B0-999")]);
-    expect(posts).toContainEqual([ad("B0500000-")]);
+    expect(posts).toContainEqual(ad("B0-999"));
+    expect(posts).toContainEqual(ad("B0500000-"));
     const requests = searches().map(({ url }) => parse(url));
     expect(requests).toHaveLength(PRICE_RANGES);
     expect(_.uniqWith(requests, _.isEqual)).toHaveLength(PRICE_RANGES);
@@ -99,7 +97,7 @@ describe("PLP", () => {
     });
     scrape();
 
-    await waitForPosts(PRICE_RANGES + 2);
+    await waitForAds(PRICE_RANGES + 2);
     await sleep(200);
 
     const prices = searches().map(({ url }) => parse(url).price);
@@ -120,10 +118,10 @@ describe("PLP", () => {
     paginated();
     scrape();
 
-    const posts = await waitForPosts(3 * PRICE_RANGES);
+    const posts = await waitForAds(3 * PRICE_RANGES);
     await sleep(200);
 
-    expect(_.uniq(posts.flat().map((ad) => ad.asin))).toHaveLength(3 * PRICE_RANGES);
+    expect(_.uniq(posts.map((ad) => ad.asin))).toHaveLength(3 * PRICE_RANGES);
     expect(searches()).toHaveLength(3 * PRICE_RANGES);
   });
 
@@ -132,7 +130,7 @@ describe("PLP", () => {
     paginated();
     scrape();
 
-    await waitForPosts(PRICE_RANGES);
+    await waitForAds(PRICE_RANGES);
     await sleep(200);
 
     expect(searches()).toHaveLength(PRICE_RANGES);
@@ -157,7 +155,7 @@ describe("PLP", () => {
     );
     scrape();
 
-    await waitForPosts(PRICE_RANGES);
+    await waitForAds(PRICE_RANGES);
 
     expect(searches()).toHaveLength(PRICE_RANGES + 1);
   });
@@ -234,7 +232,7 @@ describe("PLP", () => {
   it("reports metrics every minute", async () => {
     respondSearch(({ url }) => plpPage({ asins: [`B0${parse(url).price}`] }));
     scrape();
-    await waitForPosts(PRICE_RANGES);
+    await waitForAds(PRICE_RANGES);
 
     cronJobs
       .filter((job) => job.cronTime === "0 * * * * *")

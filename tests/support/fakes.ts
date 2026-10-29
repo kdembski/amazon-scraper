@@ -1,6 +1,7 @@
 import { vi } from "vitest";
 import type { AmazonService } from "@/marketplaces/amazon/AmazonService";
 import type { AmazonPdpResultSender } from "@/marketplaces/amazon/pdp/AmazonPdpResultSender";
+import type { AmazonPlpAdSender } from "@/marketplaces/amazon/plp/AmazonPlpAdSender";
 import type { ApiService } from "@/shared/backend/ApiService";
 import type { ScraperConfigService } from "@/shared/backend/ScraperConfigService";
 import type { AmazonCountryService } from "@/marketplaces/amazon/AmazonCountryService";
@@ -25,6 +26,12 @@ export function fakeAmazonPdpResultSender() {
   const deleted = vi.fn();
   const service = { prices, deleted } as unknown as AmazonPdpResultSender;
   return { service, prices, deleted };
+}
+
+export function fakeAmazonPlpAdSender() {
+  const add = vi.fn();
+  const service = { add } as unknown as AmazonPlpAdSender;
+  return { service, add };
 }
 
 export function fakeAmazonCountryService() {

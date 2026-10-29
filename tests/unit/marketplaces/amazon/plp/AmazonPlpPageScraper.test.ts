@@ -4,7 +4,7 @@ import { AmazonPlpCrawl } from "@/marketplaces/amazon/plp/AmazonPlpCrawl";
 import type { AmazonPlpPageFetcher } from "@/marketplaces/amazon/plp/AmazonPlpPageFetcher";
 import type { MetricsService } from "@/shared/metrics/MetricsService";
 import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
-import { fakeApiService } from "@@tests/support/fakes";
+import { fakeAmazonPlpAdSender } from "@@tests/support/fakes";
 
 type Reply = { lastPage?: number; asins?: string[]; failed?: number; givenUp?: boolean };
 
@@ -17,7 +17,7 @@ const parse = (url: string) => ({
 });
 
 const setup = (reply: (price: string, number: number) => Reply = () => ({}), allPages = false) => {
-  const api = fakeApiService();
+  const sender = fakeAmazonPlpAdSender();
   const fetch = vi.fn(async (url: string, _referer: string) => {
     const { price, number } = parse(url);
     const { lastPage = 1, asins = [`B0${price}P${number}`], failed = 0, givenUp } = reply(price, number);
@@ -30,9 +30,9 @@ const setup = (reply: (price: string, number: number) => Reply = () => ({}), all
     undefined,
     { increment } as unknown as MetricsService
   );
-  const crawl = new AmazonPlpCrawl("electronics", allPages, api.service);
+  const crawl = new AmazonPlpCrawl("electronics", allPages, sender.service);
   const requests = () => fetch.mock.calls.map(([url]) => parse(url));
-  return { api, fetch, increment, scraper, crawl, requests };
+  return { sender, fetch, increment, scraper, crawl, requests };
 };
 
 const seeds = [
@@ -177,11 +177,11 @@ describe("AmazonPlpPageScraper", () => {
   });
 
   it("sends the ads of every page through the crawl", async () => {
-    const { api, scraper, crawl } = setup(() => ({ asins: ["B0SAME"] }));
+    const { sender, scraper, crawl } = setup(() => ({ asins: ["B0SAME"] }));
 
     await scraper.execute(crawl);
 
-    expect(api.post).toHaveBeenCalledTimes(1);
-    expect(api.post).toHaveBeenCalledWith("amazon/ads", [ad("B0SAME")]);
+    expect(sender.add).toHaveBeenCalledTimes(1);
+    expect(sender.add).toHaveBeenCalledWith([ad("B0SAME")]);
   });
 });
