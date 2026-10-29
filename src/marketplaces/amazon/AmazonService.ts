@@ -3,11 +3,8 @@ import { ScrapingClient } from "@/shared/http/ScrapingClient";
 export class AmazonService {
   private static instance: AmazonService;
   private baseUrl = "https://www.amazon.";
-  private scrapingClient;
 
-  private constructor(scrapingClient = ScrapingClient.getInstance()) {
-    this.scrapingClient = scrapingClient;
-  }
+  private constructor(private scrapingClient = ScrapingClient.getInstance()) {}
 
   public static getInstance(): AmazonService {
     if (!AmazonService.instance) {

@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ScrapingClient } from "@/shared/http/ScrapingClient";
 import type { ScraperConfigService } from "@/shared/backend/ScraperConfigService";
 import type { ProxyService } from "@/shared/http/proxy/ProxyService";
-import type { RequestQueueService } from "@/shared/http/RequestQueueService";
+import type { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
 
 vi.mock("axios", () => ({ default: { get: vi.fn() } }));
 
@@ -30,7 +30,7 @@ const setup = () => {
   const service = new Client(
     {} as ScraperConfigService,
     proxy,
-    queue as unknown as RequestQueueService
+    queue as unknown as TokenBucketQueue
   );
 
   return { service, agent, proxy, queue, requests };

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AmazonAodAdBuilder } from "@/marketplaces/amazon/pdp/AmazonAodAdBuilder";
+import { AmazonAodAdBuilder } from "@/marketplaces/amazon/pdp/builders/AmazonAodAdBuilder";
 import { botWallPage, captchaPage, toDocument } from "@@tests/support/html";
 import { AmazonCountry } from "@/marketplaces/amazon/types/amazon.types";
 import { AmazonAd } from "@/marketplaces/amazon/types/amazon.types";

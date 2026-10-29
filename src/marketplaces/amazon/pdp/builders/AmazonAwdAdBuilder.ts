@@ -5,12 +5,18 @@ import {
   AmazonAdBuildResult,
   AmazonCountry,
 } from "@/marketplaces/amazon/types/amazon.types";
-import { buildBuybox, isCaptchaPage } from "@/marketplaces/amazon/pdp/amazonOffer";
+import { AmazonBuyboxParser } from "@/marketplaces/amazon/pdp/builders/AmazonBuyboxParser";
+import { AmazonCaptchaDetector } from "@/marketplaces/amazon/pdp/builders/AmazonCaptchaDetector";
 import { find } from "@/shared/utils/html";
 
 const BUYBOX = 'id="buybox"';
 
 export class AmazonAwdAdBuilder implements AmazonAdBuilder {
+  constructor(
+    private captchaDetector = new AmazonCaptchaDetector(),
+    private buyboxParser = new AmazonBuyboxParser()
+  ) {}
+
   // Cuts the header and the related products that come before the buy box
   trimHtml(html: string) {
     const start = html.indexOf(BUYBOX);
@@ -20,12 +26,11 @@ export class AmazonAwdAdBuilder implements AmazonAdBuilder {
   }
 
   build(document: Document): AmazonAdBuildResult {
-    if (isCaptchaPage(document)) {
-      console.warn("Warning: Captcha triggered!");
+    if (this.captchaDetector.detect(document)) {
       return { isCaptcha: true };
     }
 
-    return buildBuybox(find("#buybox", document));
+    return this.buyboxParser.parse(find("#buybox", document));
   }
 
   buildUrl(country: AmazonCountry, ad: AmazonAd) {

@@ -4,11 +4,9 @@ import { CronJob } from "cron";
 
 export class AmazonCountryService {
   private static instance: AmazonCountryService;
-  private apiService;
   private countries: AmazonCountry[] = [];
 
-  private constructor(apiService = ApiService.getInstance()) {
-    this.apiService = apiService;
+  private constructor(private apiService = ApiService.getInstance()) {
     new CronJob("0 0 */1 * * *", () => this.loadCountries()).start();
   }
 

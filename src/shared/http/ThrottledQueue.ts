@@ -4,11 +4,9 @@ export class ThrottledQueue {
   private pending = 0;
   private lastStart = 0;
   private timer?: ReturnType<typeof setTimeout>;
-  private concurrency;
   private interval;
 
-  constructor(concurrency: number, rps: number) {
-    this.concurrency = concurrency;
+  constructor(private concurrency: number, rps: number) {
     this.interval = 1000 / rps;
   }
 

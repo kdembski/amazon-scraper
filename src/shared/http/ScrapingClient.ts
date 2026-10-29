@@ -3,7 +3,7 @@ import type { Readable } from "node:stream";
 import _ from "lodash";
 import { ScraperConfigService } from "@/shared/backend/ScraperConfigService";
 import { ProxyService } from "@/shared/http/proxy/ProxyService";
-import { RequestQueueService } from "@/shared/http/RequestQueueService";
+import { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
 import { MetricsService } from "@/shared/metrics/MetricsService";
 import type { MetricLabels, RequestOutcome } from "@/shared/metrics/metrics.types";
 
@@ -14,24 +14,18 @@ export class ScrapingClient {
     (version) =>
       `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${version}.0.0.0 Safari/537.36`
   );
-  private proxyService;
-  private metricsService;
-  queueService;
 
   private constructor(
     configService = ScraperConfigService.getInstance(),
-    proxyService = ProxyService.getInstance(),
-    queueService = new RequestQueueService(
+    private proxyService = ProxyService.getInstance(),
+    public queueService = new TokenBucketQueue(
       configService.get().concurrency,
       configService.get().rps,
       true,
       () => proxyService.countConnections()
     ),
-    metricsService = MetricsService.getInstance()
+    private metricsService = MetricsService.getInstance()
   ) {
-    this.metricsService = metricsService;
-    this.queueService = queueService;
-    this.proxyService = proxyService;
     queueService.start();
   }
 

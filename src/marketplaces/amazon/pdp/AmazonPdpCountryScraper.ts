@@ -1,7 +1,7 @@
 import { AmazonService } from "@/marketplaces/amazon/AmazonService";
-import { AmazonAodAdBuilder } from "@/marketplaces/amazon/pdp/AmazonAodAdBuilder";
-import { AmazonAwdAdBuilder } from "@/marketplaces/amazon/pdp/AmazonAwdAdBuilder";
-import { AmazonTwisterAdBuilder } from "@/marketplaces/amazon/pdp/AmazonTwisterAdBuilder";
+import { AmazonAodAdBuilder } from "@/marketplaces/amazon/pdp/builders/AmazonAodAdBuilder";
+import { AmazonAwdAdBuilder } from "@/marketplaces/amazon/pdp/builders/AmazonAwdAdBuilder";
+import { AmazonTwisterAdBuilder } from "@/marketplaces/amazon/pdp/builders/AmazonTwisterAdBuilder";
 import {
   AmazonAd,
   AmazonAdBuilder,

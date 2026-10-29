@@ -1,9 +1,9 @@
 import { configDotenv } from "dotenv";
 import { parseDocument } from "htmlparser2";
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { AmazonAodAdBuilder } from "@/marketplaces/amazon/pdp/AmazonAodAdBuilder";
-import { AmazonAwdAdBuilder } from "@/marketplaces/amazon/pdp/AmazonAwdAdBuilder";
-import { AmazonTwisterAdBuilder } from "@/marketplaces/amazon/pdp/AmazonTwisterAdBuilder";
+import { AmazonAodAdBuilder } from "@/marketplaces/amazon/pdp/builders/AmazonAodAdBuilder";
+import { AmazonAwdAdBuilder } from "@/marketplaces/amazon/pdp/builders/AmazonAwdAdBuilder";
+import { AmazonTwisterAdBuilder } from "@/marketplaces/amazon/pdp/builders/AmazonTwisterAdBuilder";
 import { AmazonPlpBuilder } from "@/marketplaces/amazon/plp/AmazonPlpBuilder";
 import { AmazonService } from "@/marketplaces/amazon/AmazonService";
 import { ProxyService } from "@/shared/http/proxy/ProxyService";

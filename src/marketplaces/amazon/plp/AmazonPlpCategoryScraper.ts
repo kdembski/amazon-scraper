@@ -4,16 +4,10 @@ import { AmazonPlpPageScraper } from "@/marketplaces/amazon/plp/AmazonPlpPageScr
 import { AmazonAdCategory } from "@/marketplaces/amazon/types/amazon.types";
 
 export class AmazonPlpCategoryScraper {
-  private pageScraper;
-  private newReleasesScraper;
-
   constructor(
-    pageScraper = new AmazonPlpPageScraper(),
-    newReleasesScraper = new AmazonNewReleasesScraper()
-  ) {
-    this.pageScraper = pageScraper;
-    this.newReleasesScraper = newReleasesScraper;
-  }
+    private pageScraper = new AmazonPlpPageScraper(),
+    private newReleasesScraper = new AmazonNewReleasesScraper()
+  ) {}
 
   async execute(category: AmazonAdCategory) {
     const crawl = new AmazonPlpCrawl(category.name, !category.scrapedAt);

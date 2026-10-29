@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AmazonTwisterAdBuilder } from "@/marketplaces/amazon/pdp/AmazonTwisterAdBuilder";
+import { AmazonTwisterAdBuilder } from "@/marketplaces/amazon/pdp/builders/AmazonTwisterAdBuilder";
 import { buildAd, buildAmazonCountry } from "@@tests/support/factories";
 import {
   botWallPage,
