@@ -10,7 +10,7 @@ services:
   amazon-pdp-1:
     <<: *amazon-pdp
     environment:
-      NODE_OPTIONS: --max-old-space-size=8192
+      NODE_OPTIONS: --max-old-space-size=1536
       name: amazon-pdp-1
   amazon-pdp-2:
     <<: *amazon-pdp
