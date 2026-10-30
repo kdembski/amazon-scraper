@@ -127,6 +127,19 @@ describe("MetricsReporter", () => {
     );
   });
 
+  it("adds the registered gauges read at sending", async () => {
+    const { api, metrics, reporter } = setup();
+    let inFlight = 1;
+    metrics.gauge("ads_in_flight", () => inFlight);
+    metrics.increment("requests", { country: "de", outcome: "ok" });
+    reporter.start("amazon");
+    inFlight = 7;
+
+    await reporter.send();
+
+    expect(api.post.mock.calls[0][1].metrics.at(-1)).toEqual({ metric: "ads_in_flight", value: 7 });
+  });
+
   it("measures the event loop delay from the start and resets it after each send", async () => {
     const { metrics, reporter, eventLoopDelay } = setup();
     reporter.start("amazon");

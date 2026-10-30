@@ -7,20 +7,24 @@ import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
 const setup = ({ maxSize = 10 } = {}) => {
   const send = vi.fn().mockResolvedValue(undefined);
   const increment = vi.fn();
+  const gauge = vi.fn();
   const sender = new BatchSender<number>(
     "amazon/ads",
     (items) => ({ items }),
     maxSize,
     5000,
     { send } as unknown as ApiService,
-    { increment } as unknown as MetricsService
+    { increment, gauge } as unknown as MetricsService
   );
-  return { sender, send, increment };
+  return { sender, send, increment, gauge };
 };
 
 const withoutKey = (send: ReturnType<typeof vi.fn>) =>
   send.mock.calls.map(([path, body]) => [path, body]);
 const keys = (send: ReturnType<typeof vi.fn>) => send.mock.calls.map(([, , key]) => key);
+
+const calls = (increment: ReturnType<typeof vi.fn>, metric: string) =>
+  increment.mock.calls.filter(([name]) => name === metric);
 
 const networkError = () => new Error("socket hang up");
 const httpError = (status: number) => Object.assign(new Error("failed"), { response: { status } });
@@ -115,7 +119,7 @@ describe("BatchSender", () => {
       ["amazon/ads", { items: [1, 2, 3] }],
       ["amazon/ads", { items: [1, 2, 3] }],
     ]);
-    expect(increment.mock.calls).toEqual([["backend_items", { outcome: "sent" }, 3]]);
+    expect(calls(increment, "backend_items")).toEqual([["backend_items", { outcome: "sent" }, 3]]);
   });
 
   it("drops the batch after MAX_FAILED_ATTEMPTS failures and keeps sending later items", async () => {
@@ -127,7 +131,7 @@ describe("BatchSender", () => {
 
     expect(send).toHaveBeenCalledTimes(MAX_FAILED_ATTEMPTS);
     expect(console.error).toHaveBeenCalledTimes(1);
-    expect(increment.mock.calls).toEqual([["backend_items", { outcome: "dropped" }, 1]]);
+    expect(calls(increment, "backend_items")).toEqual([["backend_items", { outcome: "dropped" }, 1]]);
 
     send.mockResolvedValue(undefined);
     sender.add(2);
@@ -159,6 +163,43 @@ describe("BatchSender", () => {
 
     expect(send).toHaveBeenCalledTimes(1);
     expect(console.error).toHaveBeenCalledTimes(1);
-    expect(increment.mock.calls).toEqual([["backend_items", { outcome: "dropped" }, 1]]);
+    expect(calls(increment, "backend_items")).toEqual([["backend_items", { outcome: "dropped" }, 1]]);
+  });
+
+  it("counts every attempt by outcome with its duration", async () => {
+    const { sender, send, increment } = setup();
+    const timeout = (code: string) => Object.assign(new Error("timeout"), { code });
+    send
+      .mockRejectedValueOnce(networkError())
+      .mockRejectedValueOnce(timeout("ECONNABORTED"))
+      .mockRejectedValueOnce(timeout("ETIMEDOUT"))
+      .mockImplementationOnce(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        throw httpError(502);
+      });
+
+    sender.add(1);
+    await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+
+    expect(calls(increment, "backend_requests").map(([, labels]) => labels.outcome)).toEqual([
+      "network",
+      "timeout",
+      "timeout",
+      "http_502",
+      "ok",
+    ]);
+    expect(calls(increment, "backend_send_ms").map(([, , ms]) => ms)).toEqual([0, 0, 0, 250, 0]);
+  });
+
+  it("reports the length of its buffer as backend_buffer", async () => {
+    const { sender, gauge } = setup();
+    const [[metric, read]] = gauge.mock.calls;
+
+    sender.add(1);
+    sender.add(2);
+    expect([metric, read()]).toEqual(["backend_buffer", 2]);
+
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(read()).toBe(0);
   });
 });

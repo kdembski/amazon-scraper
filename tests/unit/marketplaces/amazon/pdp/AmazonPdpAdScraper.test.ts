@@ -4,6 +4,7 @@ import type { AmazonPdpCountryScraper } from "@/marketplaces/amazon/pdp/AmazonPd
 import { AmazonPdpPriceHelper } from "@/marketplaces/amazon/pdp/AmazonPdpPriceHelper";
 import type { AmazonAdPrice } from "@/marketplaces/amazon/types/amazon.types";
 import type { ItemOutcome } from "@/shared/metrics/metrics.types";
+import type { MetricsService } from "@/shared/metrics/MetricsService";
 import { buildAd, buildAmazonCountry } from "@@tests/support/factories";
 import { fakeAmazonPdpResultSender } from "@@tests/support/fakes";
 
@@ -19,11 +20,15 @@ const setup = (count: number, priorities: number[] = [], active: boolean[] = [])
       new Promise<ItemOutcome | undefined>((finish) => runs.push({ price, isCancelled, finish }))
   );
   const countryScraper = { execute } as unknown as AmazonPdpCountryScraper;
+  const increment = vi.fn();
+  const gauge = vi.fn();
   const scraper = new AmazonPdpAdScraper(
     countryScraper,
     new AmazonPdpPriceHelper(sender.service),
-    sender.service
+    sender.service,
+    { increment, gauge } as unknown as MetricsService
   );
+  const inFlight = () => gauge.mock.calls[0][1]();
   const ad = buildAd({ id: 7 });
   const countries = Array.from({ length: count }, (_, i) =>
     buildAmazonCountry({
@@ -41,7 +46,7 @@ const setup = (count: number, priorities: number[] = [], active: boolean[] = [])
     runs[i].finish("data");
   };
 
-  return { sender, execute, runs, ad, countries, done, withPrice };
+  return { sender, execute, runs, ad, countries, done, withPrice, increment, gauge, inFlight };
 };
 
 const flush = () => new Promise((resolve) => setImmediate(resolve));
@@ -66,6 +71,46 @@ describe("AmazonPdpAdScraper", () => {
         expect.any(Function),
       ])
     );
+  });
+
+  describe("metrics", () => {
+    it("counts an ad with prices and its duration and keeps it in flight until then", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      const { increment, gauge, inFlight, withPrice } = setup(2);
+      expect(gauge).toHaveBeenCalledWith("ads_in_flight", expect.any(Function));
+      expect(inFlight()).toBe(1);
+
+      vi.setSystemTime(Date.now() + 1500);
+      withPrice(0);
+      withPrice(1);
+      await flush();
+      vi.useRealTimers();
+
+      expect(inFlight()).toBe(0);
+      expect(increment.mock.calls).toEqual([
+        ["ads", { outcome: "prices" }],
+        ["ad_duration_ms", {}, 1500],
+      ]);
+    });
+
+    it("counts an ad without any price as empty", async () => {
+      const { increment, runs } = setup(2);
+
+      runs[0].finish("no_data");
+      runs[1].finish("given_up");
+      await flush();
+
+      expect(increment).toHaveBeenCalledWith("ads", { outcome: "empty" });
+    });
+
+    it("counts a deleted ad", async () => {
+      const { increment, runs } = setup(1);
+
+      runs[0].finish("deleted");
+      await flush();
+
+      expect(increment).toHaveBeenCalledWith("ads", { outcome: "deleted" });
+    });
   });
 
   it("waits for all countries before sending the prices", async () => {

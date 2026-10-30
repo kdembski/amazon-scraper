@@ -42,6 +42,7 @@ export class AmazonPdpCountryScraper {
       if (isCancelled()) return;
 
       if (!result.ok && result.status === 404 && sources.length) {
+        this.metricsService.increment("source_fallback", { country: price.country.tld });
         builder = sources.shift()!;
         continue;
       }
@@ -129,6 +130,7 @@ export class AmazonPdpCountryScraper {
       price.dispatchFrom = ad.dispatchFrom;
       return outcome;
     } catch (e) {
+      this.countResponse(price, "parse_error");
       console.error("pdp: parse failed", e);
     }
   }

@@ -104,6 +104,7 @@ export class MetricsReporter {
           pingMs === undefined
             ? { metric: "ping_failed", value: 1 }
             : { metric: "ping_ms", value: pingMs },
+          ...this.metricsService.readGauges(),
         ],
       },
     };

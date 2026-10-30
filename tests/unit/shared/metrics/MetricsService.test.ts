@@ -37,6 +37,17 @@ describe("MetricsService", () => {
     expect(Object.keys(row)).toEqual(["metric", "value"]);
   });
 
+  it("reads every gauge, the last reader of a metric replacing the earlier one", () => {
+    metrics.gauge("ads_in_flight", () => 1);
+    metrics.gauge("backend_buffer", () => 2);
+    metrics.gauge("ads_in_flight", () => 3);
+
+    expect(metrics.readGauges()).toEqual([
+      { metric: "ads_in_flight", value: 3 },
+      { metric: "backend_buffer", value: 2 },
+    ]);
+  });
+
   it("returns nothing on the second drain", () => {
     metrics.drain();
     metrics.increment("requests");

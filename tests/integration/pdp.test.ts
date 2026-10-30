@@ -363,5 +363,10 @@ describe("PDP", () => {
     expect(value("connections")).toBeGreaterThanOrEqual(1);
     expect(value("bytes_in")).toBeGreaterThan(0);
     expect(value("bytes_out")).toBeGreaterThan(0);
+    expect(value("batch_load", undefined, "ok")).toBeGreaterThanOrEqual(1);
+    expect(value("ads", undefined, "prices")).toBe(1);
+    expect(value("ad_duration_ms")).toBeGreaterThanOrEqual(0);
+    expect(value("ads_in_flight")).toBe(0);
+    expect(value("backend_buffer")).toBe(0);
   });
 });

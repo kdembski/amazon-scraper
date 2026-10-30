@@ -3,6 +3,7 @@ import type { MetricLabels, MetricRow } from "@/shared/metrics/metrics.types";
 export class MetricsService {
   private static instance: MetricsService;
   private counters = new Map<string, MetricRow>();
+  private gauges = new Map<string, () => number>();
 
   private constructor() {}
 
@@ -15,6 +16,15 @@ export class MetricsService {
 
   increment(metric: string, labels: MetricLabels = {}, value = 1) {
     this.add({ metric, ...labels, value });
+  }
+
+  // Read at every report; registering a metric again replaces its reader
+  gauge(metric: string, read: () => number) {
+    this.gauges.set(metric, read);
+  }
+
+  readGauges(): MetricRow[] {
+    return [...this.gauges].map(([metric, read]) => ({ metric, value: read() }));
   }
 
   drain(): MetricRow[] {

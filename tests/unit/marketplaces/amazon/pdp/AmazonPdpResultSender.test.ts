@@ -25,7 +25,7 @@ describe("AmazonPdpResultSender", () => {
     const resultSender = new AmazonPdpResultSender(
       new BatchSender("amazon/ads/batch", AmazonPdpResultSender.toBody, 2, 5000, {
         send,
-      } as any, { increment: vi.fn() } as any)
+      } as any, { increment: vi.fn(), gauge: vi.fn() } as any)
     );
 
     resultSender.prices(7, [price]);
