@@ -1,6 +1,6 @@
 import { parseDocument } from "htmlparser2";
 import { describe, expect, it } from "vitest";
-import { find, findAll, text } from "@/shared/utils/html";
+import { detach, find, findAll, text } from "@/shared/utils/html";
 
 const document = parseDocument(`
   <ul id="list">
@@ -33,5 +33,10 @@ describe("html", () => {
 
   it("returns undefined text for a missing element", () => {
     expect(text(find("table", document))).toBeUndefined();
+  });
+
+  it("detaches a value from the page", () => {
+    expect(detach(find("li", document)?.attribs.class)).toBe("item");
+    expect(detach(undefined)).toBeUndefined();
   });
 });

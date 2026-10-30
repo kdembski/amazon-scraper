@@ -123,8 +123,21 @@ describe("MetricsReporter", () => {
           ...gauges,
         ],
       },
-      { timeout: 30000 }
+      { timeout: 30000, headers: { "Idempotency-Key": expect.any(String) } }
     );
+  });
+
+  it("adds the registered gauges read at sending", async () => {
+    const { api, metrics, reporter } = setup();
+    let inFlight = 1;
+    metrics.gauge("ads_in_flight", () => inFlight);
+    metrics.increment("requests", { country: "de", outcome: "ok" });
+    reporter.start("amazon");
+    inFlight = 7;
+
+    await reporter.send();
+
+    expect(api.post.mock.calls[0][1].metrics.at(-1)).toEqual({ metric: "ads_in_flight", value: 7 });
   });
 
   it("measures the event loop delay from the start and resets it after each send", async () => {
@@ -229,7 +242,7 @@ describe("MetricsReporter", () => {
     expect(api.post.mock.calls[0][1].periodStart).toBe("2026-10-18T10:00:00.000Z");
   });
 
-  it("restores the counters and keeps the period start after a failed send", async () => {
+  it("resends a failed report unchanged with its key before the next one", async () => {
     const { api, metrics, reporter } = setup();
     api.post.mockResolvedValueOnce(undefined);
     metrics.increment("requests", { country: "de", outcome: "ok" }, 2);
@@ -239,13 +252,39 @@ describe("MetricsReporter", () => {
     metrics.increment("requests", { country: "de", outcome: "ok" }, 3);
     await reporter.send();
 
-    const second = api.post.mock.calls[1][1];
-    expect(second.periodStart).toBe("2026-10-18T10:00:00.000Z");
-    expect(second.metrics[0]).toEqual({
+    const [failed, retry, next] = api.post.mock.calls;
+    expect(retry[1]).toBe(failed[1]);
+    expect(retry[2]).toEqual(failed[2]);
+    expect(next[2].headers["Idempotency-Key"]).not.toBe(failed[2].headers["Idempotency-Key"]);
+    expect(next[1].periodStart).toBe("2026-10-18T10:01:00.000Z");
+    expect(next[1].metrics[0]).toEqual({
       metric: "requests",
       country: "de",
       outcome: "ok",
-      value: 5,
+      value: 3,
+    });
+  });
+
+  it("keeps collecting while a failed report still does not go through", async () => {
+    const { api, metrics, reporter } = setup();
+    api.post.mockResolvedValueOnce(undefined).mockResolvedValueOnce(undefined);
+    metrics.increment("requests", { country: "de", outcome: "ok" }, 2);
+    reporter.start("amazon");
+
+    await reporter.send();
+    metrics.increment("requests", { country: "de", outcome: "ok" }, 3);
+    await reporter.send();
+    metrics.increment("requests", { country: "de", outcome: "ok" }, 4);
+    await reporter.send();
+
+    const calls = api.post.mock.calls;
+    expect(calls).toHaveLength(4);
+    expect(calls[2][1]).toBe(calls[0][1]);
+    expect(calls[3][1].metrics[0]).toEqual({
+      metric: "requests",
+      country: "de",
+      outcome: "ok",
+      value: 7,
     });
   });
 

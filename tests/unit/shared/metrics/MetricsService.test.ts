@@ -37,24 +37,22 @@ describe("MetricsService", () => {
     expect(Object.keys(row)).toEqual(["metric", "value"]);
   });
 
+  it("reads every gauge, the last reader of a metric replacing the earlier one", () => {
+    metrics.gauge("ads_in_flight", () => 1);
+    metrics.gauge("backend_buffer", () => 2);
+    metrics.gauge("ads_in_flight", () => 3);
+
+    expect(metrics.readGauges()).toEqual([
+      { metric: "ads_in_flight", value: 3 },
+      { metric: "backend_buffer", value: 2 },
+    ]);
+  });
+
   it("returns nothing on the second drain", () => {
     metrics.drain();
     metrics.increment("requests");
     metrics.drain();
 
     expect(metrics.drain()).toEqual([]);
-  });
-
-  it("adds restored rows to the current counters", () => {
-    metrics.drain();
-    metrics.increment("requests", { country: "de", outcome: "ok" }, 2);
-    const rows = metrics.drain();
-
-    metrics.restore(rows);
-    metrics.increment("requests", { country: "de", outcome: "ok" });
-
-    expect(metrics.drain()).toEqual([
-      { metric: "requests", country: "de", outcome: "ok", value: 3 },
-    ]);
   });
 });

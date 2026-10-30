@@ -1,6 +1,6 @@
 import type { Document, Element } from "domhandler";
 import { AmazonPlpAd } from "@/marketplaces/amazon/types/amazon.types";
-import { find, findAll, text } from "@/shared/utils/html";
+import { detach, find, findAll, text } from "@/shared/utils/html";
 
 export class AmazonNewReleasesBuilder {
   build(document: Document, category: string) {
@@ -23,7 +23,7 @@ export class AmazonNewReleasesBuilder {
 
   private buildItem(item: Element, category: string) {
     const asin = item.attribs["data-asin"];
-    const image = find("img", item)?.attribs.src;
+    const image = detach(find("img", item)?.attribs.src);
     const name = text(find("[class*='p13n-sc-css-line-clamp']", item))?.trim();
 
     if (!asin || !image || !name) return;

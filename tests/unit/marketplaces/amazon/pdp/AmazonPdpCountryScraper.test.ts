@@ -165,7 +165,7 @@ describe("AmazonPdpCountryScraper", () => {
 
     it("on a parse error", async () => {
       vi.spyOn(console, "error").mockImplementation(() => {});
-      const { amazon, builder, price, run } = setup();
+      const { amazon, builder, price, run, increment } = setup();
       builder.build.mockImplementationOnce(() => {
         throw new Error("broken");
       });
@@ -175,6 +175,7 @@ describe("AmazonPdpCountryScraper", () => {
       await flush();
 
       expect(price.failed).toBe(1);
+      expect(increment).toHaveBeenCalledWith("responses", { country: "c1", outcome: "parse_error" });
       await vi.advanceTimersByTimeAsync(1000);
       expect(amazon.get).toHaveBeenCalledTimes(2);
     });
@@ -332,7 +333,8 @@ describe("AmazonPdpCountryScraper", () => {
         url: `${country.tld}/awd/${ad.asin}`,
         referer: `${country.tld}/`,
       }));
-      const metrics = { increment: vi.fn() } as unknown as MetricsService;
+      const increment = vi.fn();
+      const metrics = { increment } as unknown as MetricsService;
       const scraper = new AmazonPdpCountryScraper(
         amazon.service,
         { aod: aod.builder, twister: twister.builder, awd: awd.builder },
@@ -342,11 +344,11 @@ describe("AmazonPdpCountryScraper", () => {
       const outcome = vi.fn();
       const run = () => scraper.execute(price, buildAd(), () => false).then(outcome);
 
-      return { amazon, aod, twister, awd, price, outcome, run };
+      return { amazon, aod, twister, awd, price, outcome, run, increment };
     };
 
     it("moves to the next source on a 404 without counting a failure", async () => {
-      const { amazon, awd, price, outcome, run } = setupSources("twister,awd");
+      const { amazon, awd, price, outcome, run, increment } = setupSources("twister,awd");
       run();
 
       amazon.fail(0, notFound);
@@ -354,6 +356,7 @@ describe("AmazonPdpCountryScraper", () => {
 
       expect(amazon.requests[1].url).toBe("c1/awd/B0TESTASIN");
       expect(price.failed).toBe(0);
+      expect(calls(increment, "source_fallback")).toEqual([["source_fallback", { country: "c1" }]]);
       amazon.respond(1, html);
       await flush();
 

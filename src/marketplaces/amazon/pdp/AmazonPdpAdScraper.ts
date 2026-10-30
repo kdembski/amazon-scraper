@@ -6,28 +6,40 @@ import {
   AmazonCountry,
 } from "@/marketplaces/amazon/types/amazon.types";
 import { AmazonPdpResultSender } from "@/marketplaces/amazon/pdp/AmazonPdpResultSender";
-import { ItemOutcome } from "@/shared/metrics/metrics.types";
+import { MetricsService } from "@/shared/metrics/MetricsService";
+import { AdOutcome, ItemOutcome } from "@/shared/metrics/metrics.types";
 import _ from "lodash";
 
 export class AmazonPdpAdScraper {
+  private inFlight = 0;
+
   constructor(
     private countryScraper = new AmazonPdpCountryScraper(),
     private priceHelper = new AmazonPdpPriceHelper(),
-    private resultSender = AmazonPdpResultSender.getInstance()
-  ) {}
+    private resultSender = AmazonPdpResultSender.getInstance(),
+    private metricsService = MetricsService.getInstance()
+  ) {
+    metricsService.gauge("ads_in_flight", () => this.inFlight);
+  }
 
   execute(ad: AmazonAd, countries: AmazonCountry[]) {
     const prices = this.createPrices(countries);
+    const startedAt = Date.now();
     let isDone = false;
     const isCancelled = () => isDone;
+    this.inFlight++;
 
     return new Promise<void>((resolve) => {
       const scrapeCountry = async (price: AmazonAdPrice) => {
         const outcome = await this.countryScraper.execute(price, ad, isCancelled);
         if (!outcome || isDone) return;
-        if (!this.applyOutcome(price, outcome, prices, ad)) return;
+        const adOutcome = this.applyOutcome(price, outcome, prices, ad);
+        if (!adOutcome) return;
 
         isDone = true;
+        this.inFlight--;
+        this.metricsService.increment("ads", { outcome: adOutcome });
+        this.metricsService.increment("ad_duration_ms", {}, Date.now() - startedAt);
         resolve();
       };
 
@@ -64,24 +76,25 @@ export class AmazonPdpAdScraper {
     }
   }
 
+  // The outcome of the ad once it is decided
   private applyOutcome(
     price: AmazonAdPrice,
     outcome: ItemOutcome,
     prices: AmazonAdPrice[],
     ad: AmazonAd
-  ): boolean {
+  ): AdOutcome | undefined {
     price.complete = true;
     price.deleted = outcome === "deleted";
 
     if (this.priceHelper.isDeleted(prices)) {
       this.resultSender.deleted(ad.id);
-      return true;
+      return "deleted";
     }
 
     const isComplete = this.priceHelper.isComplete(prices);
-    if (!isComplete && !this.priceHelper.hasEnoughPrices(prices)) return false;
+    if (!isComplete && !this.priceHelper.hasEnoughPrices(prices)) return;
 
     this.priceHelper.sendCompletedPrices(prices, ad);
-    return true;
+    return prices.some((price) => !!price.value) ? "prices" : "empty";
   }
 }

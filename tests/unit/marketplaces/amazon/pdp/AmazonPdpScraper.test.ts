@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AmazonPdpScraper } from "@/marketplaces/amazon/pdp/AmazonPdpScraper";
 import type { AmazonPdpAdScraper } from "@/marketplaces/amazon/pdp/AmazonPdpAdScraper";
+import type { MetricsService } from "@/shared/metrics/MetricsService";
 import { buildAd, buildAmazonCountry } from "@@tests/support/factories";
 import {
   fakeAmazonService,
@@ -16,14 +17,16 @@ const setup = ({ batchSize = 50 } = {}) => {
   const config = fakeScraperConfigService({ batchSize });
   const adExecute = vi.fn();
   const adScraper = { execute: adExecute } as unknown as AmazonPdpAdScraper;
+  const increment = vi.fn();
   const scraper = new AmazonPdpScraper(
     api.service,
     amazon.service,
     adScraper,
     country.service,
-    config.service
+    config.service,
+    { increment } as unknown as MetricsService
   );
-  return { api, country, amazon, adExecute, scraper };
+  return { api, country, amazon, adExecute, scraper, increment };
 };
 
 type Fakes = Pick<ReturnType<typeof setup>, "api" | "country">;
@@ -82,14 +85,28 @@ describe("AmazonPdpScraper", () => {
   });
 
   describe("scrape", () => {
-    it("logs a failed load instead of rejecting", async () => {
+    it("logs and counts a failed load instead of rejecting", async () => {
       const error = vi.spyOn(console, "error").mockImplementation(() => {});
-      const { country, scraper } = setup();
+      const { country, scraper, increment } = setup();
       country.getCountries.mockRejectedValue(new Error("down"));
 
       await expect(scraper.scrape()).resolves.toBeUndefined();
 
       expect(error).toHaveBeenCalledWith("pdp: batch load failed", expect.any(Error));
+      expect(increment.mock.calls).toEqual([["batch_load", { outcome: "failed" }]]);
+    });
+
+    it.each([
+      ["ok", ads],
+      ["empty", []],
+    ])("counts a loaded batch as %s", async (outcome, loaded) => {
+      const { api, country, scraper, increment } = setup();
+      country.getCountries.mockResolvedValue(countries);
+      api.get.mockResolvedValue(loaded);
+
+      await scraper.scrape();
+
+      expect(increment.mock.calls).toEqual([["batch_load", { outcome }]]);
     });
 
     it("scrapes a batch of ads in every country", async () => {
