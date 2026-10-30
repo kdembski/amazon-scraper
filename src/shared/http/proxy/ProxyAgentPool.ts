@@ -18,9 +18,6 @@ export class ProxyAgentPool {
         { keepAlive: true, maxFreeSockets: 1 },
         this.onConnect
       );
-      // HttpsProxyAgent replaces `options`, so a `timeout` passed to the
-      // constructor never reaches http.Agent, which reads it from there to
-      // close idle sockets
       agent.options.timeout = this.idleTimeout;
       agent.protocol = "https:";
       agent.on("free", (_socket, options: { host: string }) => {
@@ -32,7 +29,6 @@ export class ProxyAgentPool {
     return agent;
   }
 
-  // Socket names start with `<host>:<port>:`
   hasFreeSocket(url: string, host: string) {
     const freeSockets = this.agents.get(url)?.freeSockets ?? {};
 
