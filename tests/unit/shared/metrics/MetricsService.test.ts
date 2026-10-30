@@ -44,17 +44,4 @@ describe("MetricsService", () => {
 
     expect(metrics.drain()).toEqual([]);
   });
-
-  it("adds restored rows to the current counters", () => {
-    metrics.drain();
-    metrics.increment("requests", { country: "de", outcome: "ok" }, 2);
-    const rows = metrics.drain();
-
-    metrics.restore(rows);
-    metrics.increment("requests", { country: "de", outcome: "ok" });
-
-    expect(metrics.drain()).toEqual([
-      { metric: "requests", country: "de", outcome: "ok", value: 3 },
-    ]);
-  });
 });

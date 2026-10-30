@@ -5,12 +5,15 @@ import { ScrapingClient } from "@/shared/http/ScrapingClient";
 import { MetricsService } from "@/shared/metrics/MetricsService";
 import { tcpPing } from "@/shared/utils/tcpPing";
 import { CronJob } from "cron";
+import { randomUUID } from "crypto";
 import { monitorEventLoopDelay } from "node:perf_hooks";
 
 const EVENT_LOOP_RESOLUTION_MS = 10;
 const PING_HOST = "1.1.1.1";
 const PING_PORT = 443;
 const PING_TIMEOUT_MS = 2000;
+
+type UnsentReport = { key: string; body: unknown };
 
 export class MetricsReporter {
   private static instance: MetricsReporter;
@@ -19,6 +22,7 @@ export class MetricsReporter {
   private cpu: NodeJS.CpuUsage = { user: 0, system: 0 };
   private cpuAt = new Date();
   private timeout = 30 * 1000;
+  private unsent?: UnsentReport;
 
   private constructor(
     private argsService = ArgsService.getInstance(),
@@ -53,7 +57,10 @@ export class MetricsReporter {
     new CronJob("0 * * * * *", () => this.send()).start();
   }
 
+  // A report that failed goes out again unchanged with its key, before any newer one
   public async send() {
+    if (this.unsent && !(await this.post(this.unsent))) return;
+
     const sentAt = this.now();
     const { bytesIn, bytesOut } = this.proxyService.collectTraffic();
     if (bytesIn > 0) this.metricsService.increment("bytes_in", {}, bytesIn);
@@ -69,9 +76,9 @@ export class MetricsReporter {
     const cpuPercent = this.measureCpuPercent(sentAt);
     const pingMs = await this.ping();
 
-    const response = await this.apiService.post(
-      `scrapers/${await this.argsService.getScraperName()}/metrics`,
-      {
+    this.unsent = {
+      key: randomUUID(),
+      body: {
         marketplace: this.marketplace,
         flow: this.argsService.getTargetFlag(),
         periodStart: this.periodStart.toISOString(),
@@ -99,14 +106,21 @@ export class MetricsReporter {
             : { metric: "ping_ms", value: pingMs },
         ],
       },
-      { timeout: this.timeout }
-    );
-
-    if (response === undefined) {
-      this.metricsService.restore(counters);
-      return;
-    }
+    };
     this.periodStart = sentAt;
+    await this.post(this.unsent);
+  }
+
+  private async post(report: UnsentReport) {
+    const response = await this.apiService.post(
+      `scrapers/${await this.argsService.getScraperName()}/metrics`,
+      report.body,
+      { timeout: this.timeout, headers: { "Idempotency-Key": report.key } }
+    );
+    if (response === undefined) return false;
+
+    this.unsent = undefined;
+    return true;
   }
 
   // Percent of one core since the previous measurement

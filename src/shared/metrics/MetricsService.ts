@@ -23,10 +23,6 @@ export class MetricsService {
     return rows;
   }
 
-  restore(rows: MetricRow[]) {
-    rows.forEach((row) => this.add(row));
-  }
-
   private add({ metric, country, outcome, value }: MetricRow) {
     const key = JSON.stringify([metric, country, outcome]);
     const existing = this.counters.get(key);
