@@ -20,6 +20,7 @@ Tests: `src/a/X.ts` → `tests/unit/a/X.test.ts`, one file per source file. Buil
 - `ScrapingClient.get()` is the only path to shops; `TokenBucketQueue` only for shop requests. Backend results go through `BatchSender`.
 - Bottleneck is open connections (NAT, conntrack): never disable keep-alive or shorten the 15 s idle timeout; set it via `agent.options.timeout` after construction (`HttpsProxyAgent` ignores the constructor option).
 - HTML parsing uses `htmlparser2` + `find`/`findAll`/`text` (`@/shared/utils/html`), no full DOM. Selectors break silently. `cleanUpPrice` assumes comma decimals; `dispatchFrom` is normalized to `Amazon`.
+- Flow docs: `.claude/skills/amazon-pdp/SKILL.md`, `.claude/skills/amazon-plp/SKILL.md`. A logic change in PDP/PLP updates the matching skill in the same commit.
 - Metrics catalog: `docs/superpowers/specs/2026-10-18-scraper-metrics-design.md`.
 
 ## Conventions
