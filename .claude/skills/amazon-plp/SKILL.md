@@ -5,77 +5,77 @@ description: Use when working on, debugging or explaining the Amazon PLP scraper
 
 # Amazon PLP – flow
 
-Cel: znaleźć nowe ASIN-y w kategorii na amazon.pl (nowości + listing wyszukiwania) i wysłać je do backendu. Tylko kraj `pl`.
+Goal: find new ASINs in a category on amazon.pl (new releases + search listing) and send them to the backend. Country `pl` only.
 
-**Zmiana logiki PLP (`src/marketplaces/amazon/plp/`, `AmazonService`, wspólne HTTP/backend) = aktualizacja tego pliku w tym samym commicie.**
+**A PLP logic change (`src/marketplaces/amazon/plp/`, `AmazonService`, shared HTTP/backend) updates this file in the same commit.**
 
-## 1. Start procesu
+## 1. Process start
 
 1. `npm start -- -t plp`.
-2. Jak w PDP: config z backendu (`concurrency`, `rps`, `batchSize`), metryki, proxy.
+2. Same as PDP: config from the backend (`concurrency`, `rps`, `batchSize`), metrics, proxies.
 3. `AmazonPlpScraper.execute()`.
 
-## 2. Pętla kategorii (`AmazonPlpScraper`)
+## 2. Category loop (`AmazonPlpScraper`)
 
-1. Bez przerwy, jedna kategoria naraz.
-2. `amazon/ads/categories/scrap` → kategoria (`name`, `scrapedAt`).
+1. Runs non-stop, one category at a time.
+2. `amazon/ads/categories/scrap` → category (`name`, `scrapedAt`).
 3. `AmazonPlpCategoryScraper.execute(category)`.
-4. Błąd (backend / wyjątek) → czeka 60 s, próbuje znowu.
+4. Error (backend / exception) → waits 60 s, tries again.
 
-## 3. Jedna kategoria (`AmazonPlpCategoryScraper`)
+## 3. One category (`AmazonPlpCategoryScraper`)
 
-1. Tworzy `AmazonPlpCrawl(name, allPages = !scrapedAt)`:
-   - `allPages = true` tylko przy pierwszym scrapie kategorii (wszystkie strony);
-   - potem tylko pierwsza strona każdego przedziału cen.
-2. Najpierw nowości (`AmazonNewReleasesScraper`), potem listing (`AmazonPlpPageScraper`), po kolei.
-3. `crawl.post(ads)` – deduplikacja po ASIN w obrębie przebiegu, każdy ASIN wysyłany raz.
+1. Creates `AmazonPlpCrawl(name, allPages = !scrapedAt)`:
+   - `allPages = true` only on the category's first scrape (all pages);
+   - afterwards only the first page of each price range.
+2. New releases first (`AmazonNewReleasesScraper`), then the listing (`AmazonPlpPageScraper`), sequentially.
+3. `crawl.post(ads)` – dedup by ASIN within the run, each ASIN sent once.
 
-## 4. Nowości (`AmazonNewReleasesScraper`)
+## 4. New releases (`AmazonNewReleasesScraper`)
 
-1. Start: `pl/gp/new-releases/<kategoria>`.
-2. Z każdej strony:
-   - produkty: `#gridItemRoot [data-asin]` (ASIN, `img`, nazwa z `p13n-sc-css-line-clamp`);
-   - podkategorie: linki `/gp/new-releases/<kategoria>/<nodeId>`;
-   - strona 2: jest link `pg=2` → pobiera `?pg=2`.
-3. Rekurencyjnie wchodzi w każdą nową podkategorię (zbiór odwiedzonych nodes), równolegle.
-4. Valid = jest `[class*='zg-browse-group']`.
-5. Metryki: `new_releases_pages`, `new_releases_ads` (nowe ASIN-y).
+1. Start: `pl/gp/new-releases/<category>`.
+2. From each page:
+   - products: `#gridItemRoot [data-asin]` (ASIN, `img`, name from `p13n-sc-css-line-clamp`);
+   - subcategories: links `/gp/new-releases/<category>/<nodeId>`;
+   - page 2: a `pg=2` link exists → fetches `?pg=2`.
+3. Recurses into every new subcategory (set of visited nodes), in parallel.
+4. Valid = `[class*='zg-browse-group']` present.
+5. Metrics: `new_releases_pages`, `new_releases_ads` (new ASINs).
 
-## 5. Listing wyszukiwania (`AmazonPlpPageScraper`)
+## 5. Search listing (`AmazonPlpPageScraper`)
 
-1. 19 przedziałów cen startowych (`SEEDS`, w groszach): `-999`, `1000-1999`, ... `500000-`.
-2. Wszystkie przedziały równolegle.
-3. URL: `pl/s?i=<kategoria>&rh=p_36%3A<min>-<max>&s=date-desc-rank[&page=N]` (najnowsze najpierw). Referer: losowy `pl/b?node=...`.
-4. Strona 1 przedziału:
-   - ostatnia strona ≥ 400 (`MAX_PAGES`, limit Amazona) → przedział dzielony na pół (`splitPriceRange`), rekurencja dla obu połówek;
-   - otwarty przedział (`500000-`) dzielony na `[min, 2·min-1]` i `[2·min-]`, do 1 000 000 zł;
-   - przedział jednej wartości nie jest dzielony.
-5. `allPages` → strony 2..lastPage po kolei; porażka strony przerywa ten przedział.
-6. Parsowanie (`AmazonPlpBuilder`):
-   - produkty: `div[role='listitem']` (ASIN `data-asin`, `img`, nazwa `a > h2 > span`);
-   - lastPage: max z `.s-pagination-item`;
-   - valid = jest `s-search-results` **i** (są produkty **lub** komunikat „brak wyników”).
-7. Metryki: `items`, `item_attempts` (`data` / `no_data` / `given_up`).
+1. 19 seed price ranges (`SEEDS`, in grosze): `-999`, `1000-1999`, ... `500000-`.
+2. All ranges in parallel.
+3. URL: `pl/s?i=<category>&rh=p_36%3A<min>-<max>&s=date-desc-rank[&page=N]` (newest first). Referer: random `pl/b?node=...`.
+4. Page 1 of a range:
+   - last page ≥ 400 (`MAX_PAGES`, Amazon's limit) → range split in half (`splitPriceRange`), recursion on both halves;
+   - an open range (`500000-`) splits into `[min, 2·min-1]` and `[2·min-]`, up to 1 000 000 zł;
+   - a single-value range is not split.
+5. `allPages` → pages 2..lastPage sequentially; a failed page stops that range.
+6. Parsing (`AmazonPlpBuilder`):
+   - products: `div[role='listitem']` (ASIN `data-asin`, `img`, name `a > h2 > span`);
+   - lastPage: max of `.s-pagination-item`;
+   - valid = `s-search-results` present **and** (products present **or** "no results" message).
+7. Metrics: `items`, `item_attempts` (`data` / `no_data` / `given_up`).
 
-## 6. Pobieranie strony (`AmazonPlpPageFetcher`, wspólne dla 4 i 5)
+## 6. Fetching a page (`AmazonPlpPageFetcher`, shared by 4 and 5)
 
-1. Backpressure: kolejka requestów ≥ `batchSize` → czeka po 1 s.
-2. Request przez `AmazonService.get()` (domyślne proxy `datacenter`).
-3. Retry do 6 prób (`MAX_FAILED_ATTEMPTS`), backoff 1 s, 2 s, 4 s ... z jitterem, gdy:
-   - błąd HTTP / sieć / timeout;
-   - pusta odpowiedź (`empty`);
-   - strona nie valid lub wyjątek parsowania (`invalid`).
-4. Sukces → `responses{outcome=data|no_data}`.
-5. 6 porażek → strona `given_up`, pomijana.
+1. Backpressure: request queue ≥ `batchSize` → waits 1 s at a time.
+2. Request via `AmazonService.get()` (default proxy `datacenter`).
+3. Retries up to 6 attempts (`MAX_FAILED_ATTEMPTS`), backoff 1 s, 2 s, 4 s ... with jitter, on:
+   - HTTP error / network / timeout;
+   - empty response (`empty`);
+   - invalid page or parse exception (`invalid`).
+4. Success → `responses{outcome=data|no_data}`.
+5. 6 failures → page `given_up`, skipped.
 
-## 7. Wysyłka (`AmazonPlpAdSender`)
+## 7. Sending (`AmazonPlpAdSender`)
 
-1. `BatchSender` na `amazon/ads`, max 2000 ASIN-ów, flush co 5 s lub po zapełnieniu.
-2. Body: tablica `{ asin, name, image, categoryName }`.
-3. 5xx / sieć → retry z tym samym `Idempotency-Key`; 4xx → drop.
+1. `BatchSender` on `amazon/ads`, max 2000 ASINs, flush every 5 s or when full.
+2. Body: array of `{ asin, name, image, categoryName }`.
+3. 5xx / network → retry with the same `Idempotency-Key`; 4xx → dropped.
 
-## Gdzie szukać
+## Where to look
 
-- 0 produktów, dużo `invalid` → selektory w `AmazonPlpBuilder` / `AmazonNewReleasesBuilder` (psują się po cichu) + test w `tests/unit/marketplaces/amazon/plp/`.
-- Brakujące ASIN-y w dużej kategorii → `MAX_PAGES`, `SEEDS`, `splitPriceRange`.
-- Kategoria trwa za długo → `allPages` (pierwszy scrap) lub rozdrabnianie przedziałów.
+- 0 products, many `invalid` → selectors in `AmazonPlpBuilder` / `AmazonNewReleasesBuilder` (break silently) + test in `tests/unit/marketplaces/amazon/plp/`.
+- ASINs missing in a large category → `MAX_PAGES`, `SEEDS`, `splitPriceRange`.
+- Category takes too long → `allPages` (first scrape) or range splitting.

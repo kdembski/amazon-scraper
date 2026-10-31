@@ -3,83 +3,83 @@ name: metrics
 description: Use when working on, debugging or explaining scraper metrics - MetricsService counters and gauges, MetricsReporter minute report to scrapers/<name>/metrics, metric names, labels (country, outcome), what a given metric counts, adding a new metric.
 ---
 
-# Metryki scrapera
+# Scraper metrics
 
-**Dodanie / zmiana / usunięcie metryki = aktualizacja tego pliku w tym samym commicie.**
+**Adding / changing / removing a metric updates this file in the same commit.**
 
-## Jak to działa
+## How it works
 
-1. Kod woła `MetricsService.increment(metric, { country?, outcome? }, value = 1)`. Wiersze o tym samym `metric + country + outcome` są sumowane.
-2. `MetricsService.gauge(metric, read)` rejestruje odczyt chwilowej wartości.
-3. `MetricsReporter` co minutę (cron `0 * * * * *`):
-   1. dolicza `bytes_in` / `bytes_out` z proxy;
-   2. zabiera liczniki (`drain()`, zerowanie); brak liczników → nic nie wysyła;
-   3. dokłada metryki procesu i gauge;
-   4. `POST scrapers/<nazwa>/metrics` z `{ marketplace, flow, periodStart, metrics: [...] }` i `Idempotency-Key`.
-   5. Błąd wysyłki → ten sam raport (ten sam klucz) idzie ponownie przed nowym.
-4. Backend (`amazon-server`, `src/modules/monitoring/`) zapisuje `ScraperMetric`, co godzinę raport na Discord.
+1. Code calls `MetricsService.increment(metric, { country?, outcome? }, value = 1)`. Rows with the same `metric + country + outcome` are summed.
+2. `MetricsService.gauge(metric, read)` registers a reader of a point-in-time value.
+3. `MetricsReporter` every minute (cron `0 * * * * *`):
+   1. adds `bytes_in` / `bytes_out` from the proxies;
+   2. takes the counters (`drain()`, reset); no counters → sends nothing;
+   3. adds process metrics and gauges;
+   4. `POST scrapers/<name>/metrics` with `{ marketplace, flow, periodStart, metrics: [...] }` and `Idempotency-Key`.
+   5. Send failure → the same report (same key) goes out again before a newer one.
+4. Backend (`amazon-server`, `src/modules/monitoring/`) stores `ScraperMetric`, hourly report to Discord.
 
-Typy: liczniki = suma w minucie; gauge = wartość w chwili raportu. `*_ms` jako licznik = suma czasów (średnia = `*_ms / liczba zdarzeń`).
+Types: counters = sum over the minute; gauges = value at report time. `*_ms` as a counter = sum of durations (mean = `*_ms / event count`).
 
-## Ruch do sklepu (`ScrapingClient`, PDP i PLP)
+## Shop traffic (`ScrapingClient`, PDP and PLP)
 
-| Metryka | Labels | Co opisuje |
+| Metric | Labels | What it describes |
 |---|---|---|
-| `requests` | `country` (z URL: `de`, `co.uk`, `pl`...), `outcome`: `ok` / `timeout` / `network` / `http_<status>` | Każdy request HTTP do Amazona. `timeout` = przekroczone 20 s. |
-| `request_ms` | `country` | Suma czasu requestów (wszystkich outcome). Średnia = `request_ms / requests`. |
-| `connections` | – | Nowe sockety proxy otwarte w minucie. |
-| `bytes_in` / `bytes_out` | – | Bajty odebrane / wysłane przez sockety proxy. |
+| `requests` | `country` (from the URL: `de`, `co.uk`, `pl`...), `outcome`: `ok` / `timeout` / `network` / `http_<status>` | Every HTTP request to Amazon. `timeout` = 20 s exceeded. |
+| `request_ms` | `country` | Sum of request durations (all outcomes). Mean = `request_ms / requests`. |
+| `connections` | – | New proxy sockets opened in the minute. |
+| `bytes_in` / `bytes_out` | – | Bytes received / sent through proxy sockets. |
 
-## Odpowiedzi i strony
+## Responses and pages
 
-| Metryka | Gdzie | Labels | Co opisuje |
+| Metric | Where | Labels | What it describes |
 |---|---|---|---|
-| `responses` | PDP, PLP | `country`, `outcome`: `data` / `no_data` / `captcha` / `invalid` / `empty` / `parse_error` | Wynik parsowania odpowiedzi 200. PDP: `captcha`, `invalid`, `empty`, `parse_error` → retry. PLP: wyjątek parsowania liczony jako `invalid`, `captcha` nie występuje. |
-| `items` | PDP (kraj ASIN-a), PLP (strona listingu) | `country`, `outcome`: `data` / `no_data` / `deleted` / `given_up` | Wynik końcowy jednostki pracy. `given_up` = 6 nieudanych prób. `deleted` tylko PDP (2× 404). |
-| `item_attempts` | PDP, PLP | jak `items` | Suma prób. Średnio prób = `item_attempts / items`. |
-| `source_fallback` | PDP | `country` | 404 ze źródła, przejście na następne z `pdpSource`. |
+| `responses` | PDP, PLP | `country`, `outcome`: `data` / `no_data` / `captcha` / `invalid` / `empty` / `parse_error` | Parse result of a 200 response. PDP: `captcha`, `invalid`, `empty`, `parse_error` → retry. PLP: a parse exception counts as `invalid`, `captcha` does not occur. |
+| `items` | PDP (ASIN's country), PLP (listing page) | `country`, `outcome`: `data` / `no_data` / `deleted` / `given_up` | Final result of a unit of work. `given_up` = 6 failed attempts. `deleted` PDP only (2× 404). |
+| `item_attempts` | PDP, PLP | same as `items` | Sum of attempts. Mean attempts = `item_attempts / items`. |
+| `source_fallback` | PDP | `country` | 404 from a source, switch to the next one in `pdpSource`. |
 
 ## PDP
 
-| Metryka | Labels | Co opisuje |
+| Metric | Labels | What it describes |
 |---|---|---|
-| `batch_load` | `outcome`: `ok` / `empty` / `failed` | Pobranie batcha ASIN-ów z `amazon/ads/scrap`. |
-| `ads` | `outcome`: `prices` / `empty` / `deleted` | ASIN rozstrzygnięty: wysłane ceny / brak cen w żadnym kraju / usunięty. |
-| `ad_duration_ms` | – | Suma czasu od startu do rozstrzygnięcia ASIN-a. Średnia = `ad_duration_ms / ads`. |
-| `ads_in_flight` | – (gauge) | ASIN-y w trakcie przetwarzania. |
+| `batch_load` | `outcome`: `ok` / `empty` / `failed` | Loading an ASIN batch from `amazon/ads/scrap`. |
+| `ads` | `outcome`: `prices` / `empty` / `deleted` | ASIN decided: prices sent / no price in any country / deleted. |
+| `ad_duration_ms` | – | Sum of time from start to decision per ASIN. Mean = `ad_duration_ms / ads`. |
+| `ads_in_flight` | – (gauge) | ASINs being processed. |
 
 ## PLP
 
-| Metryka | Labels | Co opisuje |
+| Metric | Labels | What it describes |
 |---|---|---|
-| `new_releases_pages` | `country=pl`, `outcome`: `data` / `given_up` | Strony nowości: pobrane / porzucone. |
-| `new_releases_ads` | `country=pl` | Nowe (pierwszy raz w przebiegu kategorii) ASIN-y z nowości. |
+| `new_releases_pages` | `country=pl`, `outcome`: `data` / `given_up` | New releases pages: fetched / given up. |
+| `new_releases_ads` | `country=pl` | New (first time in the category run) ASINs from new releases. |
 
-## Wysyłka do backendu (`BatchSender`)
+## Sending to the backend (`BatchSender`)
 
-| Metryka | Labels | Co opisuje |
+| Metric | Labels | What it describes |
 |---|---|---|
-| `backend_requests` | `outcome`: `ok` / `timeout` / `network` / `http_<status>` | Każda próba POST batcha (także retry). |
-| `backend_send_ms` | – | Suma czasu prób. |
-| `backend_items` | `outcome`: `sent` / `dropped` | Pozycje wysłane / porzucone (4xx lub 6 prób). |
-| `backend_buffer` | – (gauge) | Pozycje czekające w buforze (jeden `BatchSender` na tryb: PDP `amazon/ads/batch`, PLP `amazon/ads`). |
+| `backend_requests` | `outcome`: `ok` / `timeout` / `network` / `http_<status>` | Every batch POST attempt (retries included). |
+| `backend_send_ms` | – | Sum of attempt durations. |
+| `backend_items` | `outcome`: `sent` / `dropped` | Items sent / dropped (4xx or 6 attempts). |
+| `backend_buffer` | – (gauge) | Items waiting in the buffer (one `BatchSender` per mode: PDP `amazon/ads/batch`, PLP `amazon/ads`). |
 
-## Proces (dodawane przez `MetricsReporter`, chwila raportu)
+## Process (added by `MetricsReporter`, at report time)
 
-| Metryka | Co opisuje |
+| Metric | What it describes |
 |---|---|
-| `pending` | Requesty w toku w `TokenBucketQueue`. |
-| `queue_length` | Requesty czekające w kolejce. |
-| `open_connections` | Otwarte połączenia proxy. |
-| `event_loop_delay_mean_ms` / `event_loop_delay_max_ms` | Opóźnienie event loop w minucie (minus 10 ms rozdzielczości). |
-| `cpu_percent` | % jednego rdzenia od poprzedniego raportu. |
-| `memory_rss_mb` / `heap_used_mb` | Pamięć procesu. |
-| `ping_ms` / `ping_failed` | TCP ping do `1.1.1.1:443` (timeout 2 s); jedna z dwóch. |
+| `pending` | Requests in progress in `TokenBucketQueue`. |
+| `queue_length` | Requests waiting in the queue. |
+| `open_connections` | Open proxy connections. |
+| `event_loop_delay_mean_ms` / `event_loop_delay_max_ms` | Event loop delay over the minute (minus the 10 ms resolution). |
+| `cpu_percent` | % of one core since the previous report. |
+| `memory_rss_mb` / `heap_used_mb` | Process memory. |
+| `ping_ms` / `ping_failed` | TCP ping to `1.1.1.1:443` (2 s timeout); one of the two. |
 
-## Dodanie metryki
+## Adding a metric
 
-1. `increment` / `gauge` w kodzie, labels tylko `country` i `outcome`.
-2. Nowy outcome → typ w `src/shared/metrics/metrics.types.ts`.
-3. Test w `tests/unit/...` dla pliku źródłowego.
-4. Backend: czy raport godzinowy ma ją pokazać (`amazon-server`, `src/modules/monitoring/`).
-5. Ten plik + `docs/superpowers/specs/2026-10-18-scraper-metrics-design.md`.
+1. `increment` / `gauge` in code, labels only `country` and `outcome`.
+2. New outcome → type in `src/shared/metrics/metrics.types.ts`.
+3. Test in `tests/unit/...` for the source file.
+4. Backend: should the hourly report show it (`amazon-server`, `src/modules/monitoring/`).
+5. This file + `docs/superpowers/specs/2026-10-18-scraper-metrics-design.md`.
