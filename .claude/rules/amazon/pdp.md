@@ -1,6 +1,10 @@
 ---
-name: amazon-pdp
-description: Use when working on, debugging or explaining the Amazon PDP scraper (`-t pdp`, default mode) - prices and shipper per ASIN per country, sources aod/twister/awd, pdpSource fallback, captcha/invalid responses, retries, deleted ads, results sent to amazon/ads/batch.
+paths:
+  - "src/marketplaces/amazon/pdp/**"
+  - "src/marketplaces/amazon/*.ts"
+  - "src/shared/http/**"
+  - "src/shared/backend/**"
+  - "tests/unit/marketplaces/amazon/pdp/**"
 ---
 
 # Amazon PDP – flow

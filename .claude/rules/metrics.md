@@ -1,6 +1,6 @@
 ---
-name: metrics
-description: Use when working on, debugging or explaining scraper metrics - MetricsService counters and gauges, MetricsReporter minute report to scrapers/<name>/metrics, metric names, labels (country, outcome), what a given metric counts, adding a new metric.
+paths:
+  - "src/**"
 ---
 
 # Scraper metrics

@@ -1,6 +1,10 @@
 ---
-name: amazon-plp
-description: Use when working on, debugging or explaining the Amazon PLP scraper (`-t plp`) - discovering new ASINs on amazon.pl from new releases and category search listings, price-range splitting, pagination, results sent to amazon/ads.
+paths:
+  - "src/marketplaces/amazon/plp/**"
+  - "src/marketplaces/amazon/AmazonService.ts"
+  - "src/shared/http/**"
+  - "src/shared/backend/**"
+  - "tests/unit/marketplaces/amazon/plp/**"
 ---
 
 # Amazon PLP – flow
