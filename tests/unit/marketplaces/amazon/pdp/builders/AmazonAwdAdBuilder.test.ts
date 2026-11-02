@@ -24,10 +24,10 @@ describe("AmazonAwdAdBuilder", () => {
     });
   });
 
-  it("downloads the whole page and deletes the country on a 404", () => {
+  it("stops downloading after the buy box and deletes the country on a 404", () => {
     const source: AmazonAdBuilder = builder;
 
-    expect(source.stopAt).toBeUndefined();
+    expect(source.stopAt).toEqual(['id="buybox"', 'id="olpLinkWidget_feature_div"']);
     expect(source.notFoundIsNoData).toBeFalsy();
   });
 
@@ -47,6 +47,17 @@ describe("AmazonAwdAdBuilder", () => {
   describe("build", () => {
     it("reads the buy box price and shipper, not the prices before it", () => {
       const page = awdPage(twisterBuybox({ price: "24,99", soldBy: "Amazon.fr" }));
+
+      expect(build(page)).toEqual({
+        isCaptcha: false,
+        isValid: true,
+        price: 24.99,
+        dispatchFrom: "Amazon",
+      });
+    });
+
+    it("reads a page cut right after the buy box", () => {
+      const page = `<div id="related"></div><div id="buybox">${twisterBuybox({ price: "24,99", soldBy: "Amazon.fr" })}<div id="olpLinkWidget_feature_div"`;
 
       expect(build(page)).toEqual({
         isCaptcha: false,

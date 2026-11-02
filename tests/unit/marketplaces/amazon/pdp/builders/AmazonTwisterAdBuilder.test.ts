@@ -24,8 +24,8 @@ describe("AmazonTwisterAdBuilder", () => {
     });
   });
 
-  it("downloads the whole response while cutting is disabled", () => {
-    expect(builder.stopAt).toBeUndefined();
+  it("stops downloading after the buy box part", () => {
+    expect(builder.stopAt).toEqual(['"FeatureName" : "desktop_buybox"', "&&&"]);
   });
 
   it("treats a 404 as no data, not as a deleted product", () => {

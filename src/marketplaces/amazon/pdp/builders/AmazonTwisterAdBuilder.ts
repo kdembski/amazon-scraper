@@ -10,11 +10,9 @@ import { AmazonCaptchaDetector } from "@/marketplaces/amazon/pdp/builders/Amazon
 import { find } from "@/shared/utils/html";
 
 const BUYBOX_PART = '"FeatureName" : "desktop_buybox"';
-// shortcut: whole response downloaded (~320 KB vs ~90 KB cut) to keep keep-alive; set true to cut after the buy box
-const CUT_RESPONSE = false;
 
 export class AmazonTwisterAdBuilder implements AmazonAdBuilder {
-  stopAt = CUT_RESPONSE ? [BUYBOX_PART, "&&&"] : undefined;
+  stopAt = [BUYBOX_PART, "&&&"];
   notFoundIsNoData = true;
 
   constructor(

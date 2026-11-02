@@ -10,8 +10,11 @@ import { AmazonCaptchaDetector } from "@/marketplaces/amazon/pdp/builders/Amazon
 import { find } from "@/shared/utils/html";
 
 const BUYBOX = 'id="buybox"';
+const AFTER_BUYBOX = 'id="olpLinkWidget_feature_div"';
 
 export class AmazonAwdAdBuilder implements AmazonAdBuilder {
+  stopAt = [BUYBOX, AFTER_BUYBOX];
+
   constructor(
     private captchaDetector = new AmazonCaptchaDetector(),
     private buyboxParser = new AmazonBuyboxParser()
