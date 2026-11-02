@@ -35,7 +35,7 @@ Types: counters = sum over the minute; gauges = value at report time. `*_ms` as 
 | Metric | Where | Labels | What it describes |
 |---|---|---|---|
 | `responses` | PDP, PLP | `country`, `outcome`: `data` / `no_data` / `captcha` / `invalid` / `empty` / `parse_error` | Parse result of a 200 response. PDP: `captcha`, `invalid`, `empty`, `parse_error` → retry. PLP: a parse exception counts as `invalid`; `captcha` → retry. |
-| `items` | PDP (ASIN's country), PLP (listing page) | `country`, `outcome`: `data` / `no_data` / `deleted` / `given_up` | Final result of a unit of work. `given_up` = 6 failed attempts. `deleted` PDP only (2× 404). |
+| `items` | PDP (ASIN's country), PLP (listing page) | `country`, `outcome`: `data` / `no_data` / `deleted` / `given_up` | Final result of a unit of work. `given_up` = 6 failed attempts. `deleted` PDP only (2× 404 in an active country, 1× in an inactive one). |
 | `item_attempts` | PDP, PLP | same as `items` | Sum of attempts. Mean attempts = `item_attempts / items`. |
 | `source_fallback` | PDP | `country` | 404 from a source, switch to the next one in `pdpSource`. |
 

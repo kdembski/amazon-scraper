@@ -51,7 +51,7 @@ Goal: for every ASIN, get the price and the shipper (`dispatchFrom`) in every Am
    3. Result → outcome (see below). Outcome present → country done.
    4. No outcome → `failed++`; at 6 (`MAX_FAILED_ATTEMPTS`) → `given_up`; otherwise backoff 1 s, 2 s, 4 s ... max 60 s, with jitter.
 3. Result mapping:
-   - 404 from the last source: `twister` → `no_data`; others → `notFound++`, at 2 (`NOT_FOUND_TO_DELETE`) → `deleted`, before that retry.
+   - 404 from the last source: `twister` → `no_data`; others → `notFound++`, at 2 (`NOT_FOUND_TO_DELETE`) in an active country, at 1 in an inactive one → `deleted`, before that retry.
    - other HTTP error / timeout / network → retry.
    - empty response → retry (`responses{outcome=empty}`).
    - captcha → retry (`captcha`).
