@@ -45,12 +45,12 @@ describe("AmazonCountryService", () => {
     expect(api.get).toHaveBeenCalledTimes(1);
   });
 
-  it("reloads countries every hour", async () => {
+  it("reloads countries every minute", async () => {
     const { api } = setup();
     api.get.mockResolvedValue([]);
 
     expect(cronJobs).toHaveLength(1);
-    expect(cronJobs[0].cronTime).toBe("0 0 */1 * * *");
+    expect(cronJobs[0].cronTime).toBe("0 * * * * *");
     expect(cronJobs[0].start).toHaveBeenCalled();
 
     await cronJobs[0].onTick();
