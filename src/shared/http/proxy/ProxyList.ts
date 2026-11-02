@@ -1,4 +1,5 @@
 import axios from "axios";
+import _ from "lodash";
 import { sleep } from "@/shared/utils/sleep";
 
 type Pools = Record<string, string[]>;
@@ -34,18 +35,33 @@ export class ProxyList {
 
   private async downloadWebsharePools() {
     const pools: Pools = {};
-    for (const plan of await this.getActivePlans()) {
-      const pool = this.getPoolName(plan);
-      const urls = await this.downloadList(this.getPlanListUrl(plan));
-      pools[pool] = [...(pools[pool] ?? []), ...urls];
+    for (const key of this.getApiKeys()) {
+      const token = await this.getListToken(key);
+      for (const plan of await this.getActivePlans(key)) {
+        const pool = this.getPoolName(plan);
+        const urls = await this.downloadList(this.getPlanListUrl(token, plan));
+        pools[pool] = [...(pools[pool] ?? []), ...urls];
+      }
     }
     return pools;
   }
 
-  private async getActivePlans() {
+  private getApiKeys() {
+    return _.compact([process.env.PROXY_API_KEY, process.env.PROXY_API_KEY2]);
+  }
+
+  private async getListToken(key: string) {
+    const response = await axios.get<{ proxy_list_download_token: string }>(
+      `${this.webshareUrl}/proxy/config/`,
+      { headers: { Authorization: `Token ${key}` } }
+    );
+    return response.data.proxy_list_download_token;
+  }
+
+  private async getActivePlans(key: string) {
     const response = await axios.get<{ results: WebsharePlan[] }>(
       `${this.webshareUrl}/subscription/plan/`,
-      { headers: { Authorization: `Token ${process.env.PROXY_API_KEY}` } }
+      { headers: { Authorization: `Token ${key}` } }
     );
     return response.data.results.filter((plan) => plan.status === "active");
   }
@@ -54,8 +70,7 @@ export class ProxyList {
     return plan.proxy_subtype === "default" ? "datacenter" : plan.proxy_subtype;
   }
 
-  private getPlanListUrl(plan: WebsharePlan) {
-    const token = process.env.PROXY_LIST_TOKEN;
+  private getPlanListUrl(token: string, plan: WebsharePlan) {
     return `${this.webshareUrl}/proxy/list/download/${token}/-/any/username/direct/-/?plan_id=${plan.id}`;
   }
 
