@@ -3,11 +3,13 @@ import _ from "lodash";
 import { ProxyAgentPool } from "@/shared/http/proxy/ProxyAgentPool";
 import { ProxyList } from "@/shared/http/proxy/ProxyList";
 import { ProxyTrafficMeter } from "@/shared/http/proxy/ProxyTrafficMeter";
+import { RateLimiter } from "@/shared/http/proxy/RateLimiter";
 
 export class ProxyService {
   private static instance: ProxyService;
   private pools: Record<string, string[]> = {};
   private loading?: Promise<void>;
+  private limiters = new Map<string, RateLimiter>();
 
   private constructor(
     private meter = new ProxyTrafficMeter(),
@@ -28,9 +30,16 @@ export class ProxyService {
   }
 
   // Proxy of the pool whose idle connection to the host was freed last, else
-  // a random one; "direct" connects without a proxy
+  // a random one; "direct" connects without a proxy, "mixedN" directly up to
+  // N rps per host and through datacenter proxies above
   getAgent(host: string, proxyType = "datacenter") {
     if (proxyType === "direct") return this.pool.getDirect();
+
+    const mixed = proxyType.match(/^mixed(\d+)$/);
+    if (mixed) {
+      if (this.getLimiter(host, Number(mixed[1])).take()) return this.pool.getDirect();
+      proxyType = "datacenter";
+    }
 
     const proxies = this.getProxies(proxyType);
     const url =
@@ -38,6 +47,18 @@ export class ProxyService {
       this.getRandomProxy(proxies);
 
     return this.pool.get(url);
+  }
+
+  private getLimiter(host: string, rps: number) {
+    const key = `${host}:${rps}`;
+    let limiter = this.limiters.get(key);
+
+    if (!limiter) {
+      limiter = new RateLimiter(rps);
+      this.limiters.set(key, limiter);
+    }
+
+    return limiter;
   }
 
   private getProxies(proxyType: string) {

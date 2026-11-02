@@ -168,8 +168,51 @@ describe("ProxyService", () => {
       expect(pool.takeLastFree).not.toHaveBeenCalled();
     });
 
+    describe("mixed", () => {
+      it("returns the direct agent up to the rps limit, datacenter proxies above", async () => {
+        const { service } = setup();
+        await service.loadProxies();
+        vi.spyOn(Math, "random").mockReturnValue(0);
+
+        const agents = [1, 2, 3].map(() => service.getAgent("www.amazon.pl", "mixed2"));
+
+        expect(agents).toEqual([{ direct: true }, { direct: true }, { url: urls[0] }]);
+      });
+
+      it("returns the direct agent again after the limit refills", async () => {
+        const { service } = setup();
+        await service.loadProxies();
+        service.getAgent("www.amazon.pl", "mixed1");
+
+        vi.advanceTimersByTime(1000);
+
+        expect(service.getAgent("www.amazon.pl", "mixed1")).toEqual({ direct: true });
+      });
+
+      it("limits every host separately", async () => {
+        const { service } = setup();
+        await service.loadProxies();
+        service.getAgent("www.amazon.pl", "mixed1");
+
+        expect(service.getAgent("www.amazon.ie", "mixed1")).toEqual({ direct: true });
+      });
+
+      it("accepts only idle datacenter proxies above the limit", async () => {
+        const { service, pool } = setup();
+        await service.loadProxies();
+        service.getAgent("www.amazon.pl", "mixed1");
+
+        service.getAgent("www.amazon.pl", "mixed1");
+        const accept = pool.takeLastFree.mock.calls[0][1];
+
+        expect(accept(urls[0])).toBe(true);
+        expect(accept(ispUrls[0])).toBe(false);
+      });
+    });
+
     it.each([
       ["an unknown", { datacenter: urls }, "residential"],
+      ["a mixed without a limit", { datacenter: urls }, "mixed"],
       ["an empty", { datacenter: urls, isp: [] }, "isp"],
     ])("falls back to the datacenter pool for %s pool", async (_name, pools, proxyType) => {
       const { service, list } = setup();

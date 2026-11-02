@@ -84,7 +84,7 @@ Shared:
 
 - `ScrapingClient.get()` – the only path to Amazon. Random Chrome User-Agent, Referer, hard 20 s timeout. With the builder's `stopAt` markers it reads a stream and destroys it (closes the connection) once they arrived in order.
 - `TokenBucketQueue` – `concurrency` and `rps` limits from the config.
-- `ProxyService.getAgent(host, proxyType)` – proxy with a free keep-alive connection to the host, otherwise random; missing type → `datacenter`. `direct` → one keep-alive agent without a proxy (`ProxyAgentPool.getDirect`, 15 s idle timeout).
+- `ProxyService.getAgent(host, proxyType)` – proxy with a free keep-alive connection to the host, otherwise random; missing type → `datacenter`. `direct` → one keep-alive agent without a proxy (`ProxyAgentPool.getDirect`, 15 s idle timeout). `mixedN` (e.g. `mixed10`) → `direct` up to N rps per host and process (`RateLimiter`, token bucket, burst N), above that the `datacenter` pool.
 
 ## Where to look
 
