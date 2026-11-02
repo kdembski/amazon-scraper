@@ -6,7 +6,7 @@ import {
   AmazonCountry,
 } from "@/marketplaces/amazon/types/amazon.types";
 import { AmazonBuyboxParser } from "@/marketplaces/amazon/pdp/builders/AmazonBuyboxParser";
-import { AmazonCaptchaDetector } from "@/marketplaces/amazon/pdp/builders/AmazonCaptchaDetector";
+import { AmazonCaptchaDetector } from "@/marketplaces/amazon/AmazonCaptchaDetector";
 import { find } from "@/shared/utils/html";
 
 const BUYBOX_PART = '"FeatureName" : "desktop_buybox"';

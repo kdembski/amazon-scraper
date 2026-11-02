@@ -1,5 +1,6 @@
 import type { Document } from "domhandler";
 import { parseDocument } from "htmlparser2";
+import { AmazonCaptchaDetector } from "@/marketplaces/amazon/AmazonCaptchaDetector";
 import { AmazonService } from "@/marketplaces/amazon/AmazonService";
 import { AmazonPlpAd } from "@/marketplaces/amazon/types/amazon.types";
 import { ScraperConfigService } from "@/shared/backend/ScraperConfigService";
@@ -16,7 +17,8 @@ export class AmazonPlpPageFetcher {
   constructor(
     private amazonService = AmazonService.getInstance(),
     private configService = ScraperConfigService.getInstance(),
-    private metricsService = MetricsService.getInstance()
+    private metricsService = MetricsService.getInstance(),
+    private captchaDetector = new AmazonCaptchaDetector()
   ) {}
 
   async fetch<T extends PlpBuildResult>(
@@ -43,7 +45,13 @@ export class AmazonPlpPageFetcher {
     }
 
     try {
-      const page = build(parseDocument(html));
+      const document = parseDocument(html);
+      if (this.captchaDetector.detect(document)) {
+        this.countResponse("captcha");
+        return;
+      }
+
+      const page = build(document);
       if (!page.isValid) {
         this.countResponse("invalid");
         return;

@@ -70,6 +70,7 @@ Goal: find new ASINs in a category on amazon.pl (new releases + search listing) 
 3. Retries up to 6 attempts (`MAX_FAILED_ATTEMPTS`), backoff 1 s, 2 s, 4 s ... with jitter, on:
    - HTTP error / network / timeout;
    - empty response (`empty`);
+   - captcha (`captcha`, `AmazonCaptchaDetector`);
    - invalid page or parse exception (`invalid`).
 4. Success → `responses{outcome=data|no_data}`.
 5. 6 failures → page `given_up`, skipped.

@@ -5,7 +5,7 @@ import {
   AmazonAdBuildResult,
 } from "@/marketplaces/amazon/types/amazon.types";
 import { AmazonCountry } from "@/marketplaces/amazon/types/amazon.types";
-import { AmazonCaptchaDetector } from "@/marketplaces/amazon/pdp/builders/AmazonCaptchaDetector";
+import { AmazonCaptchaDetector } from "@/marketplaces/amazon/AmazonCaptchaDetector";
 import { AmazonDispatchFromNormalizer } from "@/marketplaces/amazon/pdp/builders/AmazonDispatchFromNormalizer";
 import { AmazonPriceParser } from "@/marketplaces/amazon/pdp/builders/AmazonPriceParser";
 import { find, text } from "@/shared/utils/html";
