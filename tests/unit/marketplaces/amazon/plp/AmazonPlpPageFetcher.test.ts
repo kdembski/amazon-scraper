@@ -52,6 +52,15 @@ describe("AmazonPlpPageFetcher", () => {
     expect(increment).toHaveBeenCalledWith("responses", { country: "pl", outcome: "data" });
   });
 
+  it("passes the stop markers to the request", async () => {
+    const { amazon, fetcher } = setup();
+
+    fetcher.fetch("url", "ref", () => valid, ["a", "b"]);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(amazon.get).toHaveBeenCalledWith("url", "ref", expect.anything(), undefined, ["a", "b"]);
+  });
+
   it("counts a valid page without ads as no_data", async () => {
     const { amazon, fetcher, increment } = setup();
 

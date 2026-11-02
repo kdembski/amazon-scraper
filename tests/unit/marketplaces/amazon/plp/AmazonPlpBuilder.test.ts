@@ -51,6 +51,17 @@ describe("AmazonPlpBuilder", () => {
     expect(build(results(listItem()) + pagination(lastPage)).lastPage).toBe(lastPage);
   });
 
+  it("stops downloading after the pagination", () => {
+    expect(builder.stopAt).toEqual(["s-pagination-item", "MAIN-FEEDBACK"]);
+  });
+
+  it("reads a page cut right after the pagination", () => {
+    const body = `<div class="s-main-slot">${results(listItem())}${pagination(11)}<div id="MAIN-FEEDBACK`;
+
+    expect(build(body)).toMatchObject({ isValid: true, lastPage: 11 });
+    expect(build(body).ads).toHaveLength(1);
+  });
+
   it("has one page without pagination", () => {
     expect(build(results(listItem())).lastPage).toBe(1);
   });

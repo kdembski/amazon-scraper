@@ -41,6 +41,7 @@ Goal: find new ASINs in a category on amazon.pl (new releases + search listing) 
    - products: `#gridItemRoot [data-asin]` (ASIN, `img`, name from `p13n-sc-css-line-clamp`);
    - subcategories: links `/gp/new-releases/<category>/<nodeId>`;
    - page 2: a `pg=2` link exists → fetches `?pg=2`.
+   - download stops at the `</ul>` closing `a-pagination` (after the grid).
 3. Recurses into every new subcategory (set of visited nodes), in parallel.
 4. Valid = `[class*='zg-browse-group']` present.
 5. Metrics: `new_releases_pages`, `new_releases_ads` (new ASINs).
@@ -58,13 +59,14 @@ Goal: find new ASINs in a category on amazon.pl (new releases + search listing) 
 6. Parsing (`AmazonPlpBuilder`):
    - products: `div[role='listitem']` (ASIN `data-asin`, `img`, name `a > h2 > span`);
    - lastPage: max of `.s-pagination-item`;
-   - valid = `s-search-results` present **and** (products present **or** "no results" message).
+   - valid = `s-search-results` present **and** (products present **or** "no results" message);
+   - download stops at `MAIN-FEEDBACK` after the pagination (no pagination → whole page).
 7. Metrics: `items`, `item_attempts` (`data` / `no_data` / `given_up`).
 
 ## 6. Fetching a page (`AmazonPlpPageFetcher`, shared by 4 and 5)
 
 1. Backpressure: request queue ≥ `batchSize` → waits 1 s at a time.
-2. Request via `AmazonService.get()` (default proxy `datacenter`).
+2. Request via `AmazonService.get()` (default proxy `datacenter`) with the builder's `stopAt` markers: the stream is destroyed once they arrived in order.
 3. Retries up to 6 attempts (`MAX_FAILED_ATTEMPTS`), backoff 1 s, 2 s, 4 s ... with jitter, on:
    - HTTP error / network / timeout;
    - empty response (`empty`);

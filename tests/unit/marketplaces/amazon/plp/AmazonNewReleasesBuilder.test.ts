@@ -48,6 +48,18 @@ describe("AmazonNewReleasesBuilder", () => {
     expect(build(body).nodes).toEqual(["111", "222"]);
   });
 
+  it("stops downloading after the pagination", () => {
+    expect(builder.stopAt).toEqual(["a-pagination", "</ul>"]);
+  });
+
+  it("reads a page cut right after the pagination", () => {
+    const page = newReleasesPage({ asins: ["B0TEST1"], nodes: ["111"] });
+    const body = `<div>${page}<ul class="a-pagination"><li><a href="/gp/new-releases/electronics?pg=2">2</a></li></ul>`;
+
+    expect(build(body)).toMatchObject({ isValid: true, nodes: ["111"], hasNextPage: true });
+    expect(build(body).ads).toHaveLength(1);
+  });
+
   it.each([true, false])("detects page 2 (%s)", (next) => {
     expect(build(newReleasesPage({ next })).hasNextPage).toBe(next);
   });

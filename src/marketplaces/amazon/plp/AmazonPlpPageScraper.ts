@@ -67,8 +67,11 @@ export class AmazonPlpPageScraper {
     const url = `pl/s?i=${crawl.category}&rh=${toPriceFilter(range)}&s=date-desc-rank${page}`;
     const referer = `pl/b?node=${Math.floor(Math.random() * 100000000000)}`;
 
-    const result = await this.fetcher.fetch(url, referer, (document) =>
-      this.builder.build(document, crawl.category)
+    const result = await this.fetcher.fetch(
+      url,
+      referer,
+      (document) => this.builder.build(document, crawl.category),
+      this.builder.stopAt
     );
     if (!result.page) {
       this.countItem("given_up", result.failed);

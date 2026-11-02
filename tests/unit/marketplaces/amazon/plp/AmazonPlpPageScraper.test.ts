@@ -18,7 +18,7 @@ const parse = (url: string) => ({
 
 const setup = (reply: (price: string, number: number) => Reply = () => ({}), allPages = false) => {
   const sender = fakeAmazonPlpAdSender();
-  const fetch = vi.fn(async (url: string, _referer: string) => {
+  const fetch = vi.fn(async (url: string, _referer: string, _build?: unknown, _stopAt?: string[]) => {
     const { price, number } = parse(url);
     const { lastPage = 1, asins = [`B0${price}P${number}`], failed = 0, givenUp } = reply(price, number);
     if (givenUp) return { failed: MAX_FAILED_ATTEMPTS };
@@ -75,6 +75,7 @@ describe("AmazonPlpPageScraper", () => {
       seeds.map((price) => `pl/s?i=electronics&rh=p_36%3A${price}&s=date-desc-rank`)
     );
     expect(fetch.mock.calls[0][1]).toBe("pl/b?node=50000000000");
+    expect(fetch.mock.calls[0][3]).toEqual(["s-pagination-item", "MAIN-FEEDBACK"]);
   });
 
   it.each([false, true])(

@@ -22,12 +22,13 @@ export class AmazonPlpPageFetcher {
   async fetch<T extends PlpBuildResult>(
     url: string,
     referer: string,
-    build: (document: Document) => T
+    build: (document: Document) => T,
+    stopAt?: string[]
   ): Promise<{ page?: T; failed: number }> {
     for (let failed = 0; failed < MAX_FAILED_ATTEMPTS; failed++) {
       if (failed) await sleep(getRetryDelay(failed));
 
-      const html = await this.get(url, referer);
+      const html = await this.get(url, referer, stopAt);
       const page = html === undefined ? undefined : this.build(html, build);
       if (page) return { page, failed };
     }
@@ -56,17 +57,23 @@ export class AmazonPlpPageFetcher {
     }
   }
 
-  private async get(url: string, referer: string) {
+  private async get(url: string, referer: string, stopAt?: string[]) {
     const { batchSize } = this.configService.get();
     while (this.amazonService.queueService.queue.length >= batchSize) {
       await sleep(QUEUE_FULL_DELAY);
     }
 
     return new Promise<string | undefined>((resolve) =>
-      this.amazonService.get<string>(url, referer, {
-        onSuccess: resolve,
-        onError: () => resolve(undefined),
-      })
+      this.amazonService.get<string>(
+        url,
+        referer,
+        {
+          onSuccess: resolve,
+          onError: () => resolve(undefined),
+        },
+        undefined,
+        stopAt
+      )
     );
   }
 

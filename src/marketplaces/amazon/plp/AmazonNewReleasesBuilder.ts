@@ -3,6 +3,8 @@ import { AmazonPlpAd } from "@/marketplaces/amazon/types/amazon.types";
 import { detach, find, findAll, text } from "@/shared/utils/html";
 
 export class AmazonNewReleasesBuilder {
+  stopAt = ["a-pagination", "</ul>"];
+
   build(document: Document, category: string) {
     const isValid = !!find("[class*='zg-browse-group']", document);
     const items = findAll("#gridItemRoot [data-asin]", document);
