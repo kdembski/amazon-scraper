@@ -9,9 +9,13 @@ import { MetricsService } from "@/shared/metrics/MetricsService";
 import { sleep } from "@/shared/utils/sleep";
 
 const POLL_INTERVAL = 5 * 1000;
+const NIGHT_START = 22;
+const NIGHT_END = 8;
+const TIME_ZONE = "Europe/Warsaw";
 
 export class AmazonPdpScraper implements MarketplaceScraper {
   readonly marketplace = "amazon";
+  private paused = false;
 
   constructor(
     private apiService = ApiService.getInstance(),
@@ -30,6 +34,12 @@ export class AmazonPdpScraper implements MarketplaceScraper {
   }
 
   async scrape() {
+    if (this.isNight() !== this.paused) {
+      this.paused = !this.paused;
+      console.log(`pdp: night pause ${this.paused ? "started" : "ended"}`);
+    }
+    if (this.paused) return;
+
     const { batchSize } = this.configService.get();
     if (this.amazonService.queueService.queue.length > batchSize / 10) return;
 
@@ -44,5 +54,13 @@ export class AmazonPdpScraper implements MarketplaceScraper {
       this.metricsService.increment("batch_load", { outcome: "failed" });
       console.error("pdp: batch load failed", e);
     }
+  }
+
+  private isNight() {
+    const hour = Number(
+      new Intl.DateTimeFormat("en-GB", { hour: "numeric", hourCycle: "h23", timeZone: TIME_ZONE })
+        .format(new Date())
+    );
+    return hour >= NIGHT_START || hour < NIGHT_END;
   }
 }

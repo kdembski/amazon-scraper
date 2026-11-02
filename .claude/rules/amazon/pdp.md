@@ -24,11 +24,12 @@ Goal: for every ASIN, get the price and the shipper (`dispatchFrom`) in every Am
 ## 2. Batch loop (`AmazonPdpScraper`)
 
 1. Calls `scrape()` every 5 s (`POLL_INTERVAL`).
-2. Request queue > `batchSize / 10` → skips, waits for the next tick.
-3. Gets countries: `AmazonCountryService` (`amazon/countries/scrap`, cached, refreshed every hour). A country has `tld`, `priority`, `active`, `proxyType`, `pdpSource`.
-4. Gets ASINs: `amazon/ads/scrap?batchSize=N`.
-5. Each ASIN → `AmazonPdpAdScraper.execute(ad, countries)` (no `await`, in parallel).
-6. Metric `batch_load`: `ok` / `empty` / `failed`.
+2. Night pause 22:00–8:00 `Europe/Warsaw` (`isNight()`, private) → skips; logs `pdp: night pause started` / `ended` on change. ASINs already loaded finish.
+3. Request queue > `batchSize / 10` → skips, waits for the next tick.
+4. Gets countries: `AmazonCountryService` (`amazon/countries/scrap`, cached, refreshed every hour). A country has `tld`, `priority`, `active`, `proxyType`, `pdpSource`.
+5. Gets ASINs: `amazon/ads/scrap?batchSize=N`.
+6. Each ASIN → `AmazonPdpAdScraper.execute(ad, countries)` (no `await`, in parallel).
+7. Metric `batch_load`: `ok` / `empty` / `failed`.
 
 ## 3. One ASIN (`AmazonPdpAdScraper`)
 

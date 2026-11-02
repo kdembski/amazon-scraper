@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AmazonPdpScraper } from "@/marketplaces/amazon/pdp/AmazonPdpScraper";
 import type { AmazonPdpAdScraper } from "@/marketplaces/amazon/pdp/AmazonPdpAdScraper";
 import type { MetricsService } from "@/shared/metrics/MetricsService";
@@ -41,6 +41,11 @@ describe("AmazonPdpScraper", () => {
     expect(setup().scraper.marketplace).toBe("amazon");
   });
 
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-01-15T12:00:00Z"));
+  });
+
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
@@ -49,7 +54,7 @@ describe("AmazonPdpScraper", () => {
   describe("execute", () => {
 
     it("loads a batch now and every 5 s", async () => {
-      vi.useFakeTimers();
+      vi.useFakeTimers({ now: new Date("2026-01-15T12:00:00Z") });
       const { api, country, scraper } = setup();
       country.getCountries.mockResolvedValue(countries);
       api.get.mockResolvedValue([]);
@@ -63,7 +68,7 @@ describe("AmazonPdpScraper", () => {
     });
 
     it("waits 5 s after a load finishes before the next one", async () => {
-      vi.useFakeTimers();
+      vi.useFakeTimers({ now: new Date("2026-01-15T12:00:00Z") });
       const { api, country, scraper } = setup();
       country.getCountries.mockResolvedValue(countries);
       let finish = () => {};
@@ -85,6 +90,46 @@ describe("AmazonPdpScraper", () => {
   });
 
   describe("scrape", () => {
+    it.each([
+      ["2026-01-15T20:59:00Z", true],
+      ["2026-01-15T21:00:00Z", false],
+      ["2026-01-15T06:59:00Z", false],
+      ["2026-01-15T07:00:00Z", true],
+      ["2026-07-15T19:59:00Z", true],
+      ["2026-07-15T20:00:00Z", false],
+      ["2026-07-15T05:59:00Z", false],
+      ["2026-07-15T06:00:00Z", true],
+    ])("at %s loads a batch: %s", async (iso, loads) => {
+      vi.spyOn(console, "log").mockImplementation(() => {});
+      const { api, country, scraper } = setup();
+      country.getCountries.mockResolvedValue(countries);
+      api.get.mockResolvedValue([]);
+      vi.setSystemTime(new Date(iso));
+
+      await scraper.scrape();
+
+      expect(api.get).toHaveBeenCalledTimes(loads ? 1 : 0);
+    });
+
+    it("loads no batch at night and resumes in the morning", async () => {
+      const log = vi.spyOn(console, "log").mockImplementation(() => {});
+      const { api, country, scraper } = setup();
+      country.getCountries.mockResolvedValue(countries);
+      api.get.mockResolvedValue([]);
+
+      vi.setSystemTime(new Date("2026-01-15T21:00:00Z"));
+      await scraper.scrape();
+      expect(api.get).not.toHaveBeenCalled();
+
+      vi.setSystemTime(new Date("2026-01-16T07:00:00Z"));
+      await scraper.scrape();
+      expect(api.get).toHaveBeenCalledTimes(1);
+      expect(log.mock.calls).toEqual([
+        ["pdp: night pause started"],
+        ["pdp: night pause ended"],
+      ]);
+    });
+
     it("logs and counts a failed load instead of rejecting", async () => {
       const error = vi.spyOn(console, "error").mockImplementation(() => {});
       const { country, scraper, increment } = setup();
