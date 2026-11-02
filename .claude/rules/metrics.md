@@ -27,8 +27,8 @@ Types: counters = sum over the minute; gauges = value at report time. `*_ms` as 
 |---|---|---|
 | `requests` | `country` (from the URL: `de`, `co.uk`, `pl`...), `outcome`: `ok` / `timeout` / `network` / `http_<status>` | Every HTTP request to Amazon. `timeout` = 20 s exceeded. |
 | `request_ms` | `country` | Sum of request durations (all outcomes). Mean = `request_ms / requests`. |
-| `connections` | – | New proxy sockets opened in the minute. |
-| `bytes_in` / `bytes_out` | – | Bytes received / sent through proxy sockets. |
+| `connections` | – | New sockets to shops opened in the minute (proxy and `direct`). |
+| `bytes_in` / `bytes_out` | – | Bytes received / sent through shop sockets (proxy and `direct`). |
 
 ## Responses and pages
 
@@ -70,7 +70,7 @@ Types: counters = sum over the minute; gauges = value at report time. `*_ms` as 
 |---|---|
 | `pending` | Requests in progress in `TokenBucketQueue`. |
 | `queue_length` | Requests waiting in the queue. |
-| `open_connections` | Open proxy connections. |
+| `open_connections` | Open shop connections (proxy and `direct`). |
 | `event_loop_delay_mean_ms` / `event_loop_delay_max_ms` | Event loop delay over the minute (minus the 10 ms resolution). |
 | `cpu_percent` | % of one core since the previous report. |
 | `memory_rss_mb` / `heap_used_mb` | Process memory. |

@@ -15,6 +15,7 @@ const setup = () => {
   const meter = { collect: vi.fn(() => ({ bytesIn: 3, bytesOut: 1 })) };
   const pool = {
     get: vi.fn((url: string) => ({ url })),
+    getDirect: vi.fn(() => ({ direct: true })),
     retain: vi.fn(),
     takeLastFree: vi.fn(
       (_host: string, _accept: (url: string) => boolean): string | undefined =>
@@ -156,6 +157,15 @@ describe("ProxyService", () => {
 
       vi.spyOn(Math, "random").mockReturnValue(0);
       expect(service.getAgent("www.amazon.de", "isp")).toEqual({ url: ispUrls[0] });
+    });
+
+    it("returns the direct agent for the direct type", async () => {
+      const { service, pool } = setup();
+      await service.loadProxies();
+
+      expect(service.getAgent("www.amazon.pl", "direct")).toEqual({ direct: true });
+      expect(pool.get).not.toHaveBeenCalled();
+      expect(pool.takeLastFree).not.toHaveBeenCalled();
     });
 
     it.each([

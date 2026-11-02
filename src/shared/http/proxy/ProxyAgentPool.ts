@@ -1,8 +1,10 @@
 import type net from "node:net";
+import { MeteredAgent } from "@/shared/http/proxy/MeteredAgent";
 import { MeteredProxyAgent } from "@/shared/http/proxy/MeteredProxyAgent";
 
 export class ProxyAgentPool {
   private agents = new Map<string, MeteredProxyAgent>();
+  private direct?: MeteredAgent;
   // Per host, proxies in the order their idle connection was last freed
   private freed = new Map<string, Set<string>>();
   private idleTimeout = 15 * 1000;
@@ -27,6 +29,15 @@ export class ProxyAgentPool {
     }
 
     return agent;
+  }
+
+  getDirect() {
+    this.direct ??= new MeteredAgent(
+      { keepAlive: true, timeout: this.idleTimeout },
+      this.onConnect
+    );
+
+    return this.direct;
   }
 
   hasFreeSocket(url: string, host: string) {
@@ -76,7 +87,7 @@ export class ProxyAgentPool {
   countConnections() {
     let count = 0;
 
-    this.agents.forEach((agent) => {
+    [...this.agents.values(), ...(this.direct ? [this.direct] : [])].forEach((agent) => {
       [agent.sockets, agent.freeSockets].forEach((pool) => {
         Object.values(pool).forEach((sockets) => {
           count += sockets?.length ?? 0;

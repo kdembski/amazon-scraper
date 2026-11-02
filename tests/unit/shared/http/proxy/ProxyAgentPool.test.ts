@@ -3,6 +3,7 @@ import type { AddressInfo } from "node:net";
 import net from "node:net";
 import { HttpsProxyAgent } from "https-proxy-agent";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { MeteredAgent } from "@/shared/http/proxy/MeteredAgent";
 import { MeteredProxyAgent } from "@/shared/http/proxy/MeteredProxyAgent";
 import { ProxyAgentPool } from "@/shared/http/proxy/ProxyAgentPool";
 
@@ -63,6 +64,34 @@ describe("ProxyAgentPool", () => {
         .connect({} as never, {} as never);
 
       expect(onConnect).toHaveBeenCalledWith(socket);
+    });
+  });
+
+  describe("getDirect", () => {
+    it("reuses one metered agent", () => {
+      const pool = new ProxyAgentPool(vi.fn());
+      const agent = pool.getDirect();
+
+      expect(agent).toBeInstanceOf(MeteredAgent);
+      expect(pool.getDirect()).toBe(agent);
+    });
+
+    it("keeps connections alive and closes idle ones after 15 s", () => {
+      const agent = new ProxyAgentPool(vi.fn()).getDirect();
+
+      expect(agent.options.keepAlive).toBe(true);
+      expect(agent.options.timeout).toBe(15 * 1000);
+    });
+
+    it("is not destroyed by retain", () => {
+      const pool = new ProxyAgentPool(vi.fn());
+      const agent = pool.getDirect();
+      const destroy = vi.spyOn(agent, "destroy");
+
+      pool.retain([]);
+
+      expect(destroy).not.toHaveBeenCalled();
+      expect(pool.getDirect()).toBe(agent);
     });
   });
 
@@ -207,6 +236,15 @@ describe("ProxyAgentPool", () => {
       (b.freeSockets as unknown as Pool)["www.amazon.it:443"] = [{}];
 
       expect(pool.countConnections()).toBe(5);
+    });
+
+    it("counts sockets of the direct agent", () => {
+      const pool = new ProxyAgentPool(vi.fn());
+      const direct = pool.getDirect();
+      (direct.sockets as unknown as Pool)["www.amazon.pl:443"] = [{}];
+      (direct.freeSockets as unknown as Pool)["www.amazon.pl:443"] = [{}, {}];
+
+      expect(pool.countConnections()).toBe(3);
     });
 
     it("returns 0 without agents", () => {

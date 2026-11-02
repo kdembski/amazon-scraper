@@ -28,8 +28,10 @@ export class ProxyService {
   }
 
   // Proxy of the pool whose idle connection to the host was freed last, else
-  // a random one
+  // a random one; "direct" connects without a proxy
   getAgent(host: string, proxyType = "datacenter") {
+    if (proxyType === "direct") return this.pool.getDirect();
+
     const proxies = this.getProxies(proxyType);
     const url =
       this.pool.takeLastFree(host, (url) => proxies.includes(url)) ??
