@@ -7,7 +7,7 @@ export class AmazonCountryService {
   private countries: AmazonCountry[] = [];
 
   private constructor(private apiService = ApiService.getInstance()) {
-    new CronJob("0 0 */1 * * *", () => this.loadCountries()).start();
+    new CronJob("0 * * * * *", () => this.loadCountries()).start();
   }
 
   public static getInstance(): AmazonCountryService {

@@ -112,8 +112,8 @@ const answeredOf = (results: Result[]) =>
 
 describe("live Amazon", () => {
   beforeAll(async () => {
-    if (!process.env.PROXY_LIST_TOKEN) {
-      throw new Error("PROXY_LIST_TOKEN is missing, set it in .env");
+    if (!process.env.PROXY_API_KEY) {
+      throw new Error("PROXY_API_KEY is missing, set it in .env");
     }
 
     vi.spyOn(console, "log").mockImplementation(() => {});

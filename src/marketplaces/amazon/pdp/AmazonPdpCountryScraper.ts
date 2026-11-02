@@ -103,7 +103,8 @@ export class AmazonPdpCountryScraper {
       if (result.status !== 404) return;
       if (builder.notFoundIsNoData) return "no_data";
       price.notFound++;
-      return price.notFound >= NOT_FOUND_TO_DELETE ? "deleted" : undefined;
+      const toDelete = price.country.active ? NOT_FOUND_TO_DELETE : 1;
+      return price.notFound >= toDelete ? "deleted" : undefined;
     }
 
     if (!result.data.length) {

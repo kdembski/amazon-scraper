@@ -232,6 +232,17 @@ describe("AmazonPdpCountryScraper", () => {
     expect(outcome).toHaveBeenCalledWith("deleted");
   });
 
+  it("returns deleted after one 404 in an inactive country", async () => {
+    const { amazon, price, outcome, run, failLast } = setup();
+    price.country.active = false;
+    run();
+
+    await failLast(notFound);
+
+    expect(amazon.get).toHaveBeenCalledTimes(1);
+    expect(outcome).toHaveBeenCalledWith("deleted");
+  });
+
   it("keeps the price when a retry after a 404 succeeds", async () => {
     const { amazon, price, outcome, run, failLast } = setup();
     run();
