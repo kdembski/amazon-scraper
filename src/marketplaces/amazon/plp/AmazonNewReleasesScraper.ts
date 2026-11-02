@@ -32,8 +32,11 @@ export class AmazonNewReleasesScraper {
     const path = `pl/gp/new-releases/${crawl.category}${node ? `/${node}` : ""}`;
     const url = number > 1 ? `${path}?pg=${number}` : path;
 
-    const { page } = await this.fetcher.fetch(url, path, (document) =>
-      this.builder.build(document, crawl.category)
+    const { page } = await this.fetcher.fetch(
+      url,
+      path,
+      (document) => this.builder.build(document, crawl.category),
+      this.builder.stopAt
     );
     if (!page) {
       this.countPage("given_up");

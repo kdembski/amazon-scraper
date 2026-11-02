@@ -3,6 +3,8 @@ import { AmazonPlpAd } from "@/marketplaces/amazon/types/amazon.types";
 import { detach, find, findAll, text } from "@/shared/utils/html";
 
 export class AmazonPlpBuilder {
+  stopAt = ["s-pagination-item", "MAIN-FEEDBACK"];
+
   build(document: Document, category: string) {
     const listItemSelector = "div[role='listitem']";
     const items = findAll(listItemSelector, document);

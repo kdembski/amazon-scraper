@@ -5,6 +5,7 @@ import type { MetricsService } from "@/shared/metrics/MetricsService";
 import { find } from "@/shared/utils/html";
 import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
 import { fakeAmazonService, fakeScraperConfigService } from "@@tests/support/fakes";
+import { botWallPage, captchaPage } from "@@tests/support/html";
 
 const ad = { asin: "B0A", name: "Product", image: "B0A.jpg", categoryName: "electronics" };
 const valid = { isValid: true, ads: [ad] };
@@ -50,6 +51,30 @@ describe("AmazonPlpPageFetcher", () => {
     expect(await result).toEqual({ page: { ...valid, id: "x" }, failed: 0 });
     expect(amazon.requests[0]).toMatchObject({ url: "pl/s?i=toys", referer: "pl/b?node=1" });
     expect(increment).toHaveBeenCalledWith("responses", { country: "pl", outcome: "data" });
+  });
+
+  it("passes the stop markers to the request", async () => {
+    const { amazon, fetcher } = setup();
+
+    fetcher.fetch("url", "ref", () => valid, ["a", "b"]);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(amazon.get).toHaveBeenCalledWith("url", "ref", expect.anything(), undefined, ["a", "b"]);
+  });
+
+  it.each([captchaPage, botWallPage])("retries a captcha without building it", async (page) => {
+    const { amazon, fetcher, increment } = setup();
+    const build = vi.fn(() => valid);
+
+    const result = fetcher.fetch("url", "ref", build);
+    await vi.advanceTimersByTimeAsync(0);
+    amazon.respond(0, page);
+    await vi.advanceTimersByTimeAsync(2000);
+    amazon.respond(1, "<html></html>");
+
+    expect(await result).toEqual({ page: valid, failed: 1 });
+    expect(build).toHaveBeenCalledTimes(1);
+    expect(responses(increment)).toEqual(["captcha", "data"]);
   });
 
   it("counts a valid page without ads as no_data", async () => {

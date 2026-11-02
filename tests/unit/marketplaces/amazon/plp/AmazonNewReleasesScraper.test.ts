@@ -11,7 +11,7 @@ import { fakeAmazonPlpAdSender } from "@@tests/support/fakes";
 // Answers each URL with its page from the map, or gives it up when missing
 const setup = (pages: Record<string, string>) => {
   const sender = fakeAmazonPlpAdSender();
-  const fetch = vi.fn(async (url: string, _referer: string, build: (document: any) => any) =>
+  const fetch = vi.fn(async (url: string, _referer: string, build: (document: any) => any, _stopAt?: string[]) =>
     pages[url] === undefined
       ? { failed: MAX_FAILED_ATTEMPTS }
       : { page: build(toDocument(pages[url])), failed: 0 }
@@ -44,6 +44,7 @@ describe("AmazonNewReleasesScraper", () => {
 
     expect(fetch.mock.calls.map(([url]) => url).sort()).toEqual(Object.keys(pages).sort());
     expect(fetch.mock.calls[0][1]).toBe("pl/gp/new-releases/electronics");
+    expect(fetch.mock.calls[0][3]).toEqual(["a-pagination", "</ul>"]);
     expect(asins(sender.add.mock.calls).sort()).toEqual(
       ["B0ONE", "B0ROOT", "B0ROOT2", "B0THREE", "B0TWO"].sort()
     );

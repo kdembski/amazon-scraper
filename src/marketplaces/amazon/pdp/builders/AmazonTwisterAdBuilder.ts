@@ -6,15 +6,13 @@ import {
   AmazonCountry,
 } from "@/marketplaces/amazon/types/amazon.types";
 import { AmazonBuyboxParser } from "@/marketplaces/amazon/pdp/builders/AmazonBuyboxParser";
-import { AmazonCaptchaDetector } from "@/marketplaces/amazon/pdp/builders/AmazonCaptchaDetector";
+import { AmazonCaptchaDetector } from "@/marketplaces/amazon/AmazonCaptchaDetector";
 import { find } from "@/shared/utils/html";
 
 const BUYBOX_PART = '"FeatureName" : "desktop_buybox"';
-// shortcut: whole response downloaded (~320 KB vs ~90 KB cut) to keep keep-alive; set true to cut after the buy box
-const CUT_RESPONSE = false;
 
 export class AmazonTwisterAdBuilder implements AmazonAdBuilder {
-  stopAt = CUT_RESPONSE ? [BUYBOX_PART, "&&&"] : undefined;
+  stopAt = [BUYBOX_PART, "&&&"];
   notFoundIsNoData = true;
 
   constructor(

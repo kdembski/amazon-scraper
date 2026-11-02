@@ -1,5 +1,6 @@
 import type { Document } from "domhandler";
 import { parseDocument } from "htmlparser2";
+import { AmazonCaptchaDetector } from "@/marketplaces/amazon/AmazonCaptchaDetector";
 import { AmazonService } from "@/marketplaces/amazon/AmazonService";
 import { AmazonPlpAd } from "@/marketplaces/amazon/types/amazon.types";
 import { ScraperConfigService } from "@/shared/backend/ScraperConfigService";
@@ -16,18 +17,20 @@ export class AmazonPlpPageFetcher {
   constructor(
     private amazonService = AmazonService.getInstance(),
     private configService = ScraperConfigService.getInstance(),
-    private metricsService = MetricsService.getInstance()
+    private metricsService = MetricsService.getInstance(),
+    private captchaDetector = new AmazonCaptchaDetector()
   ) {}
 
   async fetch<T extends PlpBuildResult>(
     url: string,
     referer: string,
-    build: (document: Document) => T
+    build: (document: Document) => T,
+    stopAt?: string[]
   ): Promise<{ page?: T; failed: number }> {
     for (let failed = 0; failed < MAX_FAILED_ATTEMPTS; failed++) {
       if (failed) await sleep(getRetryDelay(failed));
 
-      const html = await this.get(url, referer);
+      const html = await this.get(url, referer, stopAt);
       const page = html === undefined ? undefined : this.build(html, build);
       if (page) return { page, failed };
     }
@@ -42,7 +45,13 @@ export class AmazonPlpPageFetcher {
     }
 
     try {
-      const page = build(parseDocument(html));
+      const document = parseDocument(html);
+      if (this.captchaDetector.detect(document)) {
+        this.countResponse("captcha");
+        return;
+      }
+
+      const page = build(document);
       if (!page.isValid) {
         this.countResponse("invalid");
         return;
@@ -56,17 +65,23 @@ export class AmazonPlpPageFetcher {
     }
   }
 
-  private async get(url: string, referer: string) {
+  private async get(url: string, referer: string, stopAt?: string[]) {
     const { batchSize } = this.configService.get();
     while (this.amazonService.queueService.queue.length >= batchSize) {
       await sleep(QUEUE_FULL_DELAY);
     }
 
     return new Promise<string | undefined>((resolve) =>
-      this.amazonService.get<string>(url, referer, {
-        onSuccess: resolve,
-        onError: () => resolve(undefined),
-      })
+      this.amazonService.get<string>(
+        url,
+        referer,
+        {
+          onSuccess: resolve,
+          onError: () => resolve(undefined),
+        },
+        undefined,
+        stopAt
+      )
     );
   }
 
