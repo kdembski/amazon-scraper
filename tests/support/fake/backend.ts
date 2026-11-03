@@ -102,6 +102,13 @@ export class FakeBackend {
       .filter((request) => request !== undefined);
   }
 
+  findMissingCountryIds(id: number) {
+    return this.find("POST", "amazon/ads/batch")
+      .flatMap((request) => request.body.prices)
+      .filter((item: { id: number }) => item.id === id)
+      .flatMap((item: { missingCountryIds?: number[] }) => item.missingCountryIds ?? []);
+  }
+
   findDeleted(id: number) {
     return this.find("POST", "amazon/ads/batch").filter((request) =>
       request.body.deleted.includes(id)

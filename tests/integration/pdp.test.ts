@@ -122,6 +122,39 @@ describe("PDP", () => {
     );
   });
 
+  it("skips the countries the backend remembers the ASIN missing in", async () => {
+    world.backend.onSequence("GET", "amazon/ads/scrap", [
+      { body: [{ ...ad, skipCountryIds: [2] }] },
+      { body: [] },
+    ]);
+    world.amazon.respondPerCountry(offers);
+    scrape();
+
+    const sent = await world.backend.waitForPrices(7);
+
+    expect(sent.body).toEqual({
+      prices: [price(1, 24.99, "Amazon"), price(3, 26, "Some Seller")],
+    });
+    expect(world.amazon.requestsTo("fr")).toHaveLength(0);
+  });
+
+  it("reports the countries with a final 404 as missing", async () => {
+    world.backend.on("GET", "amazon/countries/scrap", [
+      buildAmazonCountry({ countryId: 1, tld: "de" }),
+      buildAmazonCountry({ countryId: 2, tld: "fr", active: false }),
+      buildAmazonCountry({ countryId: 3, tld: "it", pdpSource: "twister" }),
+    ]);
+    world.amazon.respond(({ country }) =>
+      country === "de" ? offers.de[0] : { status: 404 }
+    );
+    scrape();
+
+    const sent = await world.backend.waitForPrices(7);
+
+    expect(sent.body).toEqual({ prices: [price(1, 24.99, "Amazon")] });
+    expect(world.backend.findMissingCountryIds(7)).toEqual([2, 3]);
+  });
+
   it("asks gp/aw/d after a twister 404", async () => {
     world.backend.on("GET", "amazon/countries/scrap", [
       buildAmazonCountry({ countryId: 1, tld: "de" }),
