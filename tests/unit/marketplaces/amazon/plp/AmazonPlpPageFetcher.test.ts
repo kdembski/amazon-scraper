@@ -5,7 +5,7 @@ import type { MetricsService } from "@/shared/metrics/MetricsService";
 import { find } from "@/shared/utils/html";
 import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
 import { fakeAmazonService, fakeScraperConfigService } from "@@tests/support/fakes";
-import { botWallPage, captchaPage } from "@@tests/support/html";
+import { botWallPage, captchaPage, interstitialPage } from "@@tests/support/html";
 
 const ad = { asin: "B0A", name: "Product", image: "B0A.jpg", categoryName: "electronics" };
 const valid = { isValid: true, ads: [ad] };
@@ -62,7 +62,7 @@ describe("AmazonPlpPageFetcher", () => {
     expect(amazon.get).toHaveBeenCalledWith("url", "ref", expect.anything(), undefined, ["a", "b"]);
   });
 
-  it.each([captchaPage, botWallPage])("retries a captcha without building it", async (page) => {
+  it.each([captchaPage, botWallPage, interstitialPage])("retries a captcha without building it", async (page) => {
     const { amazon, fetcher, increment } = setup();
     const build = vi.fn(() => valid);
 

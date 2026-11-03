@@ -144,7 +144,7 @@ describe("AmazonPlpPageScraper", () => {
       .every(({ number }) => number === 1)).toBe(true);
   });
 
-  it("stops paginating a range after a given up page", async () => {
+  it("skips a given up page and paginates the range further", async () => {
     const { requests, increment, scraper, crawl } = setup(
       (price, number) => ({
         lastPage: price === "-999" ? 3 : 1,
@@ -155,7 +155,7 @@ describe("AmazonPlpPageScraper", () => {
 
     await scraper.execute(crawl);
 
-    expect(requests()).not.toContainEqual({ price: "-999", number: 3 });
+    expect(requests()).toContainEqual({ price: "-999", number: 3 });
     expect(increment).toHaveBeenCalledWith("items", { country: "pl", outcome: "given_up" });
     expect(increment).toHaveBeenCalledWith(
       "item_attempts",

@@ -17,6 +17,12 @@ export const botWallPage = `
   </form>
 `;
 
+// Akamai interstitial challenge
+export const interstitialPage = `
+  <meta http-equiv="refresh" content="5; URL='/s?i=baby&amp;bm-verify=AAQ'" />
+  <script>xhr.open("POST", "/_sec/verify?provider=interstitial", false);</script>
+`;
+
 // Price markup as Amazon renders it inside .a-price
 export const aPrice = (whole: string, fraction: string, offscreen = "") => `
   <span class="a-price">

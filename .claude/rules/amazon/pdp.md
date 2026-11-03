@@ -69,7 +69,7 @@ Goal: for every ASIN, get the price and the shipper (`dispatchFrom`) in every Am
 | `awd` | `<tld>/gp/aw/d/X?th=1&psc=1` | Mobile page, HTML from `id="buybox"` → `AmazonBuyboxParser`. Download stops at `id="olpLinkWidget_feature_div"` after the buy box. |
 
 Shared:
-- `AmazonCaptchaDetector`: `form` with action `/errors/validateCaptcha` or `/errors_page/validateCaptcha`.
+- `AmazonCaptchaDetector`: `form` with action `/errors/validateCaptcha` or `/errors_page/validateCaptcha`, or the Akamai interstitial (`meta[http-equiv='refresh']` with `bm-verify=`).
 - `AmazonBuyboxParser`: invalid when there is no buy box or `#priceNotAvailable`; price from `.apex-pricetopay-value` (skips subscription), fallback hidden cart input; shipper from `desktop-fulfiller-info`, fallback `desktop-merchant-info`.
 - `AmazonPriceParser`: `.a-price-whole` + `.a-price-fraction`, fallback accessibility label / `.a-offscreen`.
 - `AmazonDispatchFromNormalizer`: `amazon.nl` etc. → `Amazon`.

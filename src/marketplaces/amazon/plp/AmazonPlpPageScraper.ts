@@ -58,7 +58,7 @@ export class AmazonPlpPageScraper {
 
     if (!crawl.allPages) return;
     for (let number = 2; number <= first.lastPage; number++) {
-      if (!(await this.scrapePage(crawl, range, number))) return;
+      await this.scrapePage(crawl, range, number);
     }
   }
 
