@@ -1,4 +1,5 @@
 import type { Document } from "domhandler";
+import type { StopAt } from "@/shared/http/http.types";
 
 export interface AmazonCountry {
   countryId: number;
@@ -38,7 +39,7 @@ export interface AmazonAdBuildResult {
 
 export interface AmazonAdBuilder {
   // Markers that must arrive in this order; the response is not needed past the last one
-  stopAt?: string[];
+  stopAt?: StopAt;
   // A 404 means only that this source has no data, not that the product is gone
   notFoundIsNoData?: boolean;
   trimHtml(html: string): string;

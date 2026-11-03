@@ -6,7 +6,7 @@ import {
   PriceRange,
   splitPriceRange,
   toPriceFilter,
-} from "@/marketplaces/amazon/plp/AmazonPlpPriceRange";
+} from "@/marketplaces/amazon/plp/priceRange";
 import { MetricsService } from "@/shared/metrics/MetricsService";
 import { ItemOutcome } from "@/shared/metrics/metrics.types";
 
@@ -58,7 +58,7 @@ export class AmazonPlpPageScraper {
 
     if (!crawl.allPages) return;
     for (let number = 2; number <= first.lastPage; number++) {
-      if (!(await this.scrapePage(crawl, range, number))) return;
+      await this.scrapePage(crawl, range, number);
     }
   }
 

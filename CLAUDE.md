@@ -27,6 +27,7 @@ Tests: `src/a/X.ts` → `tests/unit/a/X.test.ts`, one file per source file. Buil
 
 - Imports via `@/` (`src/`), in tests `@@tests/`.
 - One class per file; plain functions only for small helpers. Method names do not repeat the class name.
+- A class file holds only types used in it alone, not exported; a type imported elsewhere goes to `<area>.types.ts` next to it (e.g. `src/shared/http/http.types.ts`).
 - Shared services are singletons (`getInstance()`); others take defaulted constructor params as parameter properties, no `readonly`.
 - 2 spaces, double quotes, semicolons, `lodash` as `_`. Comments in English.
 - Brace-less arrows only when the function fits on one line.

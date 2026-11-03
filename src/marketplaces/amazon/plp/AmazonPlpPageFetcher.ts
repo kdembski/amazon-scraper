@@ -9,7 +9,7 @@ import { ResponseOutcome } from "@/shared/metrics/metrics.types";
 import { getRetryDelay, MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
 import { sleep } from "@/shared/utils/sleep";
 
-export type PlpBuildResult = { isValid: boolean; ads: AmazonPlpAd[] };
+type PlpBuildResult = { isValid: boolean; ads: AmazonPlpAd[] };
 
 const QUEUE_FULL_DELAY = 1000;
 
@@ -30,15 +30,19 @@ export class AmazonPlpPageFetcher {
     for (let failed = 0; failed < MAX_FAILED_ATTEMPTS; failed++) {
       if (failed) await sleep(getRetryDelay(failed));
 
-      const html = await this.get(url, referer, stopAt);
-      const page = html === undefined ? undefined : this.build(html, build);
+      const response = await this.get(url, referer, stopAt);
+      const page = response && this.build(response.html, build, response.block);
       if (page) return { page, failed };
     }
 
     return { failed: MAX_FAILED_ATTEMPTS };
   }
 
-  private build<T extends PlpBuildResult>(html: string, build: (document: Document) => T) {
+  private build<T extends PlpBuildResult>(
+    html: string,
+    build: (document: Document) => T,
+    block: () => void
+  ) {
     if (!html.length) {
       this.countResponse("empty");
       return;
@@ -47,6 +51,7 @@ export class AmazonPlpPageFetcher {
     try {
       const document = parseDocument(html);
       if (this.captchaDetector.detect(document)) {
+        block();
         this.countResponse("captcha");
         return;
       }
@@ -71,12 +76,12 @@ export class AmazonPlpPageFetcher {
       await sleep(QUEUE_FULL_DELAY);
     }
 
-    return new Promise<string | undefined>((resolve) =>
+    return new Promise<{ html: string; block: () => void } | undefined>((resolve) =>
       this.amazonService.get<string>(
         url,
         referer,
         {
-          onSuccess: resolve,
+          onSuccess: (html, block) => resolve({ html, block }),
           onError: () => resolve(undefined),
         },
         undefined,

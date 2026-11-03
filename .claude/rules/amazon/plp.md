@@ -55,7 +55,7 @@ Goal: find new ASINs in a category on amazon.pl (new releases + search listing) 
    - last page ≥ 400 (`MAX_PAGES`, Amazon's limit) → range split in half (`splitPriceRange`), recursion on both halves;
    - an open range (`500000-`) splits into `[min, 2·min-1]` and `[2·min-]`, up to 1 000 000 zł;
    - a single-value range is not split.
-5. `allPages` → pages 2..lastPage sequentially; a failed page stops that range.
+5. `allPages` → pages 2..lastPage sequentially; a given up page is skipped, the range goes on.
 6. Parsing (`AmazonPlpBuilder`):
    - products: `div[role='listitem']` (ASIN `data-asin`, `img`, name `a > h2 > span`);
    - lastPage: max of `.s-pagination-item`;
@@ -68,9 +68,9 @@ Goal: find new ASINs in a category on amazon.pl (new releases + search listing) 
 1. Backpressure: request queue ≥ `batchSize` → waits 1 s at a time.
 2. Request via `AmazonService.get()` (default proxy `datacenter`) with the builder's `stopAt` markers: the stream is destroyed once they arrived in order.
 3. Retries up to 6 attempts (`MAX_FAILED_ATTEMPTS`), backoff 1 s, 2 s, 4 s ... with jitter, on:
-   - HTTP error / network / timeout;
+   - HTTP error / network / timeout (503 blocks the proxy for the host, see PDP 7);
    - empty response (`empty`);
-   - captcha (`captcha`, `AmazonCaptchaDetector`);
+   - captcha (`captcha`, `AmazonCaptchaDetector`, Akamai interstitial included), blocks the proxy for the host;
    - invalid page or parse exception (`invalid`).
 4. Success → `responses{outcome=data|no_data}`.
 5. 6 failures → page `given_up`, skipped.

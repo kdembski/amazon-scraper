@@ -7,6 +7,7 @@ import { AmazonTwisterAdBuilder } from "@/marketplaces/amazon/pdp/builders/Amazo
 import { AmazonPlpBuilder } from "@/marketplaces/amazon/plp/AmazonPlpBuilder";
 import { AmazonService } from "@/marketplaces/amazon/AmazonService";
 import { ProxyService } from "@/shared/http/proxy/ProxyService";
+import type { StopAt } from "@/shared/http/http.types";
 import { AmazonAdBuilder, AmazonAdBuildResult } from "@/marketplaces/amazon/types/amazon.types";
 import { buildAd, buildAmazonCountry } from "@@tests/support/factories";
 
@@ -52,7 +53,7 @@ let amazon: AmazonService;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const fetchPage = (url: string, referer: string, stopAt?: string[]) =>
+const fetchPage = (url: string, referer: string, stopAt?: StopAt) =>
   new Promise<string>((resolve, reject) =>
     amazon.get<string>(url, referer, { onSuccess: resolve, onError: reject }, undefined, stopAt)
   );
@@ -63,7 +64,7 @@ const scrape = async (
   url: string,
   referer: string,
   build: (html: string) => AmazonAdBuildResult,
-  { stopAt, retryInvalid = false }: { stopAt?: string[]; retryInvalid?: boolean } = {}
+  { stopAt, retryInvalid = false }: { stopAt?: StopAt; retryInvalid?: boolean } = {}
 ) => {
   let blocked = "";
 

@@ -52,9 +52,9 @@ Goal: for every ASIN, get the price and the shipper (`dispatchFrom`) in every Am
    4. No outcome → `failed++`; at 6 (`MAX_FAILED_ATTEMPTS`) → `given_up`; otherwise backoff 1 s, 2 s, 4 s ... max 60 s, with jitter.
 3. Result mapping:
    - 404 from the last source: `twister` → `no_data`; others → `notFound++`, at 2 (`NOT_FOUND_TO_DELETE`) in an active country, at 1 in an inactive one → `deleted`, before that retry. Both final cases set `missing`.
-   - other HTTP error / timeout / network → retry.
+   - other HTTP error / timeout / network → retry; 503 also blocks the proxy for the host (see 7).
    - empty response → retry (`responses{outcome=empty}`).
-   - captcha → retry (`captcha`).
+   - captcha → blocks the proxy for the host (see 7), retry (`captcha`).
    - `isValid === false` → retry (`invalid`).
    - parse exception → retry (`parse_error`).
    - price found → `data`, stores `value` + `dispatchFrom`.
@@ -65,11 +65,11 @@ Goal: for every ASIN, get the price and the shipper (`dispatchFrom`) in every Am
 | Source | URL | What it parses |
 |---|---|---|
 | `aod` | `<tld>/gp/product/ajax/aodAjaxMain/?asin=X&pc=dp` | `#aod-pinned-offer`: price from `[id^='aod-price-']`, shipper from `#aod-offer-shipsFrom`. HTML cut before `aod-filter`. Valid = `#aod-container` present. |
-| `twister` | `<tld>/gp/twister/ajaxv2?asinList=X&...` | JSON parts separated by `&&&`; takes `desktop_buybox` → `AmazonBuyboxParser`. Download stops at the `&&&` that ends the buy box part. 404 = `no_data`. |
+| `twister` | `<tld>/gp/twister/ajaxv2?asinList=X&...` | JSON parts separated by `&&&`; takes `desktop_buybox` → `AmazonBuyboxParser`. Download stops inside the buy box part at the `desktop-return-info` row (after price and shipper; not the `-collapsed` accordion header), at the latest at the `&&&` that ends the part; the cut JSON string is decoded up to the cut. 404 = `no_data`. |
 | `awd` | `<tld>/gp/aw/d/X?th=1&psc=1` | Mobile page, HTML from `id="buybox"` → `AmazonBuyboxParser`. Download stops at `id="olpLinkWidget_feature_div"` after the buy box. |
 
 Shared:
-- `AmazonCaptchaDetector`: `form` with action `/errors/validateCaptcha` or `/errors_page/validateCaptcha`.
+- `AmazonCaptchaDetector`: `form` with action `/errors/validateCaptcha` or `/errors_page/validateCaptcha`, or the Akamai interstitial (`meta[http-equiv='refresh']` with `bm-verify=`).
 - `AmazonBuyboxParser`: invalid when there is no buy box or `#priceNotAvailable`; price from `.apex-pricetopay-value` (skips subscription), fallback hidden cart input; shipper from `desktop-fulfiller-info`, fallback `desktop-merchant-info`.
 - `AmazonPriceParser`: `.a-price-whole` + `.a-price-fraction`, fallback accessibility label / `.a-offscreen`.
 - `AmazonDispatchFromNormalizer`: `amazon.nl` etc. → `Amazon`.
@@ -82,9 +82,10 @@ Shared:
 
 ## 7. HTTP layer (shared)
 
-- `ScrapingClient.get()` – the only path to Amazon. Random Chrome User-Agent, Referer, hard 20 s timeout. With the builder's `stopAt` markers it reads a stream and destroys it (closes the connection) once they arrived in order.
+- `ScrapingClient.get()` – the only path to Amazon. Random Chrome User-Agent, Referer, hard 20 s timeout. With the builder's `stopAt` markers it reads a stream and destroys it (closes the connection) once they arrived in order; a step given as an array is done by whichever of its markers comes first.
 - `TokenBucketQueue` – `concurrency` and `rps` limits from the config.
-- `ProxyService.getAgent(host, proxyType)` – proxy with a free keep-alive connection to the host, otherwise random; missing type → `datacenter`. `direct` → one keep-alive agent without a proxy (`ProxyAgentPool.getDirect`, 15 s idle timeout). `mixedN` (e.g. `mixed10`) → `direct` up to N rps per host and process (`RateLimiter`, token bucket, burst N), above that the `datacenter` pool.
+- `ProxyService.getAgent(host, proxyType)` – proxy with a free keep-alive connection to the host, otherwise random among those not blocked by the host; missing type → `datacenter`. `direct` → one keep-alive agent without a proxy (`ProxyAgentPool.getDirect`, 15 s idle timeout). `mixedN` (e.g. `mixed10`) → `direct` up to N rps per host and process (`RateLimiter`, token bucket, burst N), above that the `datacenter` pool.
+- Block (`ProxyAgentPool.block`): a 503 (`ScrapingClient`) or a captcha (`block` passed to `onSuccess`) closes the proxy's idle connections to the host and blocks the proxy + host pair for 5 min: its connections are not offered as free (closed when freed) and random picks skip it (all blocked → any). No effect on `direct`.
 
 ## Where to look
 

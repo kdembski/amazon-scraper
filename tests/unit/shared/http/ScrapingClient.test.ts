@@ -1,6 +1,7 @@
 import axios from "axios";
 import { Readable } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { StopAt } from "@/shared/http/http.types";
 import { ScrapingClient } from "@/shared/http/ScrapingClient";
 import type { ScraperConfigService } from "@/shared/backend/ScraperConfigService";
 import type { ProxyService } from "@/shared/http/proxy/ProxyService";
@@ -19,6 +20,7 @@ const setup = () => {
   const agent = { name: "agent" };
   const proxy = {
     getAgent: vi.fn(() => agent),
+    block: vi.fn(),
   } as unknown as ProxyService;
   const requests: Promise<unknown>[] = [];
   const queue = {
@@ -120,8 +122,40 @@ describe("ScrapingClient", () => {
       service.get("https://www.amazon.de/dp/B0TESTASIN", "https://www.amazon.de", callback);
       await Promise.all(requests);
 
-      expect(callback.onSuccess).toHaveBeenCalledWith("<html>");
+      expect(callback.onSuccess).toHaveBeenCalledWith("<html>", expect.any(Function));
       expect(callback.onError).not.toHaveBeenCalled();
+    });
+
+    it("lets onSuccess block the proxy for the host", async () => {
+      const { service, agent, proxy, requests } = setup();
+      get.mockResolvedValue({ data: "<html>" });
+      const onSuccess = vi.fn((_data: string, block: () => void) => block());
+
+      service.get("https://www.amazon.de/dp/B0TESTASIN", "https://www.amazon.de", { onSuccess });
+      await Promise.all(requests);
+
+      expect(proxy.block).toHaveBeenCalledWith(agent, "www.amazon.de");
+    });
+
+    it("blocks the proxy for the host on a 503 before onError", async () => {
+      const { service, agent, proxy, requests } = setup();
+      get.mockRejectedValue({ response: { status: 503 } });
+      const onError = vi.fn(() => expect(proxy.block).toHaveBeenCalledWith(agent, "www.amazon.de"));
+
+      service.get("https://www.amazon.de/dp/B0TESTASIN", "https://www.amazon.de", { onError });
+      await Promise.all(requests);
+
+      expect(onError).toHaveBeenCalled();
+    });
+
+    it("does not block the proxy on other errors", async () => {
+      const { service, proxy, requests } = setup();
+      get.mockRejectedValue({ response: { status: 404 } });
+
+      service.get("https://www.amazon.de/dp/B0TESTASIN", "https://www.amazon.de");
+      await Promise.all(requests);
+
+      expect(proxy.block).not.toHaveBeenCalled();
     });
 
     it("passes the error to onError and still finishes the queued task", async () => {
@@ -168,7 +202,7 @@ describe("ScrapingClient", () => {
         });
         const service = new Client(
           {} as ScraperConfigService,
-          { getAgent: vi.fn() },
+          { getAgent: vi.fn(), block: vi.fn() },
           queue,
           metrics
         );
@@ -269,7 +303,7 @@ describe("ScrapingClient", () => {
             requests.push(cb());
           }),
         };
-        const service = new Client({} as ScraperConfigService, { getAgent: vi.fn() }, queue, metrics);
+        const service = new Client({} as ScraperConfigService, { getAgent: vi.fn(), block: vi.fn() }, queue, metrics);
         const stream = Readable.from(
           (async function* () {
             for (const chunk of chunks) yield Buffer.from(chunk);
@@ -278,7 +312,7 @@ describe("ScrapingClient", () => {
         );
         get.mockResolvedValue({ data: stream });
         const callback = { onSuccess: vi.fn(), onError: vi.fn() };
-        const run = async (markers: string[] = stopAt) => {
+        const run = async (markers: StopAt = stopAt) => {
           service.get(url, undefined, callback, {}, undefined, markers);
           await Promise.all(requests);
         };
@@ -293,7 +327,7 @@ describe("ScrapingClient", () => {
 
         expect(get.mock.calls[0][1]).toMatchObject({ responseType: "stream" });
         expect(callback.onSuccess).toHaveBeenCalledTimes(1);
-        expect(callback.onSuccess).toHaveBeenCalledWith("<a><b>x&&&y");
+        expect(callback.onSuccess).toHaveBeenCalledWith("<a><b>x&&&y", expect.any(Function));
         expect(stream.destroyed).toBe(true);
         expect(metrics.increment).toHaveBeenCalledWith("requests", { outcome: "ok" });
       });
@@ -303,7 +337,7 @@ describe("ScrapingClient", () => {
 
         await run();
 
-        expect(callback.onSuccess).toHaveBeenCalledWith("<a><b>x&&&y");
+        expect(callback.onSuccess).toHaveBeenCalledWith("<a><b>x&&&y", expect.any(Function));
       });
 
       it("ignores a later marker seen before the earlier one", async () => {
@@ -311,7 +345,17 @@ describe("ScrapingClient", () => {
 
         await run();
 
-        expect(callback.onSuccess).toHaveBeenCalledWith("&&&<b>x&&&");
+        expect(callback.onSuccess).toHaveBeenCalledWith("&&&<b>x&&&", expect.any(Function));
+      });
+
+      it("cuts at whichever alternative marker comes first", async () => {
+        const first = setupStream(["<b>x", "&&&y", "##z", "rest"]);
+        await first.run(["<b>", ["##", "&&&"]]);
+        const second = setupStream(["<b>x#", "#y", "&&&z", "rest"]);
+        await second.run(["<b>", ["##", "&&&"]]);
+
+        expect(first.callback.onSuccess).toHaveBeenCalledWith("<b>x&&&y", expect.any(Function));
+        expect(second.callback.onSuccess).toHaveBeenCalledWith("<b>x##y", expect.any(Function));
       });
 
       it("passes the whole response when the markers never arrive", async () => {
@@ -319,7 +363,7 @@ describe("ScrapingClient", () => {
 
         await run();
 
-        expect(callback.onSuccess).toHaveBeenCalledWith("<a><b>");
+        expect(callback.onSuccess).toHaveBeenCalledWith("<a><b>", expect.any(Function));
       });
 
       it("decodes a character split across chunks", async () => {
@@ -328,7 +372,7 @@ describe("ScrapingClient", () => {
 
         await run(["x"]);
 
-        expect(callback.onSuccess).toHaveBeenCalledWith("€");
+        expect(callback.onSuccess).toHaveBeenCalledWith("€", expect.any(Function));
       });
 
       it("reports a stream error once", async () => {
