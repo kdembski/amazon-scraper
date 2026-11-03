@@ -27,6 +27,7 @@ export const buildPrice = (
   complete: false,
   deleted: false,
   failed: 0,
+  missing: false,
   notFound: 0,
   ...overrides,
 });

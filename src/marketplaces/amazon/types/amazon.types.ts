@@ -25,6 +25,7 @@ export interface AmazonPlpAd {
 export interface AmazonAd {
   id: number;
   asin: string;
+  skipCountryIds?: number[];
 }
 
 export interface AmazonAdBuildResult {
@@ -51,6 +52,8 @@ export interface AmazonAdPrice {
   dispatchFrom?: string;
   complete: boolean;
   deleted: boolean;
+  // A 404 from the last source
+  missing: boolean;
   failed: number;
   notFound: number;
 }

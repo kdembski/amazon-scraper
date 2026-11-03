@@ -230,6 +230,7 @@ describe("AmazonPdpCountryScraper", () => {
     expect(price.failed).toBe(NOT_FOUND_TO_DELETE - 1);
     expect(amazon.get).toHaveBeenCalledTimes(NOT_FOUND_TO_DELETE);
     expect(outcome).toHaveBeenCalledWith("deleted");
+    expect(price.missing).toBe(true);
   });
 
   it("returns deleted after one 404 in an inactive country", async () => {
@@ -241,6 +242,7 @@ describe("AmazonPdpCountryScraper", () => {
 
     expect(amazon.get).toHaveBeenCalledTimes(1);
     expect(outcome).toHaveBeenCalledWith("deleted");
+    expect(price.missing).toBe(true);
   });
 
   it("keeps the price when a retry after a 404 succeeds", async () => {
@@ -252,6 +254,7 @@ describe("AmazonPdpCountryScraper", () => {
     await flush();
 
     expect(price.notFound).toBe(1);
+    expect(price.missing).toBe(false);
     expect(price.value).toBe(10);
     expect(outcome).toHaveBeenCalledWith("data");
   });
@@ -445,6 +448,7 @@ describe("AmazonPdpCountryScraper", () => {
 
       expect(amazon.requests).toHaveLength(1);
       expect(price.value).toBeUndefined();
+      expect(price.missing).toBe(true);
       expect(outcome).toHaveBeenCalledWith("no_data");
     });
   });

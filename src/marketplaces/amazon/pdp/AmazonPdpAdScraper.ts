@@ -23,7 +23,14 @@ export class AmazonPdpAdScraper {
   }
 
   execute(ad: AmazonAd, countries: AmazonCountry[]) {
-    const prices = this.createPrices(countries);
+    const prices = this.createPrices(
+      countries.filter((country) => !ad.skipCountryIds?.includes(country.countryId))
+    );
+    if (!prices.length) {
+      this.metricsService.increment("ads", { outcome: "empty" });
+      return Promise.resolve();
+    }
+
     const startedAt = Date.now();
     let isDone = false;
     const isCancelled = () => isDone;
@@ -52,6 +59,7 @@ export class AmazonPdpAdScraper {
       country,
       complete: false,
       deleted: false,
+      missing: false,
       failed: 0,
       notFound: 0,
     }));

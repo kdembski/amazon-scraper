@@ -17,7 +17,7 @@ describe("AmazonPdpResultSender", () => {
     resultSender.prices(7, [price]);
     resultSender.deleted(8);
 
-    expect(add.mock.calls).toEqual([[{ id: 7, prices: [price] }], [{ id: 8 }]]);
+    expect(add.mock.calls).toEqual([[{ id: 7, prices: [price], missingCountryIds: [] }], [{ id: 8 }]]);
   });
 
   it("sends prices and deleted ids in one body to amazon/ads/batch", () => {
@@ -33,7 +33,7 @@ describe("AmazonPdpResultSender", () => {
 
     expect(send).toHaveBeenCalledWith(
       "amazon/ads/batch",
-      { prices: [{ id: 7, prices: [price] }], deleted: [8] },
+      { prices: [{ id: 7, prices: [price], missingCountryIds: [] }], deleted: [8] },
       expect.any(String)
     );
   });
