@@ -1,6 +1,7 @@
 import { AmazonPdpScraper } from "@/marketplaces/amazon/pdp/AmazonPdpScraper";
 import { AmazonPlpScraper } from "@/marketplaces/amazon/plp/AmazonPlpScraper";
-import { ArgsService, Target } from "@/shared/args/ArgsService";
+import type { Target } from "@/shared/args/args.types";
+import { ArgsService } from "@/shared/args/ArgsService";
 import { MetricsReporter } from "@/shared/backend/MetricsReporter";
 import { ScraperConfigService } from "@/shared/backend/ScraperConfigService";
 import { ProxyService } from "@/shared/http/proxy/ProxyService";

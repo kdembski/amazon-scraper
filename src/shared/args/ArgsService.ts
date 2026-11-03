@@ -1,8 +1,7 @@
 import _ from "lodash";
 import { Resolver } from "node:dns/promises";
 import { networkInterfaces } from "node:os";
-
-export type Target = "pdp" | "plp";
+import type { Target } from "@/shared/args/args.types";
 
 export class ArgsService {
   private static instance: ArgsService;

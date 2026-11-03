@@ -3,9 +3,9 @@ import {
   parsePriceRange,
   splitPriceRange,
   toPriceFilter,
-} from "@/marketplaces/amazon/plp/AmazonPlpPriceRange";
+} from "@/marketplaces/amazon/plp/priceRange";
 
-describe("AmazonPlpPriceRange", () => {
+describe("priceRange", () => {
   it.each([
     ["-999", { min: 0, max: 999 }],
     ["1000-1999", { min: 1000, max: 1999 }],

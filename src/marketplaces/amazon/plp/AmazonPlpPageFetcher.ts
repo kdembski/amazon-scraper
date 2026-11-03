@@ -9,7 +9,7 @@ import { ResponseOutcome } from "@/shared/metrics/metrics.types";
 import { getRetryDelay, MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
 import { sleep } from "@/shared/utils/sleep";
 
-export type PlpBuildResult = { isValid: boolean; ads: AmazonPlpAd[] };
+type PlpBuildResult = { isValid: boolean; ads: AmazonPlpAd[] };
 
 const QUEUE_FULL_DELAY = 1000;
 

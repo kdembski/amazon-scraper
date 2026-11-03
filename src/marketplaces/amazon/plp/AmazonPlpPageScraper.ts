@@ -6,7 +6,7 @@ import {
   PriceRange,
   splitPriceRange,
   toPriceFilter,
-} from "@/marketplaces/amazon/plp/AmazonPlpPriceRange";
+} from "@/marketplaces/amazon/plp/priceRange";
 import { MetricsService } from "@/shared/metrics/MetricsService";
 import { ItemOutcome } from "@/shared/metrics/metrics.types";
 

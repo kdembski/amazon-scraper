@@ -5,7 +5,7 @@ import { ScrapingClient } from "@/shared/http/ScrapingClient";
 import { getRetryDelay } from "@/shared/utils/retry";
 import { sleep } from "@/shared/utils/sleep";
 
-export type ScraperConfig = {
+type ScraperConfig = {
   concurrency: number;
   rps: number;
   batchSize: number;
