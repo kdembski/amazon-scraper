@@ -66,11 +66,44 @@ describe("AmazonPdpAdScraper", () => {
     expect(execute).toHaveBeenCalledTimes(2);
     countries.forEach((country, i) =>
       expect(execute.mock.calls[i]).toEqual([
-        { country, complete: false, deleted: false, failed: 0, notFound: 0 },
+        { country, complete: false, deleted: false, missing: false, failed: 0, notFound: 0 },
         ad,
         expect.any(Function),
       ])
     );
+  });
+
+  describe("skipped countries", () => {
+    const setupSkip = (skipCountryIds: number[]) => {
+      const sender = fakeAmazonPdpResultSender();
+      const execute = vi.fn((_price: AmazonAdPrice) => new Promise<ItemOutcome | undefined>(() => {}));
+      const increment = vi.fn();
+      const scraper = new AmazonPdpAdScraper(
+        { execute } as unknown as AmazonPdpCountryScraper,
+        new AmazonPdpPriceHelper(sender.service),
+        sender.service,
+        { increment, gauge: vi.fn() } as unknown as MetricsService
+      );
+      const countries = [1, 2, 3].map((countryId) => buildAmazonCountry({ countryId }));
+      const result = scraper.execute(buildAd({ id: 7, skipCountryIds }), countries);
+      return { execute, increment, result };
+    };
+
+    it("does not scrape the countries the ad is missing in", () => {
+      const { execute } = setupSkip([1, 3]);
+
+      expect(execute).toHaveBeenCalledTimes(1);
+      expect(execute.mock.calls[0][0]).toMatchObject({ country: { countryId: 2 } });
+    });
+
+    it("finishes an ad missing in every country as empty", async () => {
+      const { execute, increment, result } = setupSkip([1, 2, 3]);
+
+      await result;
+
+      expect(execute).not.toHaveBeenCalled();
+      expect(increment).toHaveBeenCalledWith("ads", { outcome: "empty" });
+    });
   });
 
   describe("metrics", () => {
@@ -125,7 +158,7 @@ describe("AmazonPdpAdScraper", () => {
     withPrice(2);
     await flush();
     expect(sender.prices).toHaveBeenCalledTimes(1);
-    expect(sender.prices).toHaveBeenCalledWith(7, sent([1, 2, 3]));
+    expect(sender.prices).toHaveBeenCalledWith(7, sent([1, 2, 3]), []);
     expect(done).toHaveBeenCalledTimes(1);
   });
 
@@ -146,7 +179,7 @@ describe("AmazonPdpAdScraper", () => {
     await flush();
 
     expect(sender.prices).toHaveBeenCalledTimes(1);
-    expect(sender.prices).toHaveBeenCalledWith(7, sent([1, 2, 3, 4]));
+    expect(sender.prices).toHaveBeenCalledWith(7, sent([1, 2, 3, 4]), []);
     expect(done).toHaveBeenCalledTimes(1);
     expect(runs[4].isCancelled()).toBe(true);
 
@@ -181,7 +214,7 @@ describe("AmazonPdpAdScraper", () => {
     withPrice(2);
     await flush();
 
-    expect(sender.prices).toHaveBeenCalledWith(7, sent([2, 3]));
+    expect(sender.prices).toHaveBeenCalledWith(7, sent([2, 3]), []);
     expect(done).toHaveBeenCalledTimes(1);
   });
 
@@ -205,7 +238,7 @@ describe("AmazonPdpAdScraper", () => {
       await flush();
 
       expect(runs[0].price).toMatchObject({ deleted: true, complete: true });
-      expect(sender.prices).toHaveBeenCalledWith(7, sent([3, 4, 5]));
+      expect(sender.prices).toHaveBeenCalledWith(7, sent([3, 4, 5]), []);
       expect(done).toHaveBeenCalledTimes(1);
     });
 
@@ -217,7 +250,7 @@ describe("AmazonPdpAdScraper", () => {
       await flush();
 
       expect(sender.deleted).not.toHaveBeenCalled();
-      expect(sender.prices).toHaveBeenCalledWith(7, sent([5]));
+      expect(sender.prices).toHaveBeenCalledWith(7, sent([5]), []);
       expect(done).toHaveBeenCalledTimes(1);
     });
 
@@ -265,7 +298,7 @@ describe("AmazonPdpAdScraper", () => {
 
       withPrice(2);
       await flush();
-      expect(sender.prices).toHaveBeenCalledWith(7, sent([1, 2]));
+      expect(sender.prices).toHaveBeenCalledWith(7, sent([1, 2]), []);
       expect(done).toHaveBeenCalledTimes(1);
     });
 
@@ -281,7 +314,7 @@ describe("AmazonPdpAdScraper", () => {
       withPrice(3);
       await flush();
 
-      expect(sender.prices).toHaveBeenCalledWith(7, sent([1, 2, 3, 4]));
+      expect(sender.prices).toHaveBeenCalledWith(7, sent([1, 2, 3, 4]), []);
       expect(done).toHaveBeenCalledTimes(1);
       expect(runs[4].isCancelled()).toBe(true);
 

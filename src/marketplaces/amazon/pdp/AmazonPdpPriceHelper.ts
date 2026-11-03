@@ -31,6 +31,10 @@ export class AmazonPdpPriceHelper {
         dispatchFrom: price.dispatchFrom,
       }));
 
-    this.resultSender.prices(ad.id, prepared);
+    const missingCountryIds = prices
+      .filter((price) => price.missing)
+      .map((price) => price.country.countryId);
+
+    this.resultSender.prices(ad.id, prepared, missingCountryIds);
   }
 }

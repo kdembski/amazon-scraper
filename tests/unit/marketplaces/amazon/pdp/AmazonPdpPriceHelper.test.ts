@@ -85,14 +85,27 @@ describe("AmazonPdpPriceHelper", () => {
       expect(sender.prices).toHaveBeenCalledWith(7, [
         { adId: 7, countryId: 1, value: 19.99, dispatchFrom: "Amazon" },
         { adId: 7, countryId: 3, value: 21.5, dispatchFrom: undefined },
-      ]);
+      ], []);
     });
 
     // The backend counts every ad with prices as scraped in its stats
     it("sends an empty list when no country has a price", () => {
       const { sender, helper } = setup();
       helper.sendCompletedPrices([buildPrice(), buildPrice()], ad);
-      expect(sender.prices).toHaveBeenCalledWith(7, []);
+      expect(sender.prices).toHaveBeenCalledWith(7, [], []);
+    });
+
+    it("sends the countries the ad is missing in", () => {
+      const { sender, helper } = setup();
+      const prices = [
+        buildPrice({ country: buildAmazonCountry({ countryId: 1 }), missing: true }),
+        buildPrice({ country: buildAmazonCountry({ countryId: 2 }) }),
+        buildPrice({ country: buildAmazonCountry({ countryId: 3 }), missing: true }),
+      ];
+
+      helper.sendCompletedPrices(prices, ad);
+
+      expect(sender.prices).toHaveBeenCalledWith(7, [], [1, 3]);
     });
 
     it("sends nothing for an ad without countries", () => {
