@@ -1,5 +1,6 @@
 import { CronJob } from "cron";
 import _ from "lodash";
+import type http from "node:http";
 import { ProxyAgentPool } from "@/shared/http/proxy/ProxyAgentPool";
 import { ProxyList } from "@/shared/http/proxy/ProxyList";
 import { ProxyTrafficMeter } from "@/shared/http/proxy/ProxyTrafficMeter";
@@ -30,7 +31,7 @@ export class ProxyService {
   }
 
   // Proxy of the pool whose idle connection to the host was freed last, else
-  // a random one; "direct" connects without a proxy, "mixedN" directly up to
+  // a random one not blocked by the host; "direct" connects without a proxy, "mixedN" directly up to
   // N rps per host and through datacenter proxies above
   getAgent(host: string, proxyType = "datacenter") {
     if (proxyType === "direct") return this.pool.getDirect();
@@ -44,9 +45,19 @@ export class ProxyService {
     const proxies = this.getProxies(proxyType);
     const url =
       this.pool.takeLastFree(host, (url) => proxies.includes(url)) ??
-      this.getRandomProxy(proxies);
+      this.getRandomProxy(this.getUnblocked(proxies, host));
 
     return this.pool.get(url);
+  }
+
+  block(agent: http.Agent, host: string) {
+    this.pool.block(agent, host);
+  }
+
+  // All proxies when the host blocked every one of them
+  private getUnblocked(proxies: string[], host: string) {
+    const unblocked = proxies.filter((url) => !this.pool.isBlocked(url, host));
+    return unblocked.length ? unblocked : proxies;
   }
 
   private getLimiter(host: string, rps: number) {

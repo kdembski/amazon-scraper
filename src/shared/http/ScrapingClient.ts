@@ -1,4 +1,5 @@
 import axios from "axios";
+import type http from "node:http";
 import type { Readable } from "node:stream";
 import _ from "lodash";
 import { ScraperConfigService } from "@/shared/backend/ScraperConfigService";
@@ -41,7 +42,7 @@ export class ScrapingClient {
     url: string,
     referer?: string,
     callback?: {
-      onSuccess?: (data: T) => void;
+      onSuccess?: (data: T, block: () => void) => void;
       onError?: (e: any) => void;
       isCancelled?: () => boolean;
     },
@@ -52,13 +53,16 @@ export class ScrapingClient {
     this.queueService.request(async () => {
       if (callback?.isCancelled?.()) return;
 
-      let httpsAgent;
+      let host: string;
+      let httpsAgent: http.Agent;
       try {
-        httpsAgent = this.proxyService.getAgent(new URL(url).hostname, proxyType);
+        host = new URL(url).hostname;
+        httpsAgent = this.proxyService.getAgent(host, proxyType);
       } catch (e) {
         callback?.onError?.(e);
         return;
       }
+      const block = () => this.proxyService.block(httpsAgent, host);
       const userAgent = _.sample(this.userAgents);
 
       const startedAt = Date.now();
@@ -93,10 +97,11 @@ export class ScrapingClient {
               ? ((await this.read(response.data as Readable, stopAt)) as T)
               : response.data;
             record("ok");
-            callback?.onSuccess?.(data);
+            callback?.onSuccess?.(data, block);
           })
           .catch((e) => {
             if (stopAt) e?.response?.data?.resume?.();
+            if (e?.response?.status === 503) block();
             record(
               e?.response?.status
                 ? `http_${e.response.status}`

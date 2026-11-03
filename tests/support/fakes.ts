@@ -34,7 +34,7 @@ export function fakeAmazonCountryService() {
 }
 
 type GetCallback = {
-  onSuccess?: (data: string) => void;
+  onSuccess?: (data: string, block: () => void) => void;
   onError?: (e: any) => void;
   isCancelled?: () => boolean;
 };
@@ -57,8 +57,8 @@ export function fakeAmazonService() {
   );
   const service = { get, queueService } as unknown as AmazonService;
 
-  const respond = (index: number, data: string) =>
-    requests[index].callback.onSuccess?.(data);
+  const respond = (index: number, data: string, block = vi.fn()) =>
+    requests[index].callback.onSuccess?.(data, block);
   const fail = (index: number, error: any = new Error("Network error")) =>
     requests[index].callback.onError?.(error);
 

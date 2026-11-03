@@ -16,7 +16,9 @@ import _ from "lodash";
 
 export const NOT_FOUND_TO_DELETE = 2;
 
-type FetchResult = { ok: true; data: string } | { ok: false; status?: number };
+type FetchResult =
+  | { ok: true; data: string; block: () => void }
+  | { ok: false; status?: number };
 
 export class AmazonPdpCountryScraper {
   constructor(
@@ -84,7 +86,7 @@ export class AmazonPdpCountryScraper {
         url,
         referer,
         {
-          onSuccess: (data) => resolve({ ok: true, data }),
+          onSuccess: (data, block) => resolve({ ok: true, data, block }),
           onError: (e) => resolve({ ok: false, status: e?.status }),
           isCancelled,
         },
@@ -121,6 +123,7 @@ export class AmazonPdpCountryScraper {
       const ad = builder.build(parseDocument(builder.trimHtml(result.data)));
 
       if (ad.isCaptcha) {
+        result.block();
         this.countResponse(price, "captcha");
         return;
       }
