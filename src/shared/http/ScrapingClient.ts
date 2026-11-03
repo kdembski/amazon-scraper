@@ -6,6 +6,7 @@ import { ScraperConfigService } from "@/shared/backend/ScraperConfigService";
 import { ProxyService } from "@/shared/http/proxy/ProxyService";
 import { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
 import { MetricsService } from "@/shared/metrics/MetricsService";
+import type { StopAt } from "@/shared/http/http.types";
 import type { MetricLabels, RequestOutcome } from "@/shared/metrics/metrics.types";
 
 export class ScrapingClient {
@@ -48,7 +49,7 @@ export class ScrapingClient {
     },
     labels: MetricLabels = {},
     proxyType?: string,
-    stopAt?: string[]
+    stopAt?: StopAt
   ) {
     this.queueService.request(async () => {
       if (callback?.isCancelled?.()) return;
@@ -117,7 +118,7 @@ export class ScrapingClient {
   }
 
   // Text of the stream up to the chunk that completes the markers in order
-  private read(stream: Readable, stopAt: string[]) {
+  private read(stream: Readable, stopAt: StopAt) {
     return new Promise<string>((resolve, reject) => {
       let text = "";
       let next = 0;
@@ -127,12 +128,18 @@ export class ScrapingClient {
       stream.on("data", (chunk: string) => {
         text += chunk;
         while (next < stopAt.length) {
-          const index = text.indexOf(stopAt[next], from);
-          if (index === -1) {
-            from = Math.max(from, text.length - stopAt[next].length);
+          const markers = _.castArray(stopAt[next]);
+          const found = _.minBy(
+            markers
+              .map((marker) => ({ marker, index: text.indexOf(marker, from) }))
+              .filter(({ index }) => index !== -1),
+            "index"
+          );
+          if (!found) {
+            from = Math.max(from, text.length - _.max(markers.map((marker) => marker.length))!);
             return;
           }
-          from = index + stopAt[next].length;
+          from = found.index + found.marker.length;
           next++;
         }
         stream.destroy();

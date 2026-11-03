@@ -24,8 +24,19 @@ describe("AmazonTwisterAdBuilder", () => {
     });
   });
 
-  it("stops downloading after the buy box part", () => {
-    expect(builder.stopAt).toEqual(['"FeatureName" : "desktop_buybox"', "&&&"]);
+  it("stops downloading after the shipper, at the latest after the buy box part", () => {
+    expect(builder.stopAt).toEqual([
+      '"FeatureName" : "desktop_buybox"',
+      ['desktop-return-info\\"', "&&&"],
+    ]);
+  });
+
+  it("stops at the return info row, not at the accordion header before the shipper", () => {
+    const marker = (builder.stopAt![1] as string[])[0];
+    const row = (name: string) => JSON.stringify(`<div offer-display-feature-name="${name}">`);
+
+    expect(row("desktop-return-info")).toContain(marker);
+    expect(row("desktop-return-info-collapsed")).not.toContain(marker);
   });
 
   it("treats a 404 as no data, not as a deleted product", () => {
@@ -45,6 +56,35 @@ describe("AmazonTwisterAdBuilder", () => {
       const response = twisterResponse(twisterBuybox({ price: "24,99" }), { closed: false });
 
       expect(builder.trimHtml(response)).toContain("apex-pricetopay-value");
+    });
+
+    it("reads a buy box cut after the shipper", () => {
+      const buybox = twisterBuybox({ price: "24,99", shipsFrom: "Amazon", soldBy: "Allmax" });
+      const response = twisterResponse(
+        `${buybox}<div offer-display-feature-name="desktop-return-info">Returns</div>`
+      );
+
+      expect(build(response.slice(0, response.indexOf('desktop-return-info\\"')))).toEqual({
+        isCaptcha: false,
+        isValid: true,
+        price: 24.99,
+        dispatchFrom: "Amazon",
+      });
+    });
+
+    it.each([
+      ["a quote", '\\"'],
+      ["a control character", "\\u0001"],
+    ])("reads a buy box cut inside an escaped %s", (_name, escape) => {
+      const response = twisterResponse(
+        `${twisterBuybox({ price: "24,99" })}<div title="\u0001">"</div>`
+      );
+
+      for (let length = 1; length < escape.length; length++) {
+        const cut = response.slice(0, response.lastIndexOf(escape) + length);
+
+        expect(builder.trimHtml(cut)).toContain("apex-pricetopay-value");
+      }
     });
 
     it("keeps a page without the buy box part", () => {

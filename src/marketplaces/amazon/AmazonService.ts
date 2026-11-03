@@ -1,3 +1,4 @@
+import type { StopAt } from "@/shared/http/http.types";
 import { ScrapingClient } from "@/shared/http/ScrapingClient";
 
 export class AmazonService {
@@ -27,7 +28,7 @@ export class AmazonService {
       isCancelled?: () => boolean;
     },
     proxyType?: string,
-    stopAt?: string[]
+    stopAt?: StopAt
   ) {
     this.scrapingClient.get<T>(
       `${this.baseUrl}${url}`,

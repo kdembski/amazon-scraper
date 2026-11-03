@@ -1,6 +1,7 @@
 import axios from "axios";
 import { Readable } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { StopAt } from "@/shared/http/http.types";
 import { ScrapingClient } from "@/shared/http/ScrapingClient";
 import type { ScraperConfigService } from "@/shared/backend/ScraperConfigService";
 import type { ProxyService } from "@/shared/http/proxy/ProxyService";
@@ -311,7 +312,7 @@ describe("ScrapingClient", () => {
         );
         get.mockResolvedValue({ data: stream });
         const callback = { onSuccess: vi.fn(), onError: vi.fn() };
-        const run = async (markers: string[] = stopAt) => {
+        const run = async (markers: StopAt = stopAt) => {
           service.get(url, undefined, callback, {}, undefined, markers);
           await Promise.all(requests);
         };
@@ -345,6 +346,16 @@ describe("ScrapingClient", () => {
         await run();
 
         expect(callback.onSuccess).toHaveBeenCalledWith("&&&<b>x&&&", expect.any(Function));
+      });
+
+      it("cuts at whichever alternative marker comes first", async () => {
+        const first = setupStream(["<b>x", "&&&y", "##z", "rest"]);
+        await first.run(["<b>", ["##", "&&&"]]);
+        const second = setupStream(["<b>x#", "#y", "&&&z", "rest"]);
+        await second.run(["<b>", ["##", "&&&"]]);
+
+        expect(first.callback.onSuccess).toHaveBeenCalledWith("<b>x&&&y", expect.any(Function));
+        expect(second.callback.onSuccess).toHaveBeenCalledWith("<b>x##y", expect.any(Function));
       });
 
       it("passes the whole response when the markers never arrive", async () => {
