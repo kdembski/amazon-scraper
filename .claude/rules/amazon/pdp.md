@@ -52,9 +52,9 @@ Goal: for every ASIN, get the price and the shipper (`dispatchFrom`) in every Am
    4. No outcome → `failed++`; at 6 (`MAX_FAILED_ATTEMPTS`) → `given_up`; otherwise backoff 1 s, 2 s, 4 s ... max 60 s, with jitter.
 3. Result mapping:
    - 404 from the last source: `twister` → `no_data`; others → `notFound++`, at 2 (`NOT_FOUND_TO_DELETE`) in an active country, at 1 in an inactive one → `deleted`, before that retry. Both final cases set `missing`.
-   - other HTTP error / timeout / network → retry; 503 also blocks the proxy for the host (see 7).
+   - other HTTP error / timeout / network → retry; 403, 429 and 503 also block the direct family for the host (see 7).
    - empty response → retry (`responses{outcome=empty}`).
-   - captcha → blocks the proxy for the host (see 7), retry (`captcha`).
+   - captcha → blocks the direct family for the host (see 7), retry (`captcha`).
    - `isValid === false` → retry (`invalid`).
    - parse exception → retry (`parse_error`).
    - price found → `data`, stores `value` + `dispatchFrom`.
@@ -84,8 +84,8 @@ Shared:
 
 - `ScrapingClient.get()` – the only path to Amazon. Random Chrome User-Agent, Referer, hard 20 s timeout. With the builder's `stopAt` markers it reads a stream and destroys it (closes the connection) once they arrived in order; a step given as an array is done by whichever of its markers comes first.
 - `TokenBucketQueue` – `concurrency` and `rps` limits from the config.
-- `ProxyService.getAgent(host, proxyType)` – proxy with a free keep-alive connection to the host, otherwise random among those not blocked by the host; missing type → `datacenter`. `direct` → one keep-alive agent without a proxy (`ProxyAgentPool.getDirect`, 15 s idle timeout). `mixedN` (e.g. `mixed10`) → `direct` up to N rps per host and process (`RateLimiter`, token bucket, burst N), above that the `datacenter` pool.
-- Block (`ProxyAgentPool.block`): a 503 (`ScrapingClient`) or a captcha (`block` passed to `onSuccess`) closes the proxy's idle connections to the host and blocks the proxy + host pair for 5 min: its connections are not offered as free (closed when freed) and random picks skip it (all blocked → any). No effect on `direct`.
+- `ProxyService.getAgent(host, proxyType)` – proxy with a free keep-alive connection to the host, otherwise random; missing type → `datacenter`. `direct` → no proxy, keep-alive agents per IP family (`ProxyAgentPool.getDirect(4 | 6)`, 15 s idle timeout), IPv4 and IPv6 in turn; IPv6 only when a TCP ping to `2606:4700:4700::1111:443` succeeds at each proxy list load (start, hourly; Docker network needs `enable_ipv6`). `mixedN` (e.g. `mixed1`) → `direct` in every other N-minute window by wall clock (all processes of a server switch together), the `datacenter` pool in between. While the host blocks every direct family, `direct` and `mixedN` use the `datacenter` pool.
+- Block (`ProxyAgentPool.block`): a 403, 429 or 503 (`ScrapingClient`) or a captcha (`block` passed to `onSuccess`) on a direct agent closes its idle connections to the host and blocks the direct family + host for 5 min: its connections are closed when freed and picks skip it (all direct families blocked → `datacenter`). Proxy agents are not blocked. Amazon limits IPv6 per /64, so the direct IPv6 agent stands for the whole /64.
 
 ## Where to look
 

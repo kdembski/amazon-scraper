@@ -102,7 +102,7 @@ export class ScrapingClient {
           })
           .catch((e) => {
             if (stopAt) e?.response?.data?.resume?.();
-            if (e?.response?.status === 503) block();
+            if ([403, 429, 503].includes(e?.response?.status)) block();
             record(
               e?.response?.status
                 ? `http_${e.response.status}`

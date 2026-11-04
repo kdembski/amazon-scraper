@@ -151,7 +151,7 @@ describe("AmazonPdpCountryScraper", () => {
       expect(amazon.requests[1].url).toBe("c1/dp/B0TESTASIN");
     });
 
-    it("blocks the proxy on a captcha", async () => {
+    it("blocks the agent on a captcha", async () => {
       const { amazon, run } = setup({ isCaptcha: true });
       run();
       const block = vi.fn();

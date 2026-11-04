@@ -22,3 +22,7 @@ services:
     environment:
       NODE_OPTIONS: --max-old-space-size=4096
       name: amazon-plp
+
+networks:
+  default:
+    enable_ipv6: true
