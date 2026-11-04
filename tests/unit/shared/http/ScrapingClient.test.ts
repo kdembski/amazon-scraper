@@ -126,7 +126,7 @@ describe("ScrapingClient", () => {
       expect(callback.onError).not.toHaveBeenCalled();
     });
 
-    it("lets onSuccess block the proxy for the host", async () => {
+    it("lets onSuccess block the agent for the host", async () => {
       const { service, agent, proxy, requests } = setup();
       get.mockResolvedValue({ data: "<html>" });
       const onSuccess = vi.fn((_data: string, block: () => void) => block());
@@ -137,7 +137,7 @@ describe("ScrapingClient", () => {
       expect(proxy.block).toHaveBeenCalledWith(agent, "www.amazon.de");
     });
 
-    it.each([403, 429, 503])("blocks the proxy for the host on a %s before onError", async (status) => {
+    it.each([403, 429, 503])("blocks the agent for the host on a %s before onError", async (status) => {
       const { service, agent, proxy, requests } = setup();
       get.mockRejectedValue({ response: { status } });
       const onError = vi.fn(() => expect(proxy.block).toHaveBeenCalledWith(agent, "www.amazon.de"));
@@ -148,7 +148,7 @@ describe("ScrapingClient", () => {
       expect(onError).toHaveBeenCalled();
     });
 
-    it("does not block the proxy on other errors", async () => {
+    it("does not block the agent on other errors", async () => {
       const { service, proxy, requests } = setup();
       get.mockRejectedValue({ response: { status: 404 } });
 

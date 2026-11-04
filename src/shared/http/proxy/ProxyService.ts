@@ -36,7 +36,7 @@ export class ProxyService {
   }
 
   // Proxy of the pool whose idle connection to the host was freed last, else
-  // a random one not blocked by the host; "direct" connects without a proxy
+  // a random one; "direct" connects without a proxy
   // over the server's IPv4 and IPv6 in turn, "mixedN" directly in every other
   // N-minute window and through datacenter proxies in between; both fall back
   // to datacenter proxies while the host blocks every direct family
@@ -49,19 +49,13 @@ export class ProxyService {
     const proxies = this.getProxies(proxyType);
     const url =
       this.pool.takeLastFree(host, (url) => proxies.includes(url)) ??
-      this.getRandomProxy(this.getUnblocked(proxies, host));
+      this.getRandomProxy(proxies);
 
     return this.pool.get(url);
   }
 
   block(agent: http.Agent, host: string) {
     this.pool.block(agent, host);
-  }
-
-  // All proxies when the host blocked every one of them
-  private getUnblocked(proxies: string[], host: string) {
-    const unblocked = proxies.filter((url) => !this.pool.isBlocked(url, host));
-    return unblocked.length ? unblocked : proxies;
   }
 
   private isDirectWindow(proxyType: string) {

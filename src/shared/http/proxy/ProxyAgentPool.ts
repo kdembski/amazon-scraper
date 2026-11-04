@@ -9,7 +9,7 @@ export class ProxyAgentPool {
   private directs = new Map<string, MeteredAgent>();
   // Per host, proxies in the order their idle connection was last freed
   private freed = new Map<string, Set<string>>();
-  // "<proxy> <host>" pairs blocked by the host, until the given time
+  // "<direct key> <host>" pairs blocked by the host, until the given time
   private blocked = new Map<string, number>();
   private idleTimeout = 15 * 1000;
   private blockTime = 5 * 60 * 1000;
@@ -27,11 +27,7 @@ export class ProxyAgentPool {
       );
       agent.options.timeout = this.idleTimeout;
       agent.protocol = "https:";
-      agent.on("free", (socket: net.Socket, options: { host: string }) => {
-        if (this.isBlocked(url, options.host)) {
-          socket.destroy();
-          return;
-        }
+      agent.on("free", (_socket, options: { host: string }) => {
         this.markFree(url, options.host);
       });
       this.agents.set(url, agent);
@@ -92,21 +88,21 @@ export class ProxyAgentPool {
     }
   }
 
-  // Closes the proxy's (or direct agent's) idle connections to the host after
-  // a block (403, 429, 503, captcha) and keeps it away from the host for a while
+  // Closes the direct agent's idle connections to the host after a block (403,
+  // 429, 503, captcha) and keeps it away from the host for a while; proxy
+  // agents are left alone
   block(agent: http.Agent, host: string) {
-    const url = [...this.agents, ...this.directs].find(([, known]) => known === agent)?.[0];
-    if (!url) return;
+    const key = [...this.directs].find(([, known]) => known === agent)?.[0];
+    if (!key) return;
 
-    this.blocked.set(`${url} ${host}`, Date.now() + this.blockTime);
-    this.freed.get(host)?.delete(url);
+    this.blocked.set(`${key} ${host}`, Date.now() + this.blockTime);
     Object.entries(agent.freeSockets).forEach(([name, sockets]) => {
       if (name.startsWith(`${host}:`)) sockets?.forEach((socket) => socket.destroy());
     });
   }
 
-  isBlocked(url: string, host: string) {
-    const key = `${url} ${host}`;
+  private isBlocked(directKey: string, host: string) {
+    const key = `${directKey} ${host}`;
     const until = this.blocked.get(key);
     if (!until) return false;
     if (until > Date.now()) return true;

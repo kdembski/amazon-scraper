@@ -23,7 +23,6 @@ const setup = () => {
         undefined
     ),
     countConnections: vi.fn(() => 7),
-    isBlocked: vi.fn((_url: string, _host: string) => false),
     block: vi.fn(),
   };
   const list = { load: vi.fn().mockResolvedValue({ datacenter: urls, isp: ispUrls }) };
@@ -134,25 +133,6 @@ describe("ProxyService", () => {
       vi.spyOn(Math, "random").mockReturnValue(0.99);
       expect(service.getAgent("www.amazon.de")).toEqual({ url: urls[1] });
       expect(pool.get).toHaveBeenCalledTimes(2);
-    });
-
-    it("picks a random proxy among those not blocked by the host", async () => {
-      const { service, pool } = setup();
-      await service.loadProxies();
-      pool.isBlocked.mockImplementation((url, host) => url === urls[0] && host === "www.amazon.de");
-
-      vi.spyOn(Math, "random").mockReturnValue(0);
-      expect(service.getAgent("www.amazon.de")).toEqual({ url: urls[1] });
-      expect(service.getAgent("www.amazon.fr")).toEqual({ url: urls[0] });
-    });
-
-    it("picks any proxy when the host blocked all of them", async () => {
-      const { service, pool } = setup();
-      await service.loadProxies();
-      pool.isBlocked.mockReturnValue(true);
-
-      vi.spyOn(Math, "random").mockReturnValue(0);
-      expect(service.getAgent("www.amazon.de")).toEqual({ url: urls[0] });
     });
 
     it("returns the proxy whose idle connection to the host was freed last", async () => {
