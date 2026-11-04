@@ -15,7 +15,8 @@ const setup = () => {
   const meter = { collect: vi.fn(() => ({ bytesIn: 3, bytesOut: 1 })) };
   const pool = {
     get: vi.fn((url: string) => ({ url })),
-    getDirect: vi.fn(() => ({ direct: true })),
+    getDirect: vi.fn((family: 4 | 6) => ({ direct: family })),
+    isDirectBlocked: vi.fn((_family: 4 | 6, _host: string) => false),
     retain: vi.fn(),
     takeLastFree: vi.fn(
       (_host: string, _accept: (url: string) => boolean): string | undefined =>
@@ -26,20 +27,23 @@ const setup = () => {
     block: vi.fn(),
   };
   const list = { load: vi.fn().mockResolvedValue({ datacenter: urls, isp: ispUrls }) };
+  const pingIpv6 = vi.fn<() => Promise<number | undefined>>().mockResolvedValue(undefined);
 
   resetSingleton(ProxyService);
   const Service = ProxyService as unknown as new (
     meter: ProxyTrafficMeter,
     pool: ProxyAgentPool,
-    list: ProxyList
+    list: ProxyList,
+    pingIpv6: () => Promise<number | undefined>
   ) => ProxyService;
   const service = new Service(
     meter as unknown as ProxyTrafficMeter,
     pool as unknown as ProxyAgentPool,
-    list as unknown as ProxyList
+    list as unknown as ProxyList,
+    pingIpv6
   );
 
-  return { service, meter, pool, list };
+  return { service, meter, pool, list, pingIpv6 };
 };
 
 describe("ProxyService", () => {
@@ -81,12 +85,15 @@ describe("ProxyService", () => {
       expect(pool.retain).toHaveBeenCalledWith([...urls, ...ispUrls]);
     });
 
-    it("logs the number of proxies of every pool", async () => {
-      const { service } = setup();
+    it("logs the number of proxies of every pool and the direct IP families", async () => {
+      const { service, pingIpv6 } = setup();
 
       await service.loadProxies();
+      pingIpv6.mockResolvedValue(12);
+      await service.loadProxies();
 
-      expect(console.log).toHaveBeenCalledWith("Proxies: datacenter 2, isp 1");
+      expect(console.log).toHaveBeenCalledWith("Proxies: datacenter 2, isp 1, direct IPv4");
+      expect(console.log).toHaveBeenCalledWith("Proxies: datacenter 2, isp 1, direct IPv4+IPv6");
     });
 
     it("lets a second caller share the load in progress", async () => {
@@ -180,48 +187,69 @@ describe("ProxyService", () => {
       expect(service.getAgent("www.amazon.de", "isp")).toEqual({ url: ispUrls[0] });
     });
 
-    it("returns the direct agent for the direct type", async () => {
-      const { service, pool } = setup();
-      await service.loadProxies();
+    describe("direct", () => {
+      it("connects over IPv4 when the server has no IPv6", async () => {
+        const { service, pool } = setup();
+        await service.loadProxies();
 
-      expect(service.getAgent("www.amazon.pl", "direct")).toEqual({ direct: true });
-      expect(pool.get).not.toHaveBeenCalled();
-      expect(pool.takeLastFree).not.toHaveBeenCalled();
+        expect(service.getAgent("www.amazon.pl", "direct")).toEqual({ direct: 4 });
+        expect(service.getAgent("www.amazon.pl", "direct")).toEqual({ direct: 4 });
+        expect(pool.get).not.toHaveBeenCalled();
+        expect(pool.takeLastFree).not.toHaveBeenCalled();
+      });
+
+      it("connects over IPv4 and IPv6 in turn when the server has IPv6", async () => {
+        const { service, pingIpv6 } = setup();
+        pingIpv6.mockResolvedValue(12);
+        await service.loadProxies();
+
+        const agents = [1, 2, 3].map(() => service.getAgent("www.amazon.pl", "direct"));
+
+        expect(agents).toEqual([{ direct: 4 }, { direct: 6 }, { direct: 4 }]);
+      });
+
+      it("skips the IP family blocked by the host", async () => {
+        const { service, pool, pingIpv6 } = setup();
+        pingIpv6.mockResolvedValue(12);
+        await service.loadProxies();
+        pool.isDirectBlocked.mockImplementation((family, host) => family === 6 && host === "www.amazon.pl");
+
+        expect(service.getAgent("www.amazon.pl", "direct")).toEqual({ direct: 4 });
+        expect(service.getAgent("www.amazon.pl", "direct")).toEqual({ direct: 4 });
+      });
+
+      it("falls back to datacenter proxies while the host blocks every IP family", async () => {
+        const { service, pool } = setup();
+        await service.loadProxies();
+        pool.isDirectBlocked.mockReturnValue(true);
+
+        vi.spyOn(Math, "random").mockReturnValue(0);
+        expect(service.getAgent("www.amazon.pl", "direct")).toEqual({ url: urls[0] });
+      });
     });
 
     describe("mixed", () => {
-      it("returns the direct agent up to the rps limit, datacenter proxies above", async () => {
+      const minute = 60 * 1000;
+
+      it("connects directly in every other N-minute window, through datacenter proxies in between", async () => {
         const { service } = setup();
         await service.loadProxies();
         vi.spyOn(Math, "random").mockReturnValue(0);
 
-        const agents = [1, 2, 3].map(() => service.getAgent("www.amazon.pl", "mixed2"));
-
-        expect(agents).toEqual([{ direct: true }, { direct: true }, { url: urls[0] }]);
+        vi.setSystemTime(0);
+        expect(service.getAgent("www.amazon.pl", "mixed2")).toEqual({ direct: 4 });
+        vi.setSystemTime(2 * minute - 1);
+        expect(service.getAgent("www.amazon.pl", "mixed2")).toEqual({ direct: 4 });
+        vi.setSystemTime(2 * minute);
+        expect(service.getAgent("www.amazon.pl", "mixed2")).toEqual({ url: urls[0] });
+        vi.setSystemTime(4 * minute);
+        expect(service.getAgent("www.amazon.pl", "mixed2")).toEqual({ direct: 4 });
       });
 
-      it("returns the direct agent again after the limit refills", async () => {
-        const { service } = setup();
-        await service.loadProxies();
-        service.getAgent("www.amazon.pl", "mixed1");
-
-        vi.advanceTimersByTime(1000);
-
-        expect(service.getAgent("www.amazon.pl", "mixed1")).toEqual({ direct: true });
-      });
-
-      it("limits every host separately", async () => {
-        const { service } = setup();
-        await service.loadProxies();
-        service.getAgent("www.amazon.pl", "mixed1");
-
-        expect(service.getAgent("www.amazon.ie", "mixed1")).toEqual({ direct: true });
-      });
-
-      it("accepts only idle datacenter proxies above the limit", async () => {
+      it("accepts only idle datacenter proxies between the direct windows", async () => {
         const { service, pool } = setup();
         await service.loadProxies();
-        service.getAgent("www.amazon.pl", "mixed1");
+        vi.setSystemTime(minute);
 
         service.getAgent("www.amazon.pl", "mixed1");
         const accept = pool.takeLastFree.mock.calls[0][1];
@@ -229,11 +257,22 @@ describe("ProxyService", () => {
         expect(accept(urls[0])).toBe(true);
         expect(accept(ispUrls[0])).toBe(false);
       });
+
+      it("falls back to datacenter proxies while the host blocks direct connections", async () => {
+        const { service, pool } = setup();
+        await service.loadProxies();
+        pool.isDirectBlocked.mockReturnValue(true);
+        vi.setSystemTime(0);
+
+        vi.spyOn(Math, "random").mockReturnValue(0);
+        expect(service.getAgent("www.amazon.pl", "mixed1")).toEqual({ url: urls[0] });
+      });
     });
 
     it.each([
       ["an unknown", { datacenter: urls }, "residential"],
-      ["a mixed without a limit", { datacenter: urls }, "mixed"],
+      ["a mixed without a window", { datacenter: urls }, "mixed"],
+      ["a mixed with a zero window", { datacenter: urls }, "mixed0"],
       ["an empty", { datacenter: urls, isp: [] }, "isp"],
     ])("falls back to the datacenter pool for %s pool", async (_name, pools, proxyType) => {
       const { service, list } = setup();

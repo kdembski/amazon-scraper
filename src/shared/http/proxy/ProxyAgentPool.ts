@@ -5,7 +5,8 @@ import { MeteredProxyAgent } from "@/shared/http/proxy/MeteredProxyAgent";
 
 export class ProxyAgentPool {
   private agents = new Map<string, MeteredProxyAgent>();
-  private direct?: MeteredAgent;
+  // Direct agents per IP family, keyed "direct4" / "direct6"
+  private directs = new Map<string, MeteredAgent>();
   // Per host, proxies in the order their idle connection was last freed
   private freed = new Map<string, Set<string>>();
   // "<proxy> <host>" pairs blocked by the host, until the given time
@@ -39,13 +40,30 @@ export class ProxyAgentPool {
     return agent;
   }
 
-  getDirect() {
-    this.direct ??= new MeteredAgent(
-      { keepAlive: true, timeout: this.idleTimeout },
-      this.onConnect
-    );
+  getDirect(family: 4 | 6) {
+    const key = this.getDirectKey(family);
+    let agent = this.directs.get(key);
 
-    return this.direct;
+    if (!agent) {
+      agent = new MeteredAgent(
+        { keepAlive: true, timeout: this.idleTimeout, family },
+        this.onConnect
+      );
+      agent.on("free", (socket: net.Socket, options: { host: string }) => {
+        if (this.isBlocked(key, options.host)) socket.destroy();
+      });
+      this.directs.set(key, agent);
+    }
+
+    return agent;
+  }
+
+  isDirectBlocked(family: 4 | 6, host: string) {
+    return this.isBlocked(this.getDirectKey(family), host);
+  }
+
+  private getDirectKey(family: 4 | 6) {
+    return `direct${family}`;
   }
 
   hasFreeSocket(url: string, host: string) {
@@ -74,10 +92,10 @@ export class ProxyAgentPool {
     }
   }
 
-  // Closes the proxy's idle connections to the host after a block (503,
-  // captcha) and keeps the proxy away from the host for a while
+  // Closes the proxy's (or direct agent's) idle connections to the host after
+  // a block (403, 429, 503, captcha) and keeps it away from the host for a while
   block(agent: http.Agent, host: string) {
-    const url = [...this.agents].find(([, proxyAgent]) => proxyAgent === agent)?.[0];
+    const url = [...this.agents, ...this.directs].find(([, known]) => known === agent)?.[0];
     if (!url) return;
 
     this.blocked.set(`${url} ${host}`, Date.now() + this.blockTime);
@@ -118,7 +136,7 @@ export class ProxyAgentPool {
   countConnections() {
     let count = 0;
 
-    [...this.agents.values(), ...(this.direct ? [this.direct] : [])].forEach((agent) => {
+    [...this.agents.values(), ...this.directs.values()].forEach((agent) => {
       [agent.sockets, agent.freeSockets].forEach((pool) => {
         Object.values(pool).forEach((sockets) => {
           count += sockets?.length ?? 0;

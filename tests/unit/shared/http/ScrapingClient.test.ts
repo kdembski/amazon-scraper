@@ -137,9 +137,9 @@ describe("ScrapingClient", () => {
       expect(proxy.block).toHaveBeenCalledWith(agent, "www.amazon.de");
     });
 
-    it("blocks the proxy for the host on a 503 before onError", async () => {
+    it.each([403, 429, 503])("blocks the proxy for the host on a %s before onError", async (status) => {
       const { service, agent, proxy, requests } = setup();
-      get.mockRejectedValue({ response: { status: 503 } });
+      get.mockRejectedValue({ response: { status } });
       const onError = vi.fn(() => expect(proxy.block).toHaveBeenCalledWith(agent, "www.amazon.de"));
 
       service.get("https://www.amazon.de/dp/B0TESTASIN", "https://www.amazon.de", { onError });

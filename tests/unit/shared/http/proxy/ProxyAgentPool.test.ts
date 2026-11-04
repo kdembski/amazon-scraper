@@ -68,16 +68,21 @@ describe("ProxyAgentPool", () => {
   });
 
   describe("getDirect", () => {
-    it("reuses one metered agent", () => {
+    it("reuses one metered agent per IP family", () => {
       const pool = new ProxyAgentPool(vi.fn());
-      const agent = pool.getDirect();
+      const agent = pool.getDirect(4);
 
       expect(agent).toBeInstanceOf(MeteredAgent);
-      expect(pool.getDirect()).toBe(agent);
+      expect(pool.getDirect(4)).toBe(agent);
+      expect(pool.getDirect(6)).not.toBe(agent);
+    });
+
+    it.each([4, 6] as const)("connects over IPv%s", (family) => {
+      expect(new ProxyAgentPool(vi.fn()).getDirect(family).options.family).toBe(family);
     });
 
     it("keeps connections alive and closes idle ones after 15 s", () => {
-      const agent = new ProxyAgentPool(vi.fn()).getDirect();
+      const agent = new ProxyAgentPool(vi.fn()).getDirect(4);
 
       expect(agent.options.keepAlive).toBe(true);
       expect(agent.options.timeout).toBe(15 * 1000);
@@ -85,13 +90,13 @@ describe("ProxyAgentPool", () => {
 
     it("is not destroyed by retain", () => {
       const pool = new ProxyAgentPool(vi.fn());
-      const agent = pool.getDirect();
+      const agent = pool.getDirect(4);
       const destroy = vi.spyOn(agent, "destroy");
 
       pool.retain([]);
 
       expect(destroy).not.toHaveBeenCalled();
-      expect(pool.getDirect()).toBe(agent);
+      expect(pool.getDirect(4)).toBe(agent);
     });
   });
 
@@ -259,15 +264,32 @@ describe("ProxyAgentPool", () => {
       expect(pool.takeLastFree(de, accept)).toBeUndefined();
     });
 
-    it("ignores the direct agent", () => {
+    it("blocks a direct agent for the host and closes its idle connections", () => {
+      vi.useFakeTimers();
       const pool = new ProxyAgentPool(vi.fn());
-      const direct = pool.getDirect();
+      const direct = pool.getDirect(6);
       const socket = { destroy: vi.fn() };
       (direct.freeSockets as unknown as Pool)[`${de}:443:::::`] = [socket];
 
       pool.block(direct, de);
 
-      expect(socket.destroy).not.toHaveBeenCalled();
+      expect(socket.destroy).toHaveBeenCalled();
+      expect(pool.isDirectBlocked(6, de)).toBe(true);
+      expect(pool.isDirectBlocked(4, de)).toBe(false);
+      expect(pool.isDirectBlocked(6, "www.amazon.fr")).toBe(false);
+      vi.advanceTimersByTime(5 * 60 * 1000);
+      expect(pool.isDirectBlocked(6, de)).toBe(false);
+    });
+
+    it("closes connections of a blocked direct agent freed later", () => {
+      const pool = new ProxyAgentPool(vi.fn());
+      const direct = pool.getDirect(4);
+      const socket = { destroy: vi.fn() };
+      pool.block(direct, de);
+
+      direct.listeners("free").at(-1)?.(socket, { host: de });
+
+      expect(socket.destroy).toHaveBeenCalled();
     });
   });
 
@@ -305,13 +327,14 @@ describe("ProxyAgentPool", () => {
       expect(pool.countConnections()).toBe(5);
     });
 
-    it("counts sockets of the direct agent", () => {
+    it("counts sockets of the direct agents", () => {
       const pool = new ProxyAgentPool(vi.fn());
-      const direct = pool.getDirect();
+      const direct = pool.getDirect(4);
       (direct.sockets as unknown as Pool)["www.amazon.pl:443"] = [{}];
       (direct.freeSockets as unknown as Pool)["www.amazon.pl:443"] = [{}, {}];
+      (pool.getDirect(6).sockets as unknown as Pool)["www.amazon.pl:443"] = [{}];
 
-      expect(pool.countConnections()).toBe(3);
+      expect(pool.countConnections()).toBe(4);
     });
 
     it("returns 0 without agents", () => {
