@@ -43,7 +43,7 @@ export class ScrapingClient {
     url: string,
     referer?: string,
     callback?: {
-      onSuccess?: (data: T, block: () => void) => void;
+      onSuccess?: (data: T) => void;
       onError?: (e: any) => void;
       isCancelled?: () => boolean;
     },
@@ -63,7 +63,6 @@ export class ScrapingClient {
         callback?.onError?.(e);
         return;
       }
-      const block = () => this.proxyService.block(httpsAgent, host);
       const userAgent = _.sample(this.userAgents);
 
       const startedAt = Date.now();
@@ -98,11 +97,11 @@ export class ScrapingClient {
               ? ((await this.read(response.data as Readable, stopAt)) as T)
               : response.data;
             record("ok");
-            callback?.onSuccess?.(data, block);
+            callback?.onSuccess?.(data);
           })
           .catch((e) => {
             if (stopAt) e?.response?.data?.resume?.();
-            if ([403, 429, 503].includes(e?.response?.status)) block();
+            if ([403, 429].includes(e?.response?.status)) this.proxyService.block(httpsAgent, host);
             record(
               e?.response?.status
                 ? `http_${e.response.status}`

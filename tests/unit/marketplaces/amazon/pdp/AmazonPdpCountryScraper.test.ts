@@ -151,17 +151,6 @@ describe("AmazonPdpCountryScraper", () => {
       expect(amazon.requests[1].url).toBe("c1/dp/B0TESTASIN");
     });
 
-    it("blocks the agent on a captcha", async () => {
-      const { amazon, run } = setup({ isCaptcha: true });
-      run();
-      const block = vi.fn();
-
-      amazon.respond(0, html, block);
-      await flush();
-
-      expect(block).toHaveBeenCalled();
-    });
-
     it("on a network error", async () => {
       const { amazon, price, run } = setup();
       run();

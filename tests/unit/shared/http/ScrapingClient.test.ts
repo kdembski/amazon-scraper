@@ -122,22 +122,11 @@ describe("ScrapingClient", () => {
       service.get("https://www.amazon.de/dp/B0TESTASIN", "https://www.amazon.de", callback);
       await Promise.all(requests);
 
-      expect(callback.onSuccess).toHaveBeenCalledWith("<html>", expect.any(Function));
+      expect(callback.onSuccess).toHaveBeenCalledWith("<html>");
       expect(callback.onError).not.toHaveBeenCalled();
     });
 
-    it("lets onSuccess block the agent for the host", async () => {
-      const { service, agent, proxy, requests } = setup();
-      get.mockResolvedValue({ data: "<html>" });
-      const onSuccess = vi.fn((_data: string, block: () => void) => block());
-
-      service.get("https://www.amazon.de/dp/B0TESTASIN", "https://www.amazon.de", { onSuccess });
-      await Promise.all(requests);
-
-      expect(proxy.block).toHaveBeenCalledWith(agent, "www.amazon.de");
-    });
-
-    it.each([403, 429, 503])("blocks the agent for the host on a %s before onError", async (status) => {
+    it.each([403, 429])("blocks the agent for the host on a %s before onError", async (status) => {
       const { service, agent, proxy, requests } = setup();
       get.mockRejectedValue({ response: { status } });
       const onError = vi.fn(() => expect(proxy.block).toHaveBeenCalledWith(agent, "www.amazon.de"));
@@ -148,9 +137,9 @@ describe("ScrapingClient", () => {
       expect(onError).toHaveBeenCalled();
     });
 
-    it("does not block the agent on other errors", async () => {
+    it.each([404, 503])("does not block the agent on a %s", async (status) => {
       const { service, proxy, requests } = setup();
-      get.mockRejectedValue({ response: { status: 404 } });
+      get.mockRejectedValue({ response: { status } });
 
       service.get("https://www.amazon.de/dp/B0TESTASIN", "https://www.amazon.de");
       await Promise.all(requests);
@@ -327,7 +316,7 @@ describe("ScrapingClient", () => {
 
         expect(get.mock.calls[0][1]).toMatchObject({ responseType: "stream" });
         expect(callback.onSuccess).toHaveBeenCalledTimes(1);
-        expect(callback.onSuccess).toHaveBeenCalledWith("<a><b>x&&&y", expect.any(Function));
+        expect(callback.onSuccess).toHaveBeenCalledWith("<a><b>x&&&y");
         expect(stream.destroyed).toBe(true);
         expect(metrics.increment).toHaveBeenCalledWith("requests", { outcome: "ok" });
       });
@@ -337,7 +326,7 @@ describe("ScrapingClient", () => {
 
         await run();
 
-        expect(callback.onSuccess).toHaveBeenCalledWith("<a><b>x&&&y", expect.any(Function));
+        expect(callback.onSuccess).toHaveBeenCalledWith("<a><b>x&&&y");
       });
 
       it("ignores a later marker seen before the earlier one", async () => {
@@ -345,7 +334,7 @@ describe("ScrapingClient", () => {
 
         await run();
 
-        expect(callback.onSuccess).toHaveBeenCalledWith("&&&<b>x&&&", expect.any(Function));
+        expect(callback.onSuccess).toHaveBeenCalledWith("&&&<b>x&&&");
       });
 
       it("cuts at whichever alternative marker comes first", async () => {
@@ -354,8 +343,8 @@ describe("ScrapingClient", () => {
         const second = setupStream(["<b>x#", "#y", "&&&z", "rest"]);
         await second.run(["<b>", ["##", "&&&"]]);
 
-        expect(first.callback.onSuccess).toHaveBeenCalledWith("<b>x&&&y", expect.any(Function));
-        expect(second.callback.onSuccess).toHaveBeenCalledWith("<b>x##y", expect.any(Function));
+        expect(first.callback.onSuccess).toHaveBeenCalledWith("<b>x&&&y");
+        expect(second.callback.onSuccess).toHaveBeenCalledWith("<b>x##y");
       });
 
       it("passes the whole response when the markers never arrive", async () => {
@@ -363,7 +352,7 @@ describe("ScrapingClient", () => {
 
         await run();
 
-        expect(callback.onSuccess).toHaveBeenCalledWith("<a><b>", expect.any(Function));
+        expect(callback.onSuccess).toHaveBeenCalledWith("<a><b>");
       });
 
       it("decodes a character split across chunks", async () => {
@@ -372,7 +361,7 @@ describe("ScrapingClient", () => {
 
         await run(["x"]);
 
-        expect(callback.onSuccess).toHaveBeenCalledWith("€", expect.any(Function));
+        expect(callback.onSuccess).toHaveBeenCalledWith("€");
       });
 
       it("reports a stream error once", async () => {

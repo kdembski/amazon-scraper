@@ -243,7 +243,9 @@ describe("ProxyAgentPool", () => {
       expect(pool.isDirectBlocked(6, de)).toBe(true);
       expect(pool.isDirectBlocked(4, de)).toBe(false);
       expect(pool.isDirectBlocked(6, "www.amazon.fr")).toBe(false);
-      vi.advanceTimersByTime(5 * 60 * 1000);
+      vi.advanceTimersByTime(10 * 60 * 1000 - 1);
+      expect(pool.isDirectBlocked(6, de)).toBe(true);
+      vi.advanceTimersByTime(1);
       expect(pool.isDirectBlocked(6, de)).toBe(false);
     });
 
