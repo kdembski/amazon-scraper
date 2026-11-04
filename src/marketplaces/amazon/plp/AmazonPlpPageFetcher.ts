@@ -31,7 +31,7 @@ export class AmazonPlpPageFetcher {
       if (failed) await sleep(getRetryDelay(failed));
 
       const response = await this.get(url, referer, stopAt);
-      const page = response && this.build(response.html, build, response.block);
+      const page = response && this.build(response.html, build);
       if (page) return { page, failed };
     }
 
@@ -40,8 +40,7 @@ export class AmazonPlpPageFetcher {
 
   private build<T extends PlpBuildResult>(
     html: string,
-    build: (document: Document) => T,
-    block: () => void
+    build: (document: Document) => T
   ) {
     if (!html.length) {
       this.countResponse("empty");
@@ -51,7 +50,6 @@ export class AmazonPlpPageFetcher {
     try {
       const document = parseDocument(html);
       if (this.captchaDetector.detect(document)) {
-        block();
         this.countResponse("captcha");
         return;
       }
@@ -76,12 +74,12 @@ export class AmazonPlpPageFetcher {
       await sleep(QUEUE_FULL_DELAY);
     }
 
-    return new Promise<{ html: string; block: () => void } | undefined>((resolve) =>
+    return new Promise<{ html: string } | undefined>((resolve) =>
       this.amazonService.get<string>(
         url,
         referer,
         {
-          onSuccess: (html, block) => resolve({ html, block }),
+          onSuccess: (html) => resolve({ html }),
           onError: () => resolve(undefined),
         },
         undefined,

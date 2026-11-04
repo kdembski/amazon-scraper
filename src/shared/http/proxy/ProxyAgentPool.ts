@@ -12,7 +12,7 @@ export class ProxyAgentPool {
   // "<direct key> <host>" pairs blocked by the host, until the given time
   private blocked = new Map<string, number>();
   private idleTimeout = 15 * 1000;
-  private blockTime = 5 * 60 * 1000;
+  private blockTime = 10 * 60 * 1000;
 
   constructor(private onConnect: (socket: net.Socket) => void) {}
 
@@ -88,9 +88,8 @@ export class ProxyAgentPool {
     }
   }
 
-  // Closes the direct agent's idle connections to the host after a block (403,
-  // 429, 503, captcha) and keeps it away from the host for a while; proxy
-  // agents are left alone
+  // Closes the direct agent's idle connections to the host after a 403 or
+  // 429 and keeps it away from the host for a while; proxy agents are left alone
   block(agent: http.Agent, host: string) {
     const key = [...this.directs].find(([, known]) => known === agent)?.[0];
     if (!key) return;

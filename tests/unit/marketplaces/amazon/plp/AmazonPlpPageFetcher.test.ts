@@ -77,18 +77,6 @@ describe("AmazonPlpPageFetcher", () => {
     expect(responses(increment)).toEqual(["captcha", "data"]);
   });
 
-  it("blocks the agent on a captcha", async () => {
-    const { amazon, fetcher } = setup();
-    const block = vi.fn();
-
-    fetcher.fetch("url", "ref", () => valid);
-    await vi.advanceTimersByTimeAsync(0);
-    amazon.respond(0, captchaPage, block);
-    await vi.advanceTimersByTimeAsync(0);
-
-    expect(block).toHaveBeenCalled();
-  });
-
   it("counts a valid page without ads as no_data", async () => {
     const { amazon, fetcher, increment } = setup();
 

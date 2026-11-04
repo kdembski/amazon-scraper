@@ -23,7 +23,7 @@ export class AmazonService {
     url: string,
     referer?: string,
     callback?: {
-      onSuccess?: (data: T, block: () => void) => void;
+      onSuccess?: (data: T) => void;
       onError?: (e: any) => void;
       isCancelled?: () => boolean;
     },
