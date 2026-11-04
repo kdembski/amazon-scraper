@@ -37,8 +37,8 @@ export class ProxyService {
 
   // Proxy of the pool whose idle connection to the host was freed last, else
   // a random one; "direct" connects without a proxy
-  // over the server's IPv4 and IPv6 in turn, "mixedN" directly in every other
-  // N-minute window and through datacenter proxies in between; both fall back
+  // over the server's IPv4 and IPv6 in turn, "mixedN/M" directly for N minutes
+  // and through datacenter proxies for the next M (M = N when left out); both fall back
   // to datacenter proxies while the host blocks every direct family
   getAgent(host: string, proxyType = "datacenter") {
     if (proxyType === "direct" || this.isDirectWindow(proxyType)) {
@@ -59,10 +59,14 @@ export class ProxyService {
   }
 
   private isDirectWindow(proxyType: string) {
-    const minutes = Number(proxyType.match(/^mixed(\d+)$/)?.[1]);
-    if (!minutes) return false;
+    const mixed = proxyType.match(/^mixed(\d+)(?:\/(\d+))?$/);
+    const direct = Number(mixed?.[1]);
+    if (!direct) return false;
 
-    return Math.floor(Date.now() / (minutes * 60 * 1000)) % 2 === 0;
+    const proxy = Number(mixed?.[2] ?? direct);
+    const minute = Math.floor(Date.now() / (60 * 1000));
+
+    return minute % (direct + proxy) < direct;
   }
 
   private getDirect(host: string) {

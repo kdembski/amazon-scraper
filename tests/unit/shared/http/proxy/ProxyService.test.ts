@@ -226,6 +226,25 @@ describe("ProxyService", () => {
         expect(service.getAgent("www.amazon.pl", "mixed2")).toEqual({ direct: 4 });
       });
 
+      it("connects directly for N minutes and through datacenter proxies for the next M with mixedN/M", async () => {
+        const { service } = setup();
+        await service.loadProxies();
+        vi.spyOn(Math, "random").mockReturnValue(0);
+
+        const agents = [0, 1, 2, 3, 4].map((m) => {
+          vi.setSystemTime(m * minute);
+          return service.getAgent("www.amazon.pl", "mixed1/2");
+        });
+
+        expect(agents).toEqual([
+          { direct: 4 },
+          { url: urls[0] },
+          { url: urls[0] },
+          { direct: 4 },
+          { url: urls[0] },
+        ]);
+      });
+
       it("accepts only idle datacenter proxies between the direct windows", async () => {
         const { service, pool } = setup();
         await service.loadProxies();
@@ -253,6 +272,8 @@ describe("ProxyService", () => {
       ["an unknown", { datacenter: urls }, "residential"],
       ["a mixed without a window", { datacenter: urls }, "mixed"],
       ["a mixed with a zero window", { datacenter: urls }, "mixed0"],
+      ["a mixed with a zero direct window", { datacenter: urls }, "mixed0/2"],
+      ["a malformed mixed", { datacenter: urls }, "mixed1/"],
       ["an empty", { datacenter: urls, isp: [] }, "isp"],
     ])("falls back to the datacenter pool for %s pool", async (_name, pools, proxyType) => {
       const { service, list } = setup();
