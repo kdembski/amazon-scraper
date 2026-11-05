@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { MeteredProxyAgent } from "@/shared/http/proxy/MeteredProxyAgent";
 
 const connect = (agent: MeteredProxyAgent) =>
-  agent.connect({} as never, {} as never);
+  agent.connect({} as never, { host: "www.amazon.de" } as never);
 
 describe("MeteredProxyAgent", () => {
   afterEach(() => {
@@ -21,7 +21,7 @@ describe("MeteredProxyAgent", () => {
     const agent = new MeteredProxyAgent("http://u:p@1.1.1.1:8080", {}, onConnect);
 
     expect(await connect(agent)).toBe(tls);
-    expect(onConnect).toHaveBeenCalledWith(raw);
+    expect(onConnect).toHaveBeenCalledWith(raw, "www.amazon.de");
   });
 
   it("passes the socket itself when it has no parent", async () => {
@@ -33,6 +33,6 @@ describe("MeteredProxyAgent", () => {
     const agent = new MeteredProxyAgent("http://u:p@1.1.1.1:8080", {}, onConnect);
 
     expect(await connect(agent)).toBe(socket);
-    expect(onConnect).toHaveBeenCalledWith(socket);
+    expect(onConnect).toHaveBeenCalledWith(socket, "www.amazon.de");
   });
 });

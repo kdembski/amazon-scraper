@@ -7,7 +7,7 @@ export class MeteredProxyAgent extends HttpsProxyAgent<string> {
   constructor(
     proxy: string,
     options: HttpsProxyAgentOptions<string>,
-    private onConnect: (socket: net.Socket) => void
+    private onConnect: (socket: net.Socket, host: string) => void
   ) {
     super(proxy, options);
   }
@@ -17,7 +17,7 @@ export class MeteredProxyAgent extends HttpsProxyAgent<string> {
     opts: Parameters<HttpsProxyAgent<string>["connect"]>[1]
   ): Promise<net.Socket> {
     const socket = (await super.connect(req, opts)) as net.Socket;
-    this.onConnect((socket as { _parent?: net.Socket })._parent ?? socket);
+    this.onConnect((socket as { _parent?: net.Socket })._parent ?? socket, opts.host ?? "");
     return socket;
   }
 }
