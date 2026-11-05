@@ -63,6 +63,8 @@ export class ScrapingClient {
         callback?.onError?.(e);
         return;
       }
+      if (labels.country) this.proxyService.setCountry(host, labels.country);
+      const route = this.proxyService.getRoute(httpsAgent);
       const userAgent = _.sample(this.userAgents);
 
       const startedAt = Date.now();
@@ -71,6 +73,7 @@ export class ScrapingClient {
         if (recorded) return;
         recorded = true;
         this.metricsService.increment("requests", { ...labels, outcome });
+        this.metricsService.increment(`requests_${route}`, { ...labels, outcome });
         this.metricsService.increment(
           "request_ms",
           labels,

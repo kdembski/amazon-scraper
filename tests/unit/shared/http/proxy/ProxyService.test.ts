@@ -12,7 +12,10 @@ const urls = ["http://u1:p1@1.1.1.1:8080", "http://u2:p2@2.2.2.2:8081"];
 const ispUrls = ["http://u3:p3@3.3.3.3:8082"];
 
 const setup = () => {
-  const meter = { collect: vi.fn(() => ({ bytesIn: 3, bytesOut: 1 })) };
+  const meter = {
+    collect: vi.fn(() => [{ labels: { outcome: "proxy" }, bytesIn: 3, bytesOut: 1 }]),
+    setCountry: vi.fn(),
+  };
   const pool = {
     get: vi.fn((url: string) => ({ url })),
     getDirect: vi.fn((family: 4 | 6) => ({ direct: family })),
@@ -24,6 +27,7 @@ const setup = () => {
     ),
     countConnections: vi.fn(() => 7),
     block: vi.fn(),
+    getRoute: vi.fn(),
   };
   const list = { load: vi.fn().mockResolvedValue({ datacenter: urls, isp: ispUrls }) };
   const pingIpv6 = vi.fn<() => Promise<number | undefined>>().mockResolvedValue(undefined);
@@ -290,6 +294,40 @@ describe("ProxyService", () => {
   });
 
   it("collects traffic from the meter", () => {
-    expect(setup().service.collectTraffic()).toEqual({ bytesIn: 3, bytesOut: 1 });
+    expect(setup().service.collectTraffic()).toEqual([
+      { labels: { outcome: "proxy" }, bytesIn: 3, bytesOut: 1 },
+    ]);
+  });
+
+  it("names the route of an agent by the pool", () => {
+    const { service, pool } = setup();
+    pool.getRoute.mockReturnValue("direct6");
+    const agent = { direct: 6 };
+
+    expect(service.getRoute(agent as never)).toBe("direct6");
+    expect(pool.getRoute).toHaveBeenCalledWith(agent);
+  });
+
+  it("passes the country of a host to the meter", () => {
+    const { service, meter } = setup();
+
+    service.setCountry("www.amazon.de", "de");
+
+    expect(meter.setCountry).toHaveBeenCalledWith("www.amazon.de", "de");
+  });
+
+  it("tracks new connections of the pool in the meter with host and route", () => {
+    resetSingleton(ProxyService);
+    const service = ProxyService.getInstance() as unknown as {
+      meter: ProxyTrafficMeter;
+      pool: { onConnect: (...args: unknown[]) => void };
+    };
+    const track = vi.spyOn(service.meter, "track").mockImplementation(() => {});
+    const socket = {};
+
+    service.pool.onConnect(socket, "www.amazon.de", "direct4");
+
+    expect(track).toHaveBeenCalledWith(socket, "www.amazon.de", "direct4");
+    resetSingleton(ProxyService);
   });
 });

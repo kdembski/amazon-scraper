@@ -4,6 +4,7 @@ import { MetricsService } from "@/shared/metrics/MetricsService";
 import type { ArgsService } from "@/shared/args/ArgsService";
 import type { ScrapingClient } from "@/shared/http/ScrapingClient";
 import type { ProxyService } from "@/shared/http/proxy/ProxyService";
+import type { Traffic } from "@/shared/http/http.types";
 import { cronJobs } from "@@tests/support/cron";
 import { fakeApiService } from "@@tests/support/fakes";
 import { resetSingleton } from "@@tests/support/singleton";
@@ -22,7 +23,7 @@ const gauges = [
   { metric: "ping_ms", value: 24.5 },
 ];
 
-const setup = ({ target = "pdp", traffic = { bytesIn: 0, bytesOut: 0 } } = {}) => {
+const setup = ({ target = "pdp", traffic = [] as Traffic[] } = {}) => {
   const args = {
     getTargetFlag: vi.fn(() => target),
     getScraperName: vi.fn(async () => "amazon-pdp"),
@@ -210,14 +211,20 @@ describe("MetricsReporter", () => {
     expect(api.post.mock.calls[0][1].flow).toBe("plp");
   });
 
-  it("adds the traffic that is above zero", async () => {
-    const { api, reporter } = setup({ traffic: { bytesIn: 100, bytesOut: 0 } });
+  it("adds the traffic that is above zero with its country and route", async () => {
+    const { api, reporter } = setup({
+      traffic: [
+        { labels: { country: "de", outcome: "direct6" }, bytesIn: 100, bytesOut: 0 },
+        { labels: { country: "fr", outcome: "proxy" }, bytesIn: 0, bytesOut: 20 },
+      ],
+    });
     reporter.start("amazon");
 
     await reporter.send();
 
     expect(api.post.mock.calls[0][1].metrics).toEqual([
-      { metric: "bytes_in", value: 100 },
+      { metric: "bytes_in", country: "de", outcome: "direct6", value: 100 },
+      { metric: "bytes_out", country: "fr", outcome: "proxy", value: 20 },
       ...gauges,
     ]);
   });

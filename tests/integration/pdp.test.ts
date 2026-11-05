@@ -1,3 +1,4 @@
+import _ from "lodash";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
 import { NOT_FOUND_TO_DELETE } from "@/marketplaces/amazon/pdp/AmazonPdpCountryScraper";
@@ -388,14 +389,19 @@ describe("PDP", () => {
         (m: any) =>
           m.metric === metric && m.country === country && m.outcome === outcome
       )?.value;
+    const sum = (metric: string, country: string) =>
+      _.sumBy(metrics, (m: any) =>
+        m.metric === metric && m.country === country ? m.value : 0
+      );
     ["de", "fr", "it"].forEach((country) => {
       expect(value("requests", country, "ok")).toBe(1);
+      expect(value("requests_proxy", country, "ok")).toBe(1);
       expect(value("responses", country, "data")).toBe(1);
       expect(value("items", country, "data")).toBe(1);
+      expect(value("connections", country, "proxy")).toBeGreaterThanOrEqual(1);
+      expect(sum("bytes_in", country)).toBeGreaterThan(0);
+      expect(sum("bytes_out", country)).toBeGreaterThan(0);
     });
-    expect(value("connections")).toBeGreaterThanOrEqual(1);
-    expect(value("bytes_in")).toBeGreaterThan(0);
-    expect(value("bytes_out")).toBeGreaterThan(0);
     expect(value("batch_load", undefined, "ok")).toBeGreaterThanOrEqual(1);
     expect(value("ads", undefined, "prices")).toBe(1);
     expect(value("ad_duration_ms")).toBeGreaterThanOrEqual(0);

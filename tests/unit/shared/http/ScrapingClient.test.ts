@@ -21,6 +21,8 @@ const setup = () => {
   const proxy = {
     getAgent: vi.fn(() => agent),
     block: vi.fn(),
+    getRoute: vi.fn(() => "proxy"),
+    setCountry: vi.fn(),
   } as unknown as ProxyService;
   const requests: Promise<unknown>[] = [];
   const queue = {
@@ -189,13 +191,19 @@ describe("ScrapingClient", () => {
         queue.request.mockImplementation((cb: () => Promise<unknown>) => {
           requests.push(cb());
         });
+        const proxy = {
+          getAgent: vi.fn(),
+          block: vi.fn(),
+          getRoute: vi.fn(() => "direct6"),
+          setCountry: vi.fn(),
+        };
         const service = new Client(
           {} as ScraperConfigService,
-          { getAgent: vi.fn(), block: vi.fn() },
+          proxy,
           queue,
           metrics
         );
-        return { service, metrics, requests };
+        return { service, metrics, proxy, requests };
       };
       const url = "https://www.amazon.de/dp/X";
 
@@ -210,6 +218,31 @@ describe("ScrapingClient", () => {
           country: "de",
           outcome: "ok",
         });
+      });
+
+      it("counts the request also under the route of its agent", async () => {
+        const { service, metrics, requests } = setupMetrics();
+        get.mockRejectedValue({ response: { status: 503 } });
+
+        service.get(url, undefined, undefined, { country: "de" });
+        await Promise.all(requests);
+
+        expect(metrics.increment).toHaveBeenCalledWith("requests_direct6", {
+          country: "de",
+          outcome: "http_503",
+        });
+      });
+
+      it("passes the country of the host to the proxy service", async () => {
+        const { service, proxy, requests } = setupMetrics();
+        get.mockResolvedValue({ data: "" });
+
+        service.get(url, undefined, undefined, { country: "de" });
+        service.get(url);
+        await Promise.all(requests);
+
+        expect(proxy.setCountry).toHaveBeenCalledTimes(1);
+        expect(proxy.setCountry).toHaveBeenCalledWith("www.amazon.de", "de");
       });
 
       it("counts the outcome without labels", async () => {
@@ -292,7 +325,12 @@ describe("ScrapingClient", () => {
             requests.push(cb());
           }),
         };
-        const service = new Client({} as ScraperConfigService, { getAgent: vi.fn(), block: vi.fn() }, queue, metrics);
+        const service = new Client(
+          {} as ScraperConfigService,
+          { getAgent: vi.fn(), block: vi.fn(), getRoute: vi.fn(() => "proxy"), setCountry: vi.fn() },
+          queue,
+          metrics
+        );
         const stream = Readable.from(
           (async function* () {
             for (const chunk of chunks) yield Buffer.from(chunk);

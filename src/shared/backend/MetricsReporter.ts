@@ -62,9 +62,10 @@ export class MetricsReporter {
     if (this.unsent && !(await this.post(this.unsent))) return;
 
     const sentAt = this.now();
-    const { bytesIn, bytesOut } = this.proxyService.collectTraffic();
-    if (bytesIn > 0) this.metricsService.increment("bytes_in", {}, bytesIn);
-    if (bytesOut > 0) this.metricsService.increment("bytes_out", {}, bytesOut);
+    this.proxyService.collectTraffic().forEach(({ labels, bytesIn, bytesOut }) => {
+      if (bytesIn > 0) this.metricsService.increment("bytes_in", labels, bytesIn);
+      if (bytesOut > 0) this.metricsService.increment("bytes_out", labels, bytesOut);
+    });
 
     const counters = this.metricsService.drain();
     if (counters.length === 0) return;

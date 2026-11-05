@@ -1,4 +1,5 @@
 import http from "node:http";
+import https from "node:https";
 import type { AddressInfo } from "node:net";
 import net from "node:net";
 import { HttpsProxyAgent } from "https-proxy-agent";
@@ -52,7 +53,7 @@ describe("ProxyAgentPool", () => {
       expect(isSecureEndpoint).not.toHaveBeenCalled();
     });
 
-    it("passes every new connection to onConnect", async () => {
+    it("passes every new connection to onConnect with its host and the proxy route", async () => {
       const onConnect = vi.fn();
       const socket = { bytesRead: 0 };
       vi.spyOn(HttpsProxyAgent.prototype, "connect").mockResolvedValue(
@@ -61,9 +62,19 @@ describe("ProxyAgentPool", () => {
 
       await new ProxyAgentPool(onConnect)
         .get(first)
-        .connect({} as never, {} as never);
+        .connect({} as never, { host: "www.amazon.de" } as never);
 
-      expect(onConnect).toHaveBeenCalledWith(socket);
+      expect(onConnect).toHaveBeenCalledWith(socket, "www.amazon.de", "proxy");
+    });
+  });
+
+  describe("getRoute", () => {
+    it("names direct agents by IP family and every other agent proxy", () => {
+      const pool = new ProxyAgentPool(vi.fn());
+
+      expect(pool.getRoute(pool.getDirect(4))).toBe("direct4");
+      expect(pool.getRoute(pool.getDirect(6))).toBe("direct6");
+      expect(pool.getRoute(pool.get(first))).toBe("proxy");
     });
   });
 
@@ -75,6 +86,18 @@ describe("ProxyAgentPool", () => {
       expect(agent).toBeInstanceOf(MeteredAgent);
       expect(pool.getDirect(4)).toBe(agent);
       expect(pool.getDirect(6)).not.toBe(agent);
+    });
+
+    it.each([4, 6] as const)("passes new IPv%s connections to onConnect with the direct route", (family) => {
+      const socket = { bytesRead: 0 };
+      vi.spyOn(https.Agent.prototype, "createConnection").mockReturnValue(socket as never);
+      const onConnect = vi.fn();
+
+      new ProxyAgentPool(onConnect)
+        .getDirect(family)
+        .createConnection({ host: "www.amazon.de" } as http.ClientRequestArgs);
+
+      expect(onConnect).toHaveBeenCalledWith(socket, "www.amazon.de", `direct${family}`);
     });
 
     it.each([4, 6] as const)("connects over IPv%s", (family) => {

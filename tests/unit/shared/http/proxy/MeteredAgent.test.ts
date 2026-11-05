@@ -17,7 +17,9 @@ describe("MeteredAgent", () => {
     const onConnect = vi.fn();
     const agent = new MeteredAgent({}, onConnect);
 
-    expect(agent.createConnection({} as http.ClientRequestArgs)).toBe(socket);
-    expect(onConnect).toHaveBeenCalledWith(socket);
+    expect(
+      agent.createConnection({ host: "www.amazon.de" } as http.ClientRequestArgs)
+    ).toBe(socket);
+    expect(onConnect).toHaveBeenCalledWith(socket, "www.amazon.de");
   });
 });

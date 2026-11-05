@@ -18,7 +18,9 @@ export class ProxyService {
 
   private constructor(
     private meter = new ProxyTrafficMeter(),
-    private pool = new ProxyAgentPool((socket) => meter.track(socket)),
+    private pool = new ProxyAgentPool((socket, host, route) =>
+      meter.track(socket, host, route)
+    ),
     private list = new ProxyList(),
     private pingIpv6 = () => tcpPing(IPV6_PING_HOST, 443, 2000)
   ) {
@@ -56,6 +58,14 @@ export class ProxyService {
 
   block(agent: http.Agent, host: string) {
     this.pool.block(agent, host);
+  }
+
+  getRoute(agent: http.Agent) {
+    return this.pool.getRoute(agent);
+  }
+
+  setCountry(host: string, country: string) {
+    this.meter.setCountry(host, country);
   }
 
   private isDirectWindow(proxyType: string) {

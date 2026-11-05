@@ -12,7 +12,7 @@ paths:
 1. Code calls `MetricsService.increment(metric, { country?, outcome? }, value = 1)`. Rows with the same `metric + country + outcome` are summed.
 2. `MetricsService.gauge(metric, read)` registers a reader of a point-in-time value.
 3. `MetricsReporter` every minute (cron `0 * * * * *`):
-   1. adds `bytes_in` / `bytes_out` from the proxies;
+   1. adds `bytes_in` / `bytes_out` from the shop sockets, per country and route;
    2. takes the counters (`drain()`, reset); no counters → sends nothing;
    3. adds process metrics and gauges;
    4. `POST scrapers/<name>/metrics` with `{ marketplace, flow, periodStart, metrics: [...] }` and `Idempotency-Key`.
@@ -26,9 +26,12 @@ Types: counters = sum over the minute; gauges = value at report time. `*_ms` as 
 | Metric | Labels | What it describes |
 |---|---|---|
 | `requests` | `country` (from the URL: `de`, `co.uk`, `pl`...), `outcome`: `ok` / `timeout` / `network` / `http_<status>` | Every HTTP request to Amazon. `timeout` = 20 s exceeded. |
+| `requests_proxy` / `requests_direct4` / `requests_direct6` | same as `requests` | The same requests split by route: through a proxy, direct over IPv4, direct over IPv6. Their sum = `requests`. |
 | `request_ms` | `country` | Sum of request durations (all outcomes). Mean = `request_ms / requests`. |
-| `connections` | – | New sockets to shops opened in the minute (proxy and `direct`). |
-| `bytes_in` / `bytes_out` | – | Bytes received / sent through shop sockets (proxy and `direct`). |
+| `connections` | `country`, `outcome`: route (`proxy` / `direct4` / `direct6`) | New sockets to shops opened in the minute. |
+| `bytes_in` / `bytes_out` | `country`, `outcome`: route (`proxy` / `direct4` / `direct6`) | Bytes received / sent through shop sockets (raw socket: TLS, CONNECT and headers included). |
+
+`connections` and `bytes_*` take the country from the host: `ScrapingClient` hands `ProxyService.setCountry(host, country)` the country of every request; a host never requested with a country has none. `outcome` holds the route there, not a result.
 
 ## Responses and pages
 

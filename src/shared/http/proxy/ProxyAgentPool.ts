@@ -2,11 +2,12 @@ import type http from "node:http";
 import type net from "node:net";
 import { MeteredAgent } from "@/shared/http/proxy/MeteredAgent";
 import { MeteredProxyAgent } from "@/shared/http/proxy/MeteredProxyAgent";
+import type { Route } from "@/shared/http/http.types";
 
 export class ProxyAgentPool {
   private agents = new Map<string, MeteredProxyAgent>();
   // Direct agents per IP family, keyed "direct4" / "direct6"
-  private directs = new Map<string, MeteredAgent>();
+  private directs = new Map<Route, MeteredAgent>();
   // Per host, proxies in the order their idle connection was last freed
   private freed = new Map<string, Set<string>>();
   // "<direct key> <host>" pairs blocked by the host, until the given time
@@ -14,7 +15,9 @@ export class ProxyAgentPool {
   private idleTimeout = 15 * 1000;
   private blockTime = 10 * 60 * 1000;
 
-  constructor(private onConnect: (socket: net.Socket) => void) {}
+  constructor(
+    private onConnect: (socket: net.Socket, host: string, route: Route) => void
+  ) {}
 
   get(url: string) {
     let agent = this.agents.get(url);
@@ -23,7 +26,7 @@ export class ProxyAgentPool {
       agent = new MeteredProxyAgent(
         url,
         { keepAlive: true, maxFreeSockets: 1 },
-        this.onConnect
+        (socket, host) => this.onConnect(socket, host, "proxy")
       );
       agent.options.timeout = this.idleTimeout;
       agent.protocol = "https:";
@@ -43,7 +46,7 @@ export class ProxyAgentPool {
     if (!agent) {
       agent = new MeteredAgent(
         { keepAlive: true, timeout: this.idleTimeout, family },
-        this.onConnect
+        (socket, host) => this.onConnect(socket, host, key)
       );
       agent.on("free", (socket: net.Socket, options: { host: string }) => {
         if (this.isBlocked(key, options.host)) socket.destroy();
@@ -59,7 +62,15 @@ export class ProxyAgentPool {
   }
 
   private getDirectKey(family: 4 | 6) {
-    return `direct${family}`;
+    return `direct${family}` as const;
+  }
+
+  getRoute(agent: http.Agent): Route {
+    return this.findDirectKey(agent) ?? "proxy";
+  }
+
+  private findDirectKey(agent: http.Agent) {
+    return [...this.directs].find(([, known]) => known === agent)?.[0];
   }
 
   hasFreeSocket(url: string, host: string) {
@@ -91,7 +102,7 @@ export class ProxyAgentPool {
   // Closes the direct agent's idle connections to the host after a 403 or
   // 429 and keeps it away from the host for a while; proxy agents are left alone
   block(agent: http.Agent, host: string) {
-    const key = [...this.directs].find(([, known]) => known === agent)?.[0];
+    const key = this.findDirectKey(agent);
     if (!key) return;
 
     this.blocked.set(`${key} ${host}`, Date.now() + this.blockTime);
