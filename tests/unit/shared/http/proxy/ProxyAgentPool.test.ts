@@ -282,6 +282,28 @@ describe("ProxyAgentPool", () => {
 
       expect(socket.destroy).toHaveBeenCalled();
     });
+
+    it("keeps the connections a blocked direct agent holds to other hosts", () => {
+      const pool = new ProxyAgentPool(vi.fn());
+      const direct = pool.getDirect(4);
+      const other = { destroy: vi.fn() };
+      (direct.freeSockets as unknown as Pool)["www.amazon.fr:443:::::"] = [other];
+
+      pool.block(direct, de);
+      direct.listeners("free").at(-1)?.(other, { host: "www.amazon.fr" });
+
+      expect(other.destroy).not.toHaveBeenCalled();
+    });
+
+    it("keeps connections of a direct agent freed while it is not blocked", () => {
+      const pool = new ProxyAgentPool(vi.fn());
+      const direct = pool.getDirect(6);
+      const socket = { destroy: vi.fn() };
+
+      direct.listeners("free").at(-1)?.(socket, { host: de });
+
+      expect(socket.destroy).not.toHaveBeenCalled();
+    });
   });
 
   describe("retain", () => {

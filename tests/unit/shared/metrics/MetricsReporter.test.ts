@@ -259,4 +259,18 @@ describe("MetricsReporter", () => {
 
     expect(api.send.mock.calls[1][1].periodStart).toBe("2026-10-18T10:01:00.000Z");
   });
+
+  it("resends a failed report even when there are no new counters", async () => {
+    const { api, metrics, reporter } = setup();
+    api.send.mockRejectedValueOnce(new Error("down"));
+    metrics.increment("requests", { country: "de", outcome: "ok" });
+    reporter.start("amazon");
+
+    await reporter.send();
+    await reporter.send();
+
+    const [failed, retry] = api.send.mock.calls;
+    expect(api.send).toHaveBeenCalledTimes(2);
+    expect(retry[1]).toBe(failed[1]);
+  });
 });

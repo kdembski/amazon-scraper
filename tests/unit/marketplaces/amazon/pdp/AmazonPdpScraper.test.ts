@@ -146,6 +146,17 @@ describe("AmazonPdpScraper", () => {
       expect(adExecute).toHaveBeenCalledWith(ads[1], countries);
     });
 
+    it("loads a batch while the queue is at most a tenth of the batch", async () => {
+      const { api, country, queue, scraper } = setup({ batchSize: 50 });
+      country.getCountries.mockResolvedValue(countries);
+      api.get.mockResolvedValue([]);
+      queue.queue.push(...Array.from({ length: 5 }, () => vi.fn()));
+
+      await scraper.scrape();
+
+      expect(api.get).toHaveBeenCalledTimes(1);
+    });
+
     it("waits while the queue is longer than a tenth of the batch", async () => {
       const { api, country, queue, scraper } = setup({ batchSize: 50 });
       queue.queue.push(...Array.from({ length: 6 }, () => vi.fn()));

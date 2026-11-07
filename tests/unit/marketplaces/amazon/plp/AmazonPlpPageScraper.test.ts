@@ -95,6 +95,18 @@ describe("AmazonPlpPageScraper", () => {
     }
   );
 
+  it("paginates a range with 399 pages instead of splitting it", async () => {
+    const { requests, scraper, crawl } = setup(
+      (price) => ({ lastPage: price === "-999" ? 399 : 1 }),
+      true
+    );
+
+    await scraper.execute(crawl);
+
+    expect(requests()).not.toContainEqual({ price: "-499", number: 1 });
+    expect(requests().filter(({ price }) => price === "-999")).toHaveLength(399);
+  });
+
   it("splits the open range at double its minimum", async () => {
     const { requests, scraper, crawl } = setup((price) => ({
       lastPage: price === "500000-" ? 400 : 1,

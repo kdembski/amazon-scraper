@@ -88,6 +88,12 @@ describe("AmazonTwisterAdBuilder", () => {
     it("keeps a page without the buy box part", () => {
       expect(builder.trimHtml(captchaPage)).toBe(captchaPage);
     });
+
+    it("keeps a page whose buy box part has no buy box value", () => {
+      const response = '{ "FeatureName" : "desktop_buybox", "Value" : { "content" : {} } }&&&';
+
+      expect(builder.trimHtml(response)).toBe(response);
+    });
   });
 
   describe("build", () => {

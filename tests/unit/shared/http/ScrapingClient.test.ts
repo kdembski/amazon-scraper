@@ -85,6 +85,24 @@ describe("ScrapingClient", () => {
       });
     });
 
+    it("frees the queue slot only after the caller has handled the result", async () => {
+      const { service, requests } = setup();
+      get.mockResolvedValue({ data: "<html>" });
+      const order: string[] = [];
+
+      const handled = service.get("https://www.amazon.de/dp/B0TESTASIN").then(async () => {
+        await null;
+        await null;
+        await null;
+        order.push("caller");
+      });
+      await requests[0];
+      order.push("slot");
+      await handled;
+
+      expect(order).toEqual(["caller", "slot"]);
+    });
+
     it("resolves to the response data", async () => {
       const { service } = setup();
       get.mockResolvedValue({ data: "<html>" });
