@@ -1,9 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AmazonPlpPageScraper } from "@/marketplaces/amazon/plp/AmazonPlpPageScraper";
 import { AmazonPlpCrawl } from "@/marketplaces/amazon/plp/AmazonPlpCrawl";
-import type { AmazonPlpPageFetcher } from "@/marketplaces/amazon/plp/AmazonPlpPageFetcher";
+import { type AmazonPlpPageFetcher, PLP_MAX_FAILED_ATTEMPTS } from "@/marketplaces/amazon/plp/AmazonPlpPageFetcher";
 import type { MetricsService } from "@/shared/metrics/MetricsService";
-import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/RetryBackoff";
 import { fakeAmazonPlpAdSender } from "@@tests/support/fakes";
 
 type Reply = { lastPage?: number; asins?: string[]; failed?: number; givenUp?: boolean };
@@ -21,7 +20,7 @@ const setup = (reply: (price: string, number: number) => Reply = () => ({}), all
   const fetch = vi.fn(async (url: string, _referer: string, _build?: unknown, _stopAt?: string[]) => {
     const { price, number } = parse(url);
     const { lastPage = 1, asins = [`B0${price}P${number}`], failed = 0, givenUp } = reply(price, number);
-    if (givenUp) return { failed: MAX_FAILED_ATTEMPTS };
+    if (givenUp) return { failed: PLP_MAX_FAILED_ATTEMPTS };
     return { page: { isValid: true, ads: asins.map(ad), lastPage }, failed };
   });
   const increment = vi.fn();
@@ -94,6 +93,47 @@ describe("AmazonPlpPageScraper", () => {
       expect(requests()).toHaveLength(seeds.length + 2);
     }
   );
+
+  it("splits a given up range by its last page from an earlier run", async () => {
+    let run = 1;
+    const { requests, scraper, crawl } = setup((price) => ({
+      lastPage: price === "-999" ? 400 : 1,
+      givenUp: run === 2 && price === "-999",
+    }));
+    await scraper.execute(crawl);
+    run = 2;
+
+    await scraper.execute(crawl);
+
+    const second = requests().slice(seeds.length + 2);
+    expect(second).toContainEqual({ price: "-499", number: 1 });
+    expect(second).toContainEqual({ price: "500-999", number: 1 });
+    expect(second).toHaveLength(seeds.length + 2);
+  });
+
+  it("does not split a given up range without a known last page", async () => {
+    const { requests, scraper, crawl } = setup((price) => ({
+      lastPage: price === "-999" ? 400 : 1,
+      givenUp: price === "-999",
+    }));
+
+    await scraper.execute(crawl);
+
+    expect(requests()).not.toContainEqual({ price: "-499", number: 1 });
+    expect(requests()).toHaveLength(seeds.length);
+  });
+
+  it("keeps the last pages of each category apart", async () => {
+    const { requests, scraper, crawl, sender } = setup((price) => ({
+      lastPage: price === "-999" ? 400 : 1,
+      givenUp: requests().length > seeds.length + 2 && price === "-999",
+    }));
+    await scraper.execute(crawl);
+
+    await scraper.execute(new AmazonPlpCrawl("toys", false, sender.service));
+
+    expect(requests().slice(seeds.length + 2)).toHaveLength(seeds.length);
+  });
 
   it("paginates a range with 399 pages instead of splitting it", async () => {
     const { requests, scraper, crawl } = setup(
@@ -172,7 +212,7 @@ describe("AmazonPlpPageScraper", () => {
     expect(increment).toHaveBeenCalledWith(
       "item_attempts",
       { country: "pl", outcome: "given_up" },
-      MAX_FAILED_ATTEMPTS
+      PLP_MAX_FAILED_ATTEMPTS
     );
   });
 

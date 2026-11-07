@@ -1,6 +1,6 @@
 import _ from "lodash";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/RetryBackoff";
+import { PLP_MAX_FAILED_ATTEMPTS } from "@/marketplaces/amazon/plp/AmazonPlpPageFetcher";
 import { cronJobs } from "@@tests/support/cron";
 import { newReleasesPage, plpPage } from "@@tests/support/html";
 import {
@@ -166,42 +166,25 @@ describe("PLP", () => {
 
     await expect
       .poll(() => searches().length)
-      .toBe(MAX_FAILED_ATTEMPTS * PRICE_RANGES);
+      .toBe(PLP_MAX_FAILED_ATTEMPTS * PRICE_RANGES);
     await sleep(200);
 
-    expect(searches()).toHaveLength(MAX_FAILED_ATTEMPTS * PRICE_RANGES);
+    expect(searches()).toHaveLength(PLP_MAX_FAILED_ATTEMPTS * PRICE_RANGES);
     expect(world.backend.find("POST", "amazon/ads")).toHaveLength(0);
   });
 
-  it("sends the new releases of the category tree before searching the listings", async () => {
-    const pages: Record<string, string> = {
-      "pl/gp/new-releases/electronics": newReleasesPage({ asins: ["B0NEW1"], nodes: ["7"], next: true }),
-      "pl/gp/new-releases/electronics?pg=2": newReleasesPage({ asins: ["B0NEW2"] }),
-      "pl/gp/new-releases/electronics/7": newReleasesPage({ asins: ["B0NEW1", "B0NEW7"], nodes: ["7"] }),
-    };
-    world.amazon.respond(({ url }) => pages[url] ?? plpPage({ empty: true }));
+  it("does not crawl the new releases", async () => {
+    respondSearch(() => plpPage({ empty: true }));
     scrape();
 
-    await expect.poll(() => searches().length).toBeGreaterThan(0);
+    await expect.poll(() => searches().length).toBe(PRICE_RANGES);
+    await sleep(200);
 
-    const newReleases = world.amazon.requests.filter(({ url }) => isNewReleases(url));
-    expect(newReleases.map(({ url }) => url).sort()).toEqual(Object.keys(pages).sort());
-    expect(_.last(newReleases)!.at).toBeLessThanOrEqual(searches()[0].at);
-    expect(posted().map((ad: { asin: string }) => ad.asin).sort()).toEqual(["B0NEW1", "B0NEW2", "B0NEW7"]);
-    expect(posted()[0]).toEqual({
-      asin: "B0NEW1",
-      name: "Product B0NEW1",
-      image: "https://images-eu.ssl-images-amazon.com/images/I/B0NEW1.jpg",
-      categoryName: "electronics",
-    });
+    expect(world.amazon.requests).toHaveLength(PRICE_RANGES);
   });
 
-  it("sends an ASIN found in the new releases or another price range only once", async () => {
-    world.amazon.respond(({ url }) =>
-      isNewReleases(url)
-        ? newReleasesPage({ asins: ["B0SAME"] })
-        : plpPage({ asins: ["B0SAME", "B0LIST"] })
-    );
+  it("sends an ASIN found in another price range only once", async () => {
+    respondSearch(() => plpPage({ asins: ["B0SAME", "B0LIST"] }));
     scrape();
 
     await expect.poll(() => searches().length).toBe(PRICE_RANGES);

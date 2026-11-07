@@ -1,9 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Document } from "domhandler";
-import { AmazonPlpPageFetcher } from "@/marketplaces/amazon/plp/AmazonPlpPageFetcher";
+import { AmazonPlpPageFetcher, PLP_MAX_FAILED_ATTEMPTS } from "@/marketplaces/amazon/plp/AmazonPlpPageFetcher";
 import type { MetricsService } from "@/shared/metrics/MetricsService";
 import { find } from "@/shared/utils/html";
-import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/RetryBackoff";
 import { fakeAmazonService, fakeScraperConfigService, fakeTokenBucketQueue } from "@@tests/support/fakes";
 import { botWallPage, captchaPage, interstitialPage } from "@@tests/support/html";
 
@@ -118,18 +117,18 @@ describe("AmazonPlpPageFetcher", () => {
     expect(responses(increment)).toEqual(["empty", "invalid", "invalid", "data"]);
   });
 
-  it("gives up after MAX_FAILED_ATTEMPTS", async () => {
+  it("gives up after PLP_MAX_FAILED_ATTEMPTS", async () => {
     const { amazon, fetcher } = setup();
 
     const result = fetcher.fetch("url", "ref", () => valid);
-    for (let index = 0; index < MAX_FAILED_ATTEMPTS; index++) {
+    for (let index = 0; index < PLP_MAX_FAILED_ATTEMPTS; index++) {
       await vi.advanceTimersByTimeAsync(60 * 1000);
       amazon.fail(index);
     }
 
-    expect(await result).toEqual({ page: undefined, failed: MAX_FAILED_ATTEMPTS });
+    expect(await result).toEqual({ page: undefined, failed: PLP_MAX_FAILED_ATTEMPTS });
     await vi.advanceTimersByTimeAsync(60 * 1000);
-    expect(amazon.requests).toHaveLength(MAX_FAILED_ATTEMPTS);
+    expect(amazon.requests).toHaveLength(PLP_MAX_FAILED_ATTEMPTS);
   });
 
   it("waits while the request queue is full", async () => {

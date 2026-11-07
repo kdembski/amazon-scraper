@@ -2,9 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { AmazonNewReleasesScraper } from "@/marketplaces/amazon/plp/AmazonNewReleasesScraper";
 import { AmazonNewReleasesBuilder } from "@/marketplaces/amazon/plp/AmazonNewReleasesBuilder";
 import { AmazonPlpCrawl } from "@/marketplaces/amazon/plp/AmazonPlpCrawl";
-import type { AmazonPlpPageFetcher } from "@/marketplaces/amazon/plp/AmazonPlpPageFetcher";
+import { type AmazonPlpPageFetcher, PLP_MAX_FAILED_ATTEMPTS } from "@/marketplaces/amazon/plp/AmazonPlpPageFetcher";
 import type { MetricsService } from "@/shared/metrics/MetricsService";
-import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/RetryBackoff";
 import { newReleasesPage, toDocument } from "@@tests/support/html";
 import { fakeAmazonPlpAdSender } from "@@tests/support/fakes";
 
@@ -13,7 +12,7 @@ const setup = (pages: Record<string, string>) => {
   const sender = fakeAmazonPlpAdSender();
   const fetch = vi.fn(async (url: string, _referer: string, build: (document: any) => any, _stopAt?: string[]) =>
     pages[url] === undefined
-      ? { failed: MAX_FAILED_ATTEMPTS }
+      ? { failed: PLP_MAX_FAILED_ATTEMPTS }
       : { page: build(toDocument(pages[url])), failed: 0 }
   );
   const increment = vi.fn();

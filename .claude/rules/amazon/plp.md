@@ -9,7 +9,7 @@ paths:
 
 # Amazon PLP – flow
 
-Goal: find new ASINs in a category on amazon.pl (new releases + search listing) and send them to the backend. Country `pl` only.
+Goal: find new ASINs in a category on amazon.pl (search listing; new releases is disabled) and send them to the backend. Country `pl` only.
 
 **A PLP logic change (`src/marketplaces/amazon/plp/`, `AmazonService`, shared HTTP/backend) updates this file in the same commit.**
 
@@ -31,10 +31,10 @@ Goal: find new ASINs in a category on amazon.pl (new releases + search listing) 
 1. Creates `AmazonPlpCrawl(name, allPages = !scrapedAt)`:
    - `allPages = true` only on the category's first scrape (all pages);
    - afterwards only the first page of each price range.
-2. New releases first (`AmazonNewReleasesScraper`), then the listing (`AmazonPlpPageScraper`), sequentially.
+2. Listing only (`AmazonPlpPageScraper`). New releases (section 4) is disabled: `AmazonNewReleasesScraper` stays in the code but is not called.
 3. `crawl.post(ads)` – dedup by ASIN within the run, each ASIN sent once.
 
-## 4. New releases (`AmazonNewReleasesScraper`)
+## 4. New releases (`AmazonNewReleasesScraper`, disabled)
 
 1. Start: `pl/gp/new-releases/<category>`.
 2. From each page:
@@ -55,6 +55,7 @@ Goal: find new ASINs in a category on amazon.pl (new releases + search listing) 
    - last page ≥ 400 (`MAX_PAGES`, Amazon's limit) → range split in half (`AmazonPriceRange.split`), recursion on both halves;
    - an open range (`500000-`) splits into `[min, 2·min-1]` and `[2·min-]`, up to 1 000 000 zł;
    - a single-value range is not split.
+   - the last page of every range (per category) is kept in memory between runs; a given up page 1 uses the last known value to split or paginate, none known → range skipped.
 5. `allPages` → pages 2..lastPage sequentially; a given up page is skipped, the range goes on.
 6. Parsing (`AmazonPlpBuilder`):
    - products: `div[role='listitem']` (ASIN `data-asin`, `img`, name `a > h2 > span`);
@@ -67,13 +68,13 @@ Goal: find new ASINs in a category on amazon.pl (new releases + search listing) 
 
 1. Backpressure: request queue ≥ `batchSize` → waits 1 s at a time.
 2. Request via `AmazonService.get()` (default proxy `datacenter`) with the builder's `stopAt` markers: the stream is destroyed once they arrived in order.
-3. `AmazonPageReader` (shared with PDP) turns the response into a page. Retries up to 6 attempts (`MAX_FAILED_ATTEMPTS`), backoff 1 s, 2 s, 4 s ... with jitter, on:
+3. `AmazonPageReader` (shared with PDP) turns the response into a page. Retries up to 10 attempts (`PLP_MAX_FAILED_ATTEMPTS`; PDP and backend keep 6, `MAX_FAILED_ATTEMPTS`), backoff 1 s, 2 s, 4 s ... with jitter, on:
    - HTTP error / network / timeout (403 and 429 block the direct family for the host, see PDP 7);
    - empty response (`empty`);
    - captcha (`captcha`, `AmazonCaptchaDetector`, Akamai interstitial included), no block;
    - invalid page or parse exception (`invalid`).
 4. Success → `responses{outcome=data|no_data}`.
-5. 6 failures → page `given_up`, skipped.
+5. 10 failures → page `given_up`, skipped.
 
 ## 7. Sending (`AmazonPlpAdSender`)
 
