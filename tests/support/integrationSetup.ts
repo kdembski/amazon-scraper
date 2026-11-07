@@ -4,6 +4,15 @@ import { cronJobs } from "@@tests/support/cron";
 // Crons are triggered by hand through cronJobs
 vi.mock("cron", async () => (await import("@@tests/support/cron")).cronModule);
 
+// Tests run at any hour, the night pause would stop the PDP loop
+vi.mock("@/marketplaces/amazon/pdp/AmazonNightSchedule", () => ({
+  AmazonNightSchedule: class {
+    isNight() {
+      return false;
+    }
+  },
+}));
+
 // Retries go out right away, so a country can fail MAX_FAILED_ATTEMPTS times within a test
 vi.mock("@/shared/utils/retry", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/shared/utils/retry")>()),
