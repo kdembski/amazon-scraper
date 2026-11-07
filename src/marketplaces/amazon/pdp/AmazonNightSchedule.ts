@@ -1,5 +1,5 @@
-const NIGHT_START = 22;
-const NIGHT_END = 8;
+const NIGHT_START = 23;
+const NIGHT_END = 7;
 const TIME_ZONE = "Europe/Warsaw";
 
 export class AmazonNightSchedule {

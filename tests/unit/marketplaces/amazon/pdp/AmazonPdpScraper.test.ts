@@ -96,11 +96,11 @@ describe("AmazonPdpScraper", () => {
       country.getCountries.mockResolvedValue(countries);
       api.get.mockResolvedValue([]);
 
-      vi.setSystemTime(new Date("2026-01-15T21:00:00Z"));
+      vi.setSystemTime(new Date("2026-01-15T22:00:00Z"));
       await scraper.scrape();
       expect(api.get).not.toHaveBeenCalled();
 
-      vi.setSystemTime(new Date("2026-01-16T07:00:00Z"));
+      vi.setSystemTime(new Date("2026-01-16T06:00:00Z"));
       await scraper.scrape();
       expect(api.get).toHaveBeenCalledTimes(1);
       expect(log.mock.calls).toEqual([
