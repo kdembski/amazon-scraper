@@ -5,7 +5,7 @@ import { AmazonPdpResultSender } from "@/marketplaces/amazon/pdp/AmazonPdpResult
 import { AmazonPlpAdSender } from "@/marketplaces/amazon/plp/AmazonPlpAdSender";
 import { ApiService } from "@/shared/backend/ApiService";
 import { AmazonCountryService } from "@/marketplaces/amazon/AmazonCountryService";
-import { MetricsReporter } from "@/shared/backend/MetricsReporter";
+import { MetricsReporter } from "@/shared/metrics/MetricsReporter";
 import { MetricsService } from "@/shared/metrics/MetricsService";
 import { ScrapingClient } from "@/shared/http/ScrapingClient";
 import { ArgsService } from "@/shared/args/ArgsService";

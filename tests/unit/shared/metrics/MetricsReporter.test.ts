@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { MetricsReporter } from "@/shared/backend/MetricsReporter";
+import { MetricsReporter } from "@/shared/metrics/MetricsReporter";
 import { MetricsService } from "@/shared/metrics/MetricsService";
 import type { ArgsService } from "@/shared/args/ArgsService";
 import type { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
@@ -43,21 +43,10 @@ const setup = ({ target = "pdp", traffic = [] as Traffic[] } = {}) => {
     new Date("2026-10-18T10:03:00.000Z"),
   ];
   const now = vi.fn(() => times.shift()!);
-  // Nanoseconds, including the 10 ms sampling interval
-  const eventLoopDelay = {
-    enable: vi.fn(),
-    reset: vi.fn(),
-    mean: 12_500_000,
-    max: 50_000_000,
+  const processMetrics = {
+    start: vi.fn(),
+    collect: vi.fn(async () => gauges.slice(3)),
   };
-  // Microseconds: 5 s of CPU between start() and the first send(), 60 s apart
-  const cpuUsage = vi
-    .fn()
-    .mockReturnValueOnce({ user: 1_000_000, system: 0 })
-    .mockReturnValue({ user: 4_000_000, system: 2_000_000 });
-  const memoryRss = vi.fn(() => 150 * 1024 * 1024);
-  const heapUsed = vi.fn(() => 90 * 1024 * 1024);
-  const ping = vi.fn(async (): Promise<number | undefined> => 24.5);
 
   // The constructor is private, it is only called through getInstance()
   const Reporter = MetricsReporter as unknown as new (
@@ -70,14 +59,10 @@ const setup = ({ target = "pdp", traffic = [] as Traffic[] } = {}) => {
     queue,
     proxy,
     now,
-    eventLoopDelay,
-    cpuUsage,
-    memoryRss,
-    heapUsed,
-    ping
+    processMetrics
   );
 
-  return { api, metrics, reporter, proxy, eventLoopDelay, ping };
+  return { api, metrics, reporter, proxy, processMetrics };
 };
 
 describe("MetricsReporter", () => {
@@ -140,64 +125,17 @@ describe("MetricsReporter", () => {
     expect(api.send.mock.calls[0][1].metrics.at(-1)).toEqual({ metric: "ads_in_flight", value: 7 });
   });
 
-  it("measures the event loop delay from the start and resets it after each send", async () => {
-    const { metrics, reporter, eventLoopDelay } = setup();
+  it("starts the process metrics with the period start and collects them only with counters", async () => {
+    const { metrics, reporter, processMetrics } = setup();
     reporter.start("amazon");
-    expect(eventLoopDelay.enable).toHaveBeenCalled();
+    expect(processMetrics.start).toHaveBeenCalledWith(new Date("2026-10-18T10:00:00.000Z"));
 
     await reporter.send();
-    expect(eventLoopDelay.reset).not.toHaveBeenCalled();
+    expect(processMetrics.collect).not.toHaveBeenCalled();
 
     metrics.increment("requests", { country: "de", outcome: "ok" });
     await reporter.send();
-    expect(eventLoopDelay.reset).toHaveBeenCalledTimes(1);
-  });
-
-  it.each([
-    [Number.NaN, 0],
-    [9_000_000, 0],
-    [10_040_000, 0],
-    [10_060_000, 0.1],
-  ])("reports an event loop delay of %d ns as %d ms", async (delay, expected) => {
-    const { api, metrics, reporter, eventLoopDelay } = setup();
-    eventLoopDelay.mean = delay;
-    metrics.increment("requests", { country: "de", outcome: "ok" });
-    reporter.start("amazon");
-
-    await reporter.send();
-
-    expect(api.send.mock.calls[0][1].metrics).toContainEqual({
-      metric: "event_loop_delay_mean_ms",
-      value: expected,
-    });
-  });
-
-  it("reports a failed ping instead of its time", async () => {
-    const { api, metrics, reporter, ping } = setup();
-    ping.mockResolvedValue(undefined);
-    metrics.increment("requests", { country: "de", outcome: "ok" });
-    reporter.start("amazon");
-
-    await reporter.send();
-
-    const sent = api.send.mock.calls[0][1].metrics;
-    expect(sent).toContainEqual({ metric: "ping_failed", value: 1 });
-    expect(sent).not.toContainEqual(expect.objectContaining({ metric: "ping_ms" }));
-  });
-
-  it("measures the CPU since the previous send", async () => {
-    const { api, metrics, reporter } = setup();
-    metrics.increment("requests", { country: "de", outcome: "ok" });
-    reporter.start("amazon");
-    await reporter.send();
-
-    metrics.increment("requests", { country: "de", outcome: "ok" });
-    await reporter.send();
-
-    expect(api.send.mock.calls[1][1].metrics).toContainEqual({
-      metric: "cpu_percent",
-      value: 0,
-    });
+    expect(processMetrics.collect).toHaveBeenCalledTimes(1);
   });
 
   it("sends the PLP flow", async () => {
