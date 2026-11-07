@@ -1,8 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  AmazonPdpCountryScraper,
-  NOT_FOUND_TO_DELETE,
-} from "@/marketplaces/amazon/pdp/AmazonPdpCountryScraper";
+import { NOT_FOUND_TO_DELETE } from "@/marketplaces/amazon/pdp/AmazonCountryPrice";
+import { AmazonPdpCountryScraper } from "@/marketplaces/amazon/pdp/AmazonPdpCountryScraper";
 import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/RetryBackoff";
 import { AmazonAdBuildResult } from "@/marketplaces/amazon/types/amazon.types";
 import type { MetricsService } from "@/shared/metrics/MetricsService";

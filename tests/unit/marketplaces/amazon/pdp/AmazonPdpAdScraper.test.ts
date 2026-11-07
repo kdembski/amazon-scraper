@@ -1,8 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { AmazonPdpAdScraper } from "@/marketplaces/amazon/pdp/AmazonPdpAdScraper";
 import type { AmazonPdpCountryScraper } from "@/marketplaces/amazon/pdp/AmazonPdpCountryScraper";
-import { AmazonPdpPriceHelper } from "@/marketplaces/amazon/pdp/AmazonPdpPriceHelper";
-import type { AmazonAdPrice } from "@/marketplaces/amazon/types/amazon.types";
+import type { AmazonCountryPrice } from "@/marketplaces/amazon/pdp/AmazonCountryPrice";
 import type { ItemOutcome } from "@/shared/metrics/metrics.types";
 import type { MetricsService } from "@/shared/metrics/MetricsService";
 import { RetryBackoff } from "@/shared/utils/RetryBackoff";
@@ -12,12 +11,12 @@ import { fakeAmazonPdpResultSender } from "@@tests/support/fakes";
 const setup = (count: number, priorities: number[] = [], active: boolean[] = []) => {
   const sender = fakeAmazonPdpResultSender();
   const runs: {
-    price: AmazonAdPrice;
+    price: AmazonCountryPrice;
     isCancelled: () => boolean;
     finish: (outcome?: ItemOutcome) => void;
   }[] = [];
   const execute = vi.fn(
-    (price: AmazonAdPrice, _ad, isCancelled: () => boolean) =>
+    (price: AmazonCountryPrice, _ad, isCancelled: () => boolean) =>
       new Promise<ItemOutcome | undefined>((finish) => runs.push({ price, isCancelled, finish }))
   );
   const countryScraper = { execute } as unknown as AmazonPdpCountryScraper;
@@ -25,7 +24,6 @@ const setup = (count: number, priorities: number[] = [], active: boolean[] = [])
   const gauge = vi.fn();
   const scraper = new AmazonPdpAdScraper(
     countryScraper,
-    new AmazonPdpPriceHelper(sender.service),
     sender.service,
     { increment, gauge } as unknown as MetricsService
   );
@@ -77,11 +75,10 @@ describe("AmazonPdpAdScraper", () => {
   describe("skipped countries", () => {
     const setupSkip = (skipCountryIds: number[]) => {
       const sender = fakeAmazonPdpResultSender();
-      const execute = vi.fn((_price: AmazonAdPrice) => new Promise<ItemOutcome | undefined>(() => {}));
+      const execute = vi.fn((_price: AmazonCountryPrice) => new Promise<ItemOutcome | undefined>(() => {}));
       const increment = vi.fn();
       const scraper = new AmazonPdpAdScraper(
         { execute } as unknown as AmazonPdpCountryScraper,
-        new AmazonPdpPriceHelper(sender.service),
         sender.service,
         { increment, gauge: vi.fn() } as unknown as MetricsService
       );
@@ -280,7 +277,7 @@ describe("AmazonPdpAdScraper", () => {
   });
 
   describe("priorities", () => {
-    const started = (runs: { price: AmazonAdPrice }[]) =>
+    const started = (runs: { price: AmazonCountryPrice }[]) =>
       runs.map((run) => run.price.country.tld);
 
     it("starts lower priority countries only after the higher ones finish", async () => {

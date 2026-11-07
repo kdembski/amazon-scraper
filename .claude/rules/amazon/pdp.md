@@ -33,7 +33,7 @@ Goal: for every ASIN, get the price and the shipper (`dispatchFrom`) in every Am
 
 ## 3. One ASIN (`AmazonPdpAdScraper`)
 
-1. Creates an `AmazonAdPrice` per country (`complete`, `deleted`, `missing`, `failed`, `notFound`), except `skipCountryIds`; none left → `ads{outcome=empty}`, done.
+1. Creates an `AmazonCountryPrice` per country (`complete`, `deleted`, `missing`, `retry`, `notFound`), except `skipCountryIds`, held in `AmazonAdPrices`; none left → `ads{outcome=empty}`, done.
 2. Groups countries into tiers by `priority`, highest first.
 3. Tier by tier: all countries of a tier in parallel, the next tier only after the previous one finishes.
 4. After each country, checks whether the ASIN is decided:
@@ -91,4 +91,4 @@ Shared:
 
 - Price not parsed → the source's builder + test in `tests/unit/marketplaces/amazon/pdp/builders/`.
 - Many `invalid` / `captcha` → `responses` metric per country.
-- ASIN "deleted" too early → `NOT_FOUND_TO_DELETE`, `isDeleted` (counts only `active`).
+- ASIN "deleted" too early → `AmazonCountryPrice.registerNotFound`, `AmazonAdPrices.isDeleted` (counts only `active`).

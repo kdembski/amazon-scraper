@@ -1,6 +1,5 @@
 import type { Document } from "domhandler";
 import type { StopAt } from "@/shared/http/http.types";
-import type { RetryBackoff } from "@/shared/utils/RetryBackoff";
 
 export interface AmazonCountry {
   countryId: number;
@@ -46,18 +45,6 @@ export interface AmazonAdBuilder {
   trimHtml(html: string): string;
   build(document: Document): AmazonAdBuildResult;
   buildUrl(country: AmazonCountry, ad: AmazonAd): { url: string; referer: string };
-}
-
-export interface AmazonAdPrice {
-  country: AmazonCountry;
-  value?: number;
-  dispatchFrom?: string;
-  complete: boolean;
-  deleted: boolean;
-  // A 404 from the last source
-  missing: boolean;
-  retry: RetryBackoff;
-  notFound: number;
 }
 
 export interface AmazonPdpPrice {

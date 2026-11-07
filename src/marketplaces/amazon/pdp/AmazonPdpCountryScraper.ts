@@ -2,17 +2,12 @@ import { AmazonService } from "@/marketplaces/amazon/AmazonService";
 import { AmazonAodAdBuilder } from "@/marketplaces/amazon/pdp/builders/AmazonAodAdBuilder";
 import { AmazonAwdAdBuilder } from "@/marketplaces/amazon/pdp/builders/AmazonAwdAdBuilder";
 import { AmazonTwisterAdBuilder } from "@/marketplaces/amazon/pdp/builders/AmazonTwisterAdBuilder";
-import {
-  AmazonAd,
-  AmazonAdBuilder,
-  AmazonAdPrice,
-} from "@/marketplaces/amazon/types/amazon.types";
+import type { AmazonCountryPrice } from "@/marketplaces/amazon/pdp/AmazonCountryPrice";
+import { AmazonAd, AmazonAdBuilder } from "@/marketplaces/amazon/types/amazon.types";
 import { MetricsService } from "@/shared/metrics/MetricsService";
 import { ItemOutcome, ResponseOutcome } from "@/shared/metrics/metrics.types";
 import { parseDocument } from "htmlparser2";
 import _ from "lodash";
-
-export const NOT_FOUND_TO_DELETE = 2;
 
 type FetchResult =
   | { ok: true; data: string }
@@ -30,7 +25,7 @@ export class AmazonPdpCountryScraper {
   ) {}
 
   async execute(
-    price: AmazonAdPrice,
+    price: AmazonCountryPrice,
     ad: AmazonAd,
     isCancelled: () => boolean
   ): Promise<ItemOutcome | undefined> {
@@ -74,7 +69,7 @@ export class AmazonPdpCountryScraper {
   private async fetch(
     builder: AmazonAdBuilder,
     ad: AmazonAd,
-    price: AmazonAdPrice,
+    price: AmazonCountryPrice,
     isCancelled: () => boolean
   ): Promise<FetchResult> {
     const { url, referer } = builder.buildUrl(price.country, ad);
@@ -93,7 +88,7 @@ export class AmazonPdpCountryScraper {
 
   private toOutcome(
     result: FetchResult,
-    price: AmazonAdPrice,
+    price: AmazonCountryPrice,
     builder: AmazonAdBuilder
   ): ItemOutcome | undefined {
     if (!result.ok) {
@@ -102,11 +97,7 @@ export class AmazonPdpCountryScraper {
         price.missing = true;
         return "no_data";
       }
-      price.notFound++;
-      const toDelete = price.country.active ? NOT_FOUND_TO_DELETE : 1;
-      if (price.notFound < toDelete) return;
-      price.missing = true;
-      return "deleted";
+      return price.registerNotFound() ? "deleted" : undefined;
     }
 
     if (!result.data.length) {
@@ -129,8 +120,7 @@ export class AmazonPdpCountryScraper {
 
       const outcome = ad.price ? "data" : "no_data";
       this.countResponse(price, outcome);
-      price.value = ad.price;
-      price.dispatchFrom = ad.dispatchFrom;
+      price.setResult(ad.price, ad.dispatchFrom);
       return outcome;
     } catch (e) {
       this.countResponse(price, "parse_error");
@@ -138,14 +128,14 @@ export class AmazonPdpCountryScraper {
     }
   }
 
-  private countResponse(price: AmazonAdPrice, outcome: ResponseOutcome) {
+  private countResponse(price: AmazonCountryPrice, outcome: ResponseOutcome) {
     this.metricsService.increment("responses", {
       country: price.country.tld,
       outcome,
     });
   }
 
-  private countItem(price: AmazonAdPrice, outcome: ItemOutcome) {
+  private countItem(price: AmazonCountryPrice, outcome: ItemOutcome) {
     const labels = { country: price.country.tld, outcome };
     const attempts = outcome === "given_up" ? price.retry.failed : price.retry.failed + 1;
     this.metricsService.increment("items", labels);
