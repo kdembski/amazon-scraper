@@ -1,7 +1,4 @@
-import { configDotenv } from "dotenv";
 import { createScraper } from "@/marketplaces";
-
-configDotenv({ quiet: true });
 
 // Ignore the certificate
 process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = "0";

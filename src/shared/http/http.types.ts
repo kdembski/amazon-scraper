@@ -4,6 +4,14 @@ import type { MetricLabels } from "@/shared/metrics/metrics.types";
 // whichever of its markers comes first
 export type StopAt = (string | string[])[];
 
+export type ScrapingRequest = {
+  referer?: string;
+  labels?: MetricLabels;
+  proxyType?: string;
+  stopAt?: StopAt;
+  isCancelled?: () => boolean;
+};
+
 // How a shop connection goes out: through a proxy or directly over IPv4 / IPv6
 export type Route = "proxy" | "direct4" | "direct6";
 

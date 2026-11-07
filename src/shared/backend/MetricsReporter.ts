@@ -21,7 +21,6 @@ export class MetricsReporter {
   private periodStart = new Date();
   private cpu: NodeJS.CpuUsage = { user: 0, system: 0 };
   private cpuAt = new Date();
-  private timeout = 30 * 1000;
   private unsent?: UnsentReport;
 
   private constructor(
@@ -57,7 +56,8 @@ export class MetricsReporter {
     new CronJob("0 * * * * *", () => this.send()).start();
   }
 
-  // A report that failed goes out again unchanged with its key, before any newer one
+  // A report that failed goes out again unchanged with its key, before any newer one;
+  // a 4xx drops it
   public async send() {
     if (this.unsent && !(await this.post(this.unsent))) return;
 
@@ -114,15 +114,19 @@ export class MetricsReporter {
   }
 
   private async post(report: UnsentReport) {
-    const response = await this.apiService.post(
-      `scrapers/${await this.argsService.getScraperName()}/metrics`,
-      report.body,
-      { timeout: this.timeout, headers: { "Idempotency-Key": report.key } }
-    );
-    if (response === undefined) return false;
+    try {
+      const name = await this.argsService.getScraperName();
+      await this.apiService.send(`scrapers/${name}/metrics`, report.body, report.key);
+      this.unsent = undefined;
+      return true;
+    } catch (e: any) {
+      const status = e?.response?.status;
+      console.error("metrics: report failed", status ?? e?.message);
+      if (!status || status >= 500) return false;
 
-    this.unsent = undefined;
-    return true;
+      this.unsent = undefined;
+      return true;
+    }
   }
 
   // Percent of one core since the previous measurement

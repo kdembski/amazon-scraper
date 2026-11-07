@@ -11,10 +11,31 @@ describe("AmazonPriceParser", () => {
     expect(parser.parse(priceBox(aPrice("24", "99")))).toBe(24.99);
   });
 
-  it("falls back to the accessibility label", () => {
-    const label = `<span class="apex-pricetopay-accessibility-label">1.299,00 €</span>`;
+  it.each([
+    ["1.299,00 €", 1299],
+    ["19,99 €", 19.99],
+    ["€1,299.00", 1299],
+    ["1.299 €", 1299],
+    ["1,299 €", 1299],
+    ["£12.5", 12.5],
+    ["1 299,50 kr", 1299.5],
+    ["129 zł", 129],
+  ])("reads the accessibility label %s", (label, price) => {
+    const box = `<span class="apex-pricetopay-accessibility-label">${label}</span>`;
 
-    expect(parser.parse(priceBox(label))).toBe(1299);
+    expect(parser.parse(priceBox(box))).toBe(price);
+  });
+
+  it("falls back to .a-offscreen without the whole and fraction parts", () => {
+    const box = `<span class="a-price"><span class="a-offscreen">24,99 €</span></span>`;
+
+    expect(parser.parse(priceBox(box))).toBe(24.99);
+  });
+
+  it("prefers the price to pay over another price", () => {
+    const box = `${aPrice("99", "00")}<span class="apex-pricetopay-value">${aPrice("24", "99")}</span>`;
+
+    expect(parser.parse(priceBox(box))).toBe(24.99);
   });
 
   it("gives nothing without a price", () => {

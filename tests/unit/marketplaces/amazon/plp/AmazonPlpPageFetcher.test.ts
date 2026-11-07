@@ -59,7 +59,7 @@ describe("AmazonPlpPageFetcher", () => {
     fetcher.fetch("url", "ref", () => valid, ["a", "b"]);
     await vi.advanceTimersByTimeAsync(0);
 
-    expect(amazon.get).toHaveBeenCalledWith("url", "ref", expect.anything(), undefined, ["a", "b"]);
+    expect(amazon.get).toHaveBeenCalledWith("url", "ref", { stopAt: ["a", "b"] });
   });
 
   it.each([captchaPage, botWallPage, interstitialPage])("retries a captcha without building it", async (page) => {

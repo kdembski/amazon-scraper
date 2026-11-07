@@ -107,11 +107,5 @@ describe("AmazonPdpPriceHelper", () => {
 
       expect(sender.prices).toHaveBeenCalledWith(7, [], [1, 3]);
     });
-
-    it("sends nothing for an ad without countries", () => {
-      const { sender, helper } = setup();
-      helper.sendCompletedPrices([], ad);
-      expect(sender.prices).not.toHaveBeenCalled();
-    });
   });
 });

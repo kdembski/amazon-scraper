@@ -20,8 +20,6 @@ export class AmazonPdpPriceHelper {
   }
 
   sendCompletedPrices(prices: AmazonAdPrice[], ad: AmazonAd) {
-    if (!prices.length) return;
-
     const prepared = prices
       .filter((price) => !!price.value)
       .map((price) => ({

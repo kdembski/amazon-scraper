@@ -6,15 +6,9 @@ export class TokenBucketQueue {
 
   constructor(
     public concurrency: number,
-    public rps = 0,
-    enableLogs = false,
-    private countConnections?: () => number
+    public rps = 0
   ) {
     this.tokens = rps;
-
-    if (enableLogs) {
-      setInterval(() => this.logState(), 1000);
-    }
   }
 
   start() {
@@ -75,19 +69,5 @@ export class TokenBucketQueue {
 
     this.tokens = Math.min(this.rps, this.tokens + refill);
     this.lastRefill = now;
-  }
-
-  private logState() {
-    const stats = [
-      `rps: ${this.rps || "-"}/s`,
-      `concurrency: ${this.concurrency}`,
-      `pending: ${this.pending}`,
-      ...(this.countConnections
-        ? [`connections: ${this.countConnections()}`]
-        : []),
-      `queue: ${this.queue.length}`,
-    ];
-    const text = stats.join(` | `);
-    console.log(text);
   }
 }

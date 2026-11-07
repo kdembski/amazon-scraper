@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import { ApiService } from "@/shared/backend/ApiService";
 import { MetricsService } from "@/shared/metrics/MetricsService";
 import type { RequestOutcome } from "@/shared/metrics/metrics.types";
+import { toRequestOutcome } from "@/shared/metrics/toRequestOutcome";
 import { getRetryDelay, MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
 import { sleep } from "@/shared/utils/sleep";
 
@@ -64,7 +65,7 @@ export class BatchSender<T> {
         this.metricsService.increment("backend_items", { outcome: "sent" }, items.length);
         return;
       } catch (e: any) {
-        this.countRequest(this.toOutcome(e), startedAt);
+        this.countRequest(toRequestOutcome(e), startedAt);
         failed++;
         const status = e?.response?.status;
         if ((status && status < 500) || failed >= MAX_FAILED_ATTEMPTS) {
@@ -80,12 +81,5 @@ export class BatchSender<T> {
   private countRequest(outcome: RequestOutcome, startedAt: number) {
     this.metricsService.increment("backend_requests", { outcome });
     this.metricsService.increment("backend_send_ms", {}, Date.now() - startedAt);
-  }
-
-  private toOutcome(e: any): RequestOutcome {
-    const status = e?.response?.status;
-    if (status) return `http_${status}`;
-    if (e?.code === "ECONNABORTED" || e?.code === "ETIMEDOUT") return "timeout";
-    return "network";
   }
 }

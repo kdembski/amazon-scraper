@@ -1,5 +1,5 @@
 import type { Document, Element } from "domhandler";
-import { AmazonPlpAd } from "@/marketplaces/amazon/types/amazon.types";
+import _ from "lodash";
 import { detach, find, findAll, text } from "@/shared/utils/html";
 
 export class AmazonPlpBuilder {
@@ -9,13 +9,7 @@ export class AmazonPlpBuilder {
     const listItemSelector = "div[role='listitem']";
     const items = findAll(listItemSelector, document);
 
-    const ads = items.reduce((accum: AmazonPlpAd[], item) => {
-      const ad = this.buildItem(item, category);
-      if (!ad) return accum;
-
-      accum.push(ad);
-      return accum;
-    }, []);
+    const ads = _.compact(items.map((item) => this.buildItem(item, category)));
 
     const hasResults = !!find("[data-component-type='s-search-results']", document);
     const isEmpty = !!find("[data-csa-c-content-id='messaging-messages-no-results']", document);

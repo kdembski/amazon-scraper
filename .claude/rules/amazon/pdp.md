@@ -58,7 +58,7 @@ Goal: for every ASIN, get the price and the shipper (`dispatchFrom`) in every Am
    - `isValid === false` → retry (`invalid`).
    - parse exception → retry (`parse_error`).
    - price found → `data`, stores `value` + `dispatchFrom`.
-   - no price, valid page → `no_data`.
+   - no price or price 0, valid page → `no_data`.
 
 ## 5. Sources (builders, `pdp/builders/`)
 

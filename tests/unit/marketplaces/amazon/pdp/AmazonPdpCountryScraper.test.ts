@@ -42,6 +42,20 @@ const calls = (increment: ReturnType<typeof vi.fn>, metric: string) =>
   increment.mock.calls.filter((call) => call[0] === metric);
 
 describe("AmazonPdpCountryScraper", () => {
+  it("treats a price of 0 as no data", async () => {
+    vi.useFakeTimers();
+    const { amazon, outcome, run, increment } = setup({ price: 0, isValid: true });
+    run();
+    await flush();
+
+    amazon.respond(0, html);
+    await flush();
+
+    expect(outcome).toHaveBeenCalledWith("no_data");
+    expect(increment).toHaveBeenCalledWith("responses", { country: "c1", outcome: "no_data" });
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     vi.useFakeTimers();
     vi.spyOn(Math, "random").mockReturnValue(1);
@@ -58,26 +72,20 @@ describe("AmazonPdpCountryScraper", () => {
     run();
 
     expect(builder.buildUrl).toHaveBeenCalledWith(price.country, ad);
-    expect(amazon.get).toHaveBeenCalledWith(
-      "c1/dp/B0TESTASIN",
-      "c1/ref",
-      {
-        onSuccess: expect.any(Function),
-        onError: expect.any(Function),
-        isCancelled: expect.any(Function),
-      },
-      "isp",
-      undefined
-    );
+    expect(amazon.get).toHaveBeenCalledWith("c1/dp/B0TESTASIN", "c1/ref", {
+      proxyType: "isp",
+      stopAt: undefined,
+      isCancelled: expect.any(Function),
+    });
   });
 
   it("passes the cancellation to the request", () => {
     const { amazon, cancel, run } = setup();
     run();
 
-    expect(amazon.requests[0].callback.isCancelled?.()).toBe(false);
+    expect(amazon.requests[0].options.isCancelled?.()).toBe(false);
     cancel();
-    expect(amazon.requests[0].callback.isCancelled?.()).toBe(true);
+    expect(amazon.requests[0].options.isCancelled?.()).toBe(true);
   });
 
   it("does not request a cancelled country", async () => {
@@ -422,7 +430,7 @@ describe("AmazonPdpCountryScraper", () => {
       run();
 
       expect(amazon.requests[0].url).toBe("c1/twister/B0TESTASIN");
-      expect(amazon.get.mock.calls[0][4]).toEqual(["a", "b"]);
+      expect(amazon.requests[0].options.stopAt).toEqual(["a", "b"]);
       amazon.respond(0, html);
       await flush();
 
@@ -436,7 +444,7 @@ describe("AmazonPdpCountryScraper", () => {
       run();
 
       expect(amazon.requests[0].url).toBe("c1/dp/B0TESTASIN");
-      expect(amazon.get.mock.calls[0][4]).toBeUndefined();
+      expect(amazon.requests[0].options.stopAt).toBeUndefined();
     });
 
     it("finishes a twister country without a price on a 404", async () => {

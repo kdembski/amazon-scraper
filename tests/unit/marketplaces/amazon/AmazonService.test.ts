@@ -14,36 +14,30 @@ const setup = () => {
 };
 
 describe("AmazonService", () => {
-  it("prefixes url and referer with https://www.amazon. and delegates to the scraping client with the proxy type", () => {
+  it("prefixes url and referer with https://www.amazon. and adds the country label", () => {
     const { service, client } = setup();
-    const callback = { onSuccess: vi.fn() };
+    const isCancelled = () => false;
 
-    service.get("de/dp/B0TESTASIN", "de/s?k=B0TESTASIN", callback, "isp");
+    service.get("de/dp/B0TESTASIN", "de/s?k=B0TESTASIN", {
+      proxyType: "isp",
+      stopAt: ["a"],
+      isCancelled,
+    });
 
-    expect(client.get).toHaveBeenCalledWith(
-      "https://www.amazon.de/dp/B0TESTASIN",
-      "https://www.amazon.de/s?k=B0TESTASIN",
-      callback,
-      { country: "de" },
-      "isp",
-      undefined
-    );
+    expect(client.get).toHaveBeenCalledWith("https://www.amazon.de/dp/B0TESTASIN", {
+      referer: "https://www.amazon.de/s?k=B0TESTASIN",
+      labels: { country: "de" },
+      proxyType: "isp",
+      stopAt: ["a"],
+      isCancelled,
+    });
   });
 
-  it("passes the stop markers to the scraping client", () => {
+  it("returns the promise of the scraping client", async () => {
     const { service, client } = setup();
-    const callback = { onSuccess: vi.fn() };
+    client.get.mockResolvedValue("<html>");
 
-    service.get("de/x", "de/", callback, "isp", ["a"]);
-
-    expect(client.get).toHaveBeenCalledWith(
-      "https://www.amazon.de/x",
-      "https://www.amazon.de/",
-      callback,
-      { country: "de" },
-      "isp",
-      ["a"]
-    );
+    await expect(service.get("de/x", "de/")).resolves.toBe("<html>");
   });
 
   it("exposes the scraping client queue", () => {

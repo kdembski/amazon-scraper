@@ -1,8 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
 
-const setup = ({ concurrency = 2, rps = 0, enableLogs = false } = {}) =>
-  new TokenBucketQueue(concurrency, rps, enableLogs);
+const setup = ({ concurrency = 2, rps = 0 } = {}) => new TokenBucketQueue(concurrency, rps);
 
 // A request that stays pending until finish() is called
 const deferred = () => {
@@ -266,42 +265,6 @@ describe("TokenBucketQueue", () => {
       requests.forEach((request) => queue.request(request.callback));
 
       expect(queue.pending).toBe(2);
-    });
-  });
-
-  describe("logs", () => {
-    it("logs the state every second when enabled", async () => {
-      const log = vi.spyOn(console, "log").mockImplementation(() => {});
-      setup({ concurrency: 5, rps: 3, enableLogs: true });
-
-      await vi.advanceTimersByTimeAsync(1000);
-
-      expect(log).toHaveBeenCalledWith("rps: 3/s | concurrency: 5 | pending: 0 | queue: 0");
-    });
-
-    it("logs open connections after pending when they are counted", async () => {
-      const log = vi.spyOn(console, "log").mockImplementation(() => {});
-      new TokenBucketQueue(5, 3, true, () => 42);
-
-      await vi.advanceTimersByTimeAsync(1000);
-
-      expect(log.mock.calls[0][0]).toContain("pending: 0 | connections: 42 | queue: 0");
-    });
-
-    it("shows a dash when rps is unlimited", async () => {
-      const log = vi.spyOn(console, "log").mockImplementation(() => {});
-      setup({ enableLogs: true });
-
-      await vi.advanceTimersByTimeAsync(1000);
-
-      expect(log.mock.calls[0][0]).toContain("rps: -/s");
-    });
-
-    it("does not log by default", async () => {
-      const log = vi.spyOn(console, "log").mockImplementation(() => {});
-      setup();
-      await vi.advanceTimersByTimeAsync(1000);
-      expect(log).not.toHaveBeenCalled();
     });
   });
 });

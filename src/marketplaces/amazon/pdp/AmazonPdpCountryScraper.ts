@@ -73,27 +73,24 @@ export class AmazonPdpCountryScraper {
     return sources.length ? sources : [this.builders.aod];
   }
 
-  private fetch(
+  private async fetch(
     builder: AmazonAdBuilder,
     ad: AmazonAd,
     price: AmazonAdPrice,
     isCancelled: () => boolean
-  ) {
+  ): Promise<FetchResult> {
     const { url, referer } = builder.buildUrl(price.country, ad);
 
-    return new Promise<FetchResult>((resolve) => {
-      this.amazonService.get<string>(
-        url,
-        referer,
-        {
-          onSuccess: (data) => resolve({ ok: true, data }),
-          onError: (e) => resolve({ ok: false, status: e?.status }),
-          isCancelled,
-        },
-        price.country.proxyType,
-        builder.stopAt
-      );
-    });
+    try {
+      const data = await this.amazonService.get<string>(url, referer, {
+        proxyType: price.country.proxyType,
+        stopAt: builder.stopAt,
+        isCancelled,
+      });
+      return { ok: true, data: data ?? "" };
+    } catch (e: any) {
+      return { ok: false, status: e?.status };
+    }
   }
 
   private toOutcome(
@@ -132,7 +129,7 @@ export class AmazonPdpCountryScraper {
         return;
       }
 
-      const outcome = _.isNil(ad.price) ? "no_data" : "data";
+      const outcome = ad.price ? "data" : "no_data";
       this.countResponse(price, outcome);
       price.value = ad.price;
       price.dispatchFrom = ad.dispatchFrom;
