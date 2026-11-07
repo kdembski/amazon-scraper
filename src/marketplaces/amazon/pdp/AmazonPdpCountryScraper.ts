@@ -1,3 +1,4 @@
+import { AmazonPageReader } from "@/marketplaces/amazon/AmazonPageReader";
 import { AmazonService } from "@/marketplaces/amazon/AmazonService";
 import { AmazonAodAdBuilder } from "@/marketplaces/amazon/pdp/builders/AmazonAodAdBuilder";
 import { AmazonAwdAdBuilder } from "@/marketplaces/amazon/pdp/builders/AmazonAwdAdBuilder";
@@ -5,8 +6,7 @@ import { AmazonTwisterAdBuilder } from "@/marketplaces/amazon/pdp/builders/Amazo
 import type { AmazonCountryPrice } from "@/marketplaces/amazon/pdp/AmazonCountryPrice";
 import { AmazonAd, AmazonAdBuilder } from "@/marketplaces/amazon/types/amazon.types";
 import { MetricsService } from "@/shared/metrics/MetricsService";
-import { ItemOutcome, ResponseOutcome } from "@/shared/metrics/metrics.types";
-import { parseDocument } from "htmlparser2";
+import { ItemOutcome } from "@/shared/metrics/metrics.types";
 import _ from "lodash";
 
 type FetchResult =
@@ -21,7 +21,8 @@ export class AmazonPdpCountryScraper {
       twister: new AmazonTwisterAdBuilder(),
       awd: new AmazonAwdAdBuilder(),
     },
-    private metricsService = MetricsService.getInstance()
+    private metricsService = MetricsService.getInstance(),
+    private pageReader = new AmazonPageReader("pdp", "parse_error", metricsService)
   ) {}
 
   async execute(
@@ -100,39 +101,16 @@ export class AmazonPdpCountryScraper {
       return price.registerNotFound() ? "deleted" : undefined;
     }
 
-    if (!result.data.length) {
-      this.countResponse(price, "empty");
-      return;
-    }
-
-    try {
-      const ad = builder.build(parseDocument(builder.trimHtml(result.data)));
-
-      if (ad.isCaptcha) {
-        this.countResponse(price, "captcha");
-        return;
-      }
-
-      if (ad.isValid === false) {
-        this.countResponse(price, "invalid");
-        return;
-      }
-
-      const outcome = ad.price ? "data" : "no_data";
-      this.countResponse(price, outcome);
-      price.setResult(ad.price, ad.dispatchFrom);
-      return outcome;
-    } catch (e) {
-      this.countResponse(price, "parse_error");
-      console.error("pdp: parse failed", e);
-    }
-  }
-
-  private countResponse(price: AmazonCountryPrice, outcome: ResponseOutcome) {
-    this.metricsService.increment("responses", {
+    const ad = this.pageReader.read(result.data, {
       country: price.country.tld,
-      outcome,
+      trim: (html) => builder.trimHtml(html),
+      build: (document) => builder.build(document),
+      hasData: (page) => !!page.price,
     });
+    if (!ad) return;
+
+    price.setResult(ad.price, ad.dispatchFrom);
+    return ad.price ? "data" : "no_data";
   }
 
   private countItem(price: AmazonCountryPrice, outcome: ItemOutcome) {

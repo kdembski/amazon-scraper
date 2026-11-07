@@ -32,7 +32,6 @@ export interface AmazonAd {
 export interface AmazonAdBuildResult {
   price?: number;
   dispatchFrom?: string;
-  isCaptcha?: boolean;
   // False when the response is not the page we requested (e.g. bot challenge)
   isValid?: boolean;
 }

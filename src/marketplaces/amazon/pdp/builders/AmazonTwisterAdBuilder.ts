@@ -6,7 +6,6 @@ import {
   AmazonCountry,
 } from "@/marketplaces/amazon/types/amazon.types";
 import { AmazonBuyboxParser } from "@/marketplaces/amazon/pdp/builders/AmazonBuyboxParser";
-import { AmazonCaptchaDetector } from "@/marketplaces/amazon/AmazonCaptchaDetector";
 import type { StopAt } from "@/shared/http/http.types";
 import { find } from "@/shared/utils/html";
 
@@ -20,10 +19,7 @@ export class AmazonTwisterAdBuilder implements AmazonAdBuilder {
   stopAt: StopAt = [BUYBOX_PART, [AFTER_SHIPPER, "&&&"]];
   notFoundIsNoData = true;
 
-  constructor(
-    private captchaDetector = new AmazonCaptchaDetector(),
-    private buyboxParser = new AmazonBuyboxParser()
-  ) {}
+  constructor(private buyboxParser = new AmazonBuyboxParser()) {}
 
   // Takes the buy box out of the JSON parts of the response, also when the
   // download stopped inside it
@@ -51,10 +47,6 @@ export class AmazonTwisterAdBuilder implements AmazonAdBuilder {
   }
 
   build(document: Document): AmazonAdBuildResult {
-    if (this.captchaDetector.detect(document)) {
-      return { isCaptcha: true };
-    }
-
     return this.buyboxParser.parse(find("#desktop_buybox", document));
   }
 

@@ -8,23 +8,21 @@ const parse = (body: string) => parser.parse(find("#box", toDocument(`<div id="b
 
 describe("AmazonBuyboxParser", () => {
   it("is invalid without a buy box", () => {
-    expect(parser.parse(null)).toEqual({ isCaptcha: false, isValid: false });
+    expect(parser.parse(null)).toEqual({ isValid: false });
   });
 
   it("is invalid when the price is not available", () => {
     expect(parse(twisterBuybox({ price: "24,99", hidden: true }))).toEqual({
-      isCaptcha: false,
       isValid: false,
     });
   });
 
   it("is valid without a price when the buy box has none", () => {
-    expect(parse(twisterBuybox())).toEqual({ isCaptcha: false, isValid: true });
+    expect(parse(twisterBuybox())).toEqual({ isValid: true });
   });
 
   it("reads the price and the shipper", () => {
     expect(parse(twisterBuybox({ price: "24,99", shipsFrom: "Amazon.nl", soldBy: "Shop" }))).toEqual({
-      isCaptcha: false,
       isValid: true,
       price: 24.99,
       dispatchFrom: "Amazon",

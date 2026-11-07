@@ -6,6 +6,7 @@ import { AmazonAdBuildResult } from "@/marketplaces/amazon/types/amazon.types";
 import type { MetricsService } from "@/shared/metrics/MetricsService";
 import { buildAd, buildAmazonCountry, buildPrice } from "@@tests/support/factories";
 import { fakeAdBuilder, fakeAmazonService } from "@@tests/support/fakes";
+import { captchaPage } from "@@tests/support/html";
 
 const html = "<html><body></body></html>";
 const notFound = { status: 404 };
@@ -113,7 +114,7 @@ describe("AmazonPdpCountryScraper", () => {
     });
 
     it("returns no_data for a country without an offer", async () => {
-      const { amazon, price, outcome, run } = setup({ isCaptcha: false, isValid: true });
+      const { amazon, price, outcome, run } = setup({ isValid: true });
       run();
 
       amazon.respond(0, html);
@@ -140,8 +141,8 @@ describe("AmazonPdpCountryScraper", () => {
   describe("retries", () => {
     it.each([
       ["an empty response", { price: 10 }, ""],
-      ["a captcha", { isCaptcha: true }, html],
-      ["an invalid response", { isCaptcha: false, isValid: false }, html],
+      ["a captcha", { price: 10 }, captchaPage],
+      ["an invalid response", { isValid: false }, html],
     ])("on %s", async (_name, result, data) => {
       const { amazon, price, outcome, run } = setup(result);
       run();
@@ -269,7 +270,7 @@ describe("AmazonPdpCountryScraper", () => {
   describe("metrics", () => {
     it.each([
       ["data", { price: 10 }],
-      ["no_data", { isCaptcha: false, isValid: true }],
+      ["no_data", { isValid: true }],
     ])("counts a response and an item as %s", async (result, buildResult) => {
       const { amazon, run, increment } = setup(buildResult);
       run();
@@ -284,8 +285,8 @@ describe("AmazonPdpCountryScraper", () => {
     });
 
     it.each([
-      ["captcha", { isCaptcha: true }, html],
-      ["invalid", { isCaptcha: false, isValid: false }, html],
+      ["captcha", { price: 10 }, captchaPage],
+      ["invalid", { isValid: false }, html],
       ["empty", { price: 10 }, ""],
     ])("counts a %s response without an item", async (outcome, result, data) => {
       const { amazon, run, increment } = setup(result);

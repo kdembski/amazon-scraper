@@ -4,7 +4,6 @@ import type { AmazonAdBuilder } from "@/marketplaces/amazon/types/amazon.types";
 import { buildAd, buildAmazonCountry } from "@@tests/support/factories";
 import {
   awdPage,
-  botWallPage,
   captchaPage,
   toDocument,
   twisterBuybox,
@@ -49,7 +48,6 @@ describe("AmazonAwdAdBuilder", () => {
       const page = awdPage(twisterBuybox({ price: "24,99", soldBy: "Amazon.fr" }));
 
       expect(build(page)).toEqual({
-        isCaptcha: false,
         isValid: true,
         price: 24.99,
         dispatchFrom: "Amazon",
@@ -60,7 +58,6 @@ describe("AmazonAwdAdBuilder", () => {
       const page = `<div id="related"></div><div id="buybox">${twisterBuybox({ price: "24,99", soldBy: "Amazon.fr" })}<div id="olpLinkWidget_feature_div"`;
 
       expect(build(page)).toEqual({
-        isCaptcha: false,
         isValid: true,
         price: 24.99,
         dispatchFrom: "Amazon",
@@ -69,25 +66,18 @@ describe("AmazonAwdAdBuilder", () => {
 
     it("gives a valid result without a price when the product is unavailable", () => {
       expect(build(awdPage(twisterBuybox({ soldBy: "" })))).toEqual({
-        isCaptcha: false,
         isValid: true,
       });
     });
 
     it("rejects a buy box that hides the price", () => {
       expect(build(awdPage(twisterBuybox({ price: "24,99", hidden: true })))).toEqual({
-        isCaptcha: false,
         isValid: false,
       });
     });
 
-    it("detects a captcha", () => {
-      expect(build(captchaPage)).toEqual({ isCaptcha: true });
-      expect(build(botWallPage)).toEqual({ isCaptcha: true });
-    });
-
     it("rejects a page without the buy box", () => {
-      expect(build("<div>error</div>")).toEqual({ isCaptcha: false, isValid: false });
+      expect(build("<div>error</div>")).toEqual({ isValid: false });
     });
   });
 });

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AmazonAodAdBuilder } from "@/marketplaces/amazon/pdp/builders/AmazonAodAdBuilder";
-import { botWallPage, captchaPage, toDocument } from "@@tests/support/html";
+import { captchaPage, toDocument } from "@@tests/support/html";
 import { AmazonCountry } from "@/marketplaces/amazon/types/amazon.types";
 import { AmazonAd } from "@/marketplaces/amazon/types/amazon.types";
 
@@ -61,25 +61,18 @@ describe("AmazonAodAdBuilder", () => {
     });
   });
 
-  it("detects a captcha page", () => {
-    expect(build(captchaPage)).toEqual({ isCaptcha: true });
-    expect(build(botWallPage)).toEqual({ isCaptcha: true });
-  });
-
   it("marks a response without the aod container as invalid", () => {
     expect(build(`<div id="something-else"></div>`)).toEqual({
-      isCaptcha: false,
       isValid: false,
     });
   });
 
   it("returns no price when the pinned offer has no price box", () => {
-    expect(build(aodPage(""))).toEqual({ isCaptcha: false, isValid: true });
+    expect(build(aodPage(""))).toEqual({ isValid: true });
   });
 
   it("returns no price when there is no pinned offer", () => {
     expect(build(`<div id="aod-container"></div>`)).toEqual({
-      isCaptcha: false,
       isValid: true,
     });
   });
@@ -91,7 +84,6 @@ describe("AmazonAodAdBuilder", () => {
     );
 
     expect(build(body)).toEqual({
-      isCaptcha: false,
       isValid: true,
       price: 1299,
       dispatchFrom: "Amazon",

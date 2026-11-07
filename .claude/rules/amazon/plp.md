@@ -67,7 +67,7 @@ Goal: find new ASINs in a category on amazon.pl (new releases + search listing) 
 
 1. Backpressure: request queue ≥ `batchSize` → waits 1 s at a time.
 2. Request via `AmazonService.get()` (default proxy `datacenter`) with the builder's `stopAt` markers: the stream is destroyed once they arrived in order.
-3. Retries up to 6 attempts (`MAX_FAILED_ATTEMPTS`), backoff 1 s, 2 s, 4 s ... with jitter, on:
+3. `AmazonPageReader` (shared with PDP) turns the response into a page. Retries up to 6 attempts (`MAX_FAILED_ATTEMPTS`), backoff 1 s, 2 s, 4 s ... with jitter, on:
    - HTTP error / network / timeout (403 and 429 block the direct family for the host, see PDP 7);
    - empty response (`empty`);
    - captcha (`captcha`, `AmazonCaptchaDetector`, Akamai interstitial included), no block;

@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { parseDocument } from "htmlparser2";
 import { beforeAll, describe, expect, it, vi } from "vitest";
+import { AmazonCaptchaDetector } from "@/marketplaces/amazon/AmazonCaptchaDetector";
 import { AmazonAodAdBuilder } from "@/marketplaces/amazon/pdp/builders/AmazonAodAdBuilder";
 import { AmazonAwdAdBuilder } from "@/marketplaces/amazon/pdp/builders/AmazonAwdAdBuilder";
 import { AmazonTwisterAdBuilder } from "@/marketplaces/amazon/pdp/builders/AmazonTwisterAdBuilder";
@@ -51,6 +52,7 @@ type Result = { code: string; asin: string } & (
 );
 
 let amazon: AmazonService;
+const captchaDetector = new AmazonCaptchaDetector();
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -63,7 +65,7 @@ const fetchPage = (url: string, referer: string, stopAt?: StopAt) => {
 const scrape = async (
   url: string,
   referer: string,
-  build: (html: string) => AmazonAdBuildResult,
+  build: (html: string) => AmazonAdBuildResult & { isCaptcha?: boolean },
   { stopAt, retryInvalid = false }: { stopAt?: StopAt; retryInvalid?: boolean } = {}
 ) => {
   let blocked = "";
@@ -91,7 +93,10 @@ const scrapeAll = (builder: AmazonAdBuilder, codes: string[], retryInvalid = fal
         const result = await scrape(
           url,
           referer,
-          (html) => builder.build(parseDocument(builder.trimHtml(html))),
+          (html) => {
+            const document = parseDocument(builder.trimHtml(html));
+            return captchaDetector.detect(document) ? { isCaptcha: true } : builder.build(document);
+          },
           { stopAt: builder.stopAt, retryInvalid }
         );
         return { code, asin, ...result };
