@@ -18,7 +18,7 @@ const setup = () => {
   const service = new Service(
     api.service,
     queue as unknown as TokenBucketQueue,
-    { getScraperName: async () => "amazon-pdp-1" }
+    { get: async () => "amazon-pdp-1" }
   );
   return { service, get: api.get, queue };
 };

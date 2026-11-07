@@ -9,6 +9,7 @@ import { MetricsReporter } from "@/shared/metrics/MetricsReporter";
 import { MetricsService } from "@/shared/metrics/MetricsService";
 import { ScrapingClient } from "@/shared/http/ScrapingClient";
 import { ArgsService } from "@/shared/args/ArgsService";
+import { ScraperNameResolver } from "@/shared/args/ScraperNameResolver";
 import { ScraperConfigService } from "@/shared/backend/ScraperConfigService";
 import type { ProxyAgentPool } from "@/shared/http/proxy/ProxyAgentPool";
 import { ProxyService } from "@/shared/http/proxy/ProxyService";
@@ -19,6 +20,7 @@ import { resetSingleton } from "@@tests/support/singleton";
 
 const singletons = [
   ArgsService,
+  ScraperNameResolver,
   ApiService,
   AmazonCountryService,
   ProxyService,

@@ -1,4 +1,5 @@
 import { ArgsService } from "@/shared/args/ArgsService";
+import { ScraperNameResolver } from "@/shared/args/ScraperNameResolver";
 import { ApiService } from "@/shared/backend/ApiService";
 import { ProxyService } from "@/shared/http/proxy/ProxyService";
 import { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
@@ -22,7 +23,8 @@ export class MetricsReporter {
     private queueService = TokenBucketQueue.getInstance(),
     private proxyService = ProxyService.getInstance(),
     private now = () => new Date(),
-    private processMetrics = new ProcessMetrics()
+    private processMetrics = new ProcessMetrics(),
+    private nameResolver = ScraperNameResolver.getInstance()
   ) {}
 
   public static getInstance(): MetricsReporter {
@@ -81,7 +83,7 @@ export class MetricsReporter {
 
   private async post(report: UnsentReport) {
     try {
-      const name = await this.argsService.getScraperName();
+      const name = await this.nameResolver.get();
       await this.apiService.send(`scrapers/${name}/metrics`, report.body, report.key);
       this.unsent = undefined;
       return true;

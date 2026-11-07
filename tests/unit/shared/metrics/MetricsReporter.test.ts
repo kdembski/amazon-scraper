@@ -26,7 +26,6 @@ const gauges = [
 const setup = ({ target = "pdp", traffic = [] as Traffic[] } = {}) => {
   const args = {
     getTargetFlag: vi.fn(() => target),
-    getScraperName: vi.fn(async () => "amazon-pdp"),
   } as unknown as ArgsService;
   const api = fakeApiService();
   api.send.mockResolvedValue({});
@@ -59,7 +58,8 @@ const setup = ({ target = "pdp", traffic = [] as Traffic[] } = {}) => {
     queue,
     proxy,
     now,
-    processMetrics
+    processMetrics,
+    { get: async () => "amazon-pdp" }
   );
 
   return { api, metrics, reporter, proxy, processMetrics };

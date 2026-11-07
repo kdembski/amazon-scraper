@@ -1,5 +1,5 @@
 import { CronJob } from "cron";
-import { ArgsService } from "@/shared/args/ArgsService";
+import { ScraperNameResolver } from "@/shared/args/ScraperNameResolver";
 import { ApiService } from "@/shared/backend/ApiService";
 import { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
 import { getRetryDelay } from "@/shared/utils/retry";
@@ -20,7 +20,7 @@ export class ScraperConfigService {
   private constructor(
     private apiService = ApiService.getInstance(),
     private queue = TokenBucketQueue.getInstance(),
-    private argsService = ArgsService.getInstance()
+    private nameResolver = ScraperNameResolver.getInstance()
   ) {}
 
   public static getInstance(): ScraperConfigService {
@@ -60,7 +60,7 @@ export class ScraperConfigService {
 
   private async fetch() {
     return this.apiService.get<ScraperConfig>(
-      `scrapers/${await this.argsService.getScraperName()}/config`,
+      `scrapers/${await this.nameResolver.get()}/config`,
       { timeout: 10 * 1000 }
     );
   }
