@@ -12,6 +12,8 @@ type PlpBuildResult = { isValid: boolean; ads: AmazonPlpAd[] };
 
 const QUEUE_FULL_DELAY = 1000;
 
+export const PLP_MAX_FAILED_ATTEMPTS = 10;
+
 export class AmazonPlpPageFetcher {
   constructor(
     private amazonService = AmazonService.getInstance(),
@@ -27,7 +29,7 @@ export class AmazonPlpPageFetcher {
     build: (document: Document) => T,
     stopAt?: string[]
   ): Promise<{ page?: T; failed: number }> {
-    const retry = new RetryBackoff();
+    const retry = new RetryBackoff(PLP_MAX_FAILED_ATTEMPTS);
 
     while (!retry.isExhausted) {
       const html = await this.get(url, referer, stopAt);

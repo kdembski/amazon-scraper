@@ -1,9 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AmazonPlpPageScraper } from "@/marketplaces/amazon/plp/AmazonPlpPageScraper";
 import { AmazonPlpCrawl } from "@/marketplaces/amazon/plp/AmazonPlpCrawl";
-import type { AmazonPlpPageFetcher } from "@/marketplaces/amazon/plp/AmazonPlpPageFetcher";
+import { type AmazonPlpPageFetcher, PLP_MAX_FAILED_ATTEMPTS } from "@/marketplaces/amazon/plp/AmazonPlpPageFetcher";
 import type { MetricsService } from "@/shared/metrics/MetricsService";
-import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/RetryBackoff";
 import { fakeAmazonPlpAdSender } from "@@tests/support/fakes";
 
 type Reply = { lastPage?: number; asins?: string[]; failed?: number; givenUp?: boolean };
@@ -21,7 +20,7 @@ const setup = (reply: (price: string, number: number) => Reply = () => ({}), all
   const fetch = vi.fn(async (url: string, _referer: string, _build?: unknown, _stopAt?: string[]) => {
     const { price, number } = parse(url);
     const { lastPage = 1, asins = [`B0${price}P${number}`], failed = 0, givenUp } = reply(price, number);
-    if (givenUp) return { failed: MAX_FAILED_ATTEMPTS };
+    if (givenUp) return { failed: PLP_MAX_FAILED_ATTEMPTS };
     return { page: { isValid: true, ads: asins.map(ad), lastPage }, failed };
   });
   const increment = vi.fn();
@@ -172,7 +171,7 @@ describe("AmazonPlpPageScraper", () => {
     expect(increment).toHaveBeenCalledWith(
       "item_attempts",
       { country: "pl", outcome: "given_up" },
-      MAX_FAILED_ATTEMPTS
+      PLP_MAX_FAILED_ATTEMPTS
     );
   });
 

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MAX_FAILED_ATTEMPTS, RetryBackoff } from "@/shared/utils/RetryBackoff";
 
 const after = (failed: number, random = () => 1) => {
-  const retry = new RetryBackoff(random);
+  const retry = new RetryBackoff(MAX_FAILED_ATTEMPTS, random);
   for (let i = 0; i < failed; i++) retry.fail();
   return retry;
 };
@@ -40,6 +40,15 @@ describe("RetryBackoff", () => {
   it("is exhausted after MAX_FAILED_ATTEMPTS failures", () => {
     expect(after(MAX_FAILED_ATTEMPTS - 1).isExhausted).toBe(false);
     expect(after(MAX_FAILED_ATTEMPTS).isExhausted).toBe(true);
+  });
+
+  it("is exhausted after its own limit of failures", () => {
+    const retry = new RetryBackoff(10);
+    for (let i = 0; i < 9; i++) retry.fail();
+    expect(retry.isExhausted).toBe(false);
+
+    retry.fail();
+    expect(retry.isExhausted).toBe(true);
   });
 
   it("waits for the delay", async () => {

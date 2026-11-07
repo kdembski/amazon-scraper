@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Node.js/TypeScript (ESM) worker scraping Amazon through rotating proxies. Stateless: gets work from the backend (`API_URL`), sends results back. Modes (`-t`): `pdp` (default, price and shipper per ASIN per country; sources `aod` | `twister` | `awd` from the country's `pdpSource` list, 404 falls through to the next) and `plp` (new releases + category listings on amazon.pl, sends new ASINs).
+Node.js/TypeScript (ESM) worker scraping Amazon through rotating proxies. Stateless: gets work from the backend (`API_URL`), sends results back. Modes (`-t`): `pdp` (default, price and shipper per ASIN per country; sources `aod` | `twister` | `awd` from the country's `pdpSource` list, 404 falls through to the next) and `plp` (category listings on amazon.pl, sends new ASINs; new releases disabled).
 
 ## Commands
 
