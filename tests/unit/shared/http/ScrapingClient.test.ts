@@ -265,39 +265,6 @@ describe("ScrapingClient", () => {
         expect(metrics.increment).toHaveBeenCalledWith("requests", { outcome: "ok" });
       });
 
-      it("cuts at markers split across chunks", async () => {
-        const { run } = setupStream(["<a><", "b>x&&", "&y", "rest"]);
-
-        await expect(run()).resolves.toBe("<a><b>x&&&y");
-      });
-
-      it("ignores a later marker seen before the earlier one", async () => {
-        const { run } = setupStream(["&&&", "<b>", "x&&&", "rest"]);
-
-        await expect(run()).resolves.toBe("&&&<b>x&&&");
-      });
-
-      it("cuts at whichever alternative marker comes first", async () => {
-        const first = setupStream(["<b>x", "&&&y", "##z", "rest"]);
-        await expect(first.run(["<b>", ["##", "&&&"]])).resolves.toBe("<b>x&&&y");
-
-        const second = setupStream(["<b>x#", "#y", "&&&z", "rest"]);
-        await expect(second.run(["<b>", ["##", "&&&"]])).resolves.toBe("<b>x##y");
-      });
-
-      it("passes the whole response when the markers never arrive", async () => {
-        const { run } = setupStream(["<a>", "<b>"]);
-
-        await expect(run()).resolves.toBe("<a><b>");
-      });
-
-      it("decodes a character split across chunks", async () => {
-        const euro = Buffer.from("€");
-        const { run } = setupStream([euro.subarray(0, 1), euro.subarray(1)]);
-
-        await expect(run(["x"])).resolves.toBe("€");
-      });
-
       it("rejects on a stream error and counts it once", async () => {
         const { run, metrics } = setupStream(["<a>"], new Error("reset"));
 

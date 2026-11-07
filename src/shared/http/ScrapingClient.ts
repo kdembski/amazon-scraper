@@ -3,10 +3,11 @@ import type { Readable } from "node:stream";
 import { setImmediate } from "node:timers/promises";
 import _ from "lodash";
 import { ProxyService } from "@/shared/http/proxy/ProxyService";
+import { StopAtReader } from "@/shared/http/StopAtReader";
 import { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
 import { MetricsService } from "@/shared/metrics/MetricsService";
 import { toRequestOutcome } from "@/shared/metrics/toRequestOutcome";
-import type { Route, ScrapingRequest, StopAt } from "@/shared/http/http.types";
+import type { Route, ScrapingRequest } from "@/shared/http/http.types";
 import type { MetricLabels, RequestOutcome } from "@/shared/metrics/metrics.types";
 
 export class ScrapingClient {
@@ -20,7 +21,8 @@ export class ScrapingClient {
   private constructor(
     private proxyService = ProxyService.getInstance(),
     private queueService = TokenBucketQueue.getInstance(),
-    private metricsService = MetricsService.getInstance()
+    private metricsService = MetricsService.getInstance(),
+    private stopAtReader = new StopAtReader()
   ) {}
 
   public static getInstance(): ScrapingClient {
@@ -67,7 +69,7 @@ export class ScrapingClient {
         ...(stopAt && { responseType: "stream" }),
       });
       const data = stopAt
-        ? ((await this.read(response.data as Readable, stopAt)) as T)
+        ? ((await this.stopAtReader.read(response.data as Readable, stopAt)) as T)
         : response.data;
       this.record("ok", route, labels, startedAt);
       return data;
@@ -88,38 +90,5 @@ export class ScrapingClient {
     this.metricsService.increment("requests", { ...labels, outcome });
     this.metricsService.increment(`requests_${route}`, { ...labels, outcome });
     this.metricsService.increment("request_ms", labels, Date.now() - startedAt);
-  }
-
-  // Text of the stream up to the chunk that completes the markers in order
-  private read(stream: Readable, stopAt: StopAt) {
-    return new Promise<string>((resolve, reject) => {
-      let text = "";
-      let next = 0;
-      let from = 0;
-
-      stream.setEncoding("utf8");
-      stream.on("data", (chunk: string) => {
-        text += chunk;
-        while (next < stopAt.length) {
-          const markers = _.castArray(stopAt[next]);
-          const found = _.minBy(
-            markers
-              .map((marker) => ({ marker, index: text.indexOf(marker, from) }))
-              .filter(({ index }) => index !== -1),
-            "index"
-          );
-          if (!found) {
-            from = Math.max(from, text.length - _.max(markers.map((marker) => marker.length))!);
-            return;
-          }
-          from = found.index + found.marker.length;
-          next++;
-        }
-        stream.destroy();
-        resolve(text);
-      });
-      stream.on("end", () => resolve(text));
-      stream.on("error", reject);
-    });
   }
 }
