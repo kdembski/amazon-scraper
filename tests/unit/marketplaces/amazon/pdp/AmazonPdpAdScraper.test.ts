@@ -5,6 +5,7 @@ import { AmazonPdpPriceHelper } from "@/marketplaces/amazon/pdp/AmazonPdpPriceHe
 import type { AmazonAdPrice } from "@/marketplaces/amazon/types/amazon.types";
 import type { ItemOutcome } from "@/shared/metrics/metrics.types";
 import type { MetricsService } from "@/shared/metrics/MetricsService";
+import { RetryBackoff } from "@/shared/utils/RetryBackoff";
 import { buildAd, buildAmazonCountry } from "@@tests/support/factories";
 import { fakeAmazonPdpResultSender } from "@@tests/support/fakes";
 
@@ -66,7 +67,7 @@ describe("AmazonPdpAdScraper", () => {
     expect(execute).toHaveBeenCalledTimes(2);
     countries.forEach((country, i) =>
       expect(execute.mock.calls[i]).toEqual([
-        { country, complete: false, deleted: false, missing: false, failed: 0, notFound: 0 },
+        { country, complete: false, deleted: false, missing: false, retry: expect.any(RetryBackoff), notFound: 0 },
         ad,
         expect.any(Function),
       ])

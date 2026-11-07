@@ -3,7 +3,7 @@ import { AmazonPlpPageScraper } from "@/marketplaces/amazon/plp/AmazonPlpPageScr
 import { AmazonPlpCrawl } from "@/marketplaces/amazon/plp/AmazonPlpCrawl";
 import type { AmazonPlpPageFetcher } from "@/marketplaces/amazon/plp/AmazonPlpPageFetcher";
 import type { MetricsService } from "@/shared/metrics/MetricsService";
-import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
+import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/RetryBackoff";
 import { fakeAmazonPlpAdSender } from "@@tests/support/fakes";
 
 type Reply = { lastPage?: number; asins?: string[]; failed?: number; givenUp?: boolean };

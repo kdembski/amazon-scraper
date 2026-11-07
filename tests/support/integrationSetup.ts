@@ -14,10 +14,17 @@ vi.mock("@/marketplaces/amazon/pdp/AmazonNightSchedule", () => ({
 }));
 
 // Retries go out right away, so a country can fail MAX_FAILED_ATTEMPTS times within a test
-vi.mock("@/shared/utils/retry", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/shared/utils/retry")>()),
-  getRetryDelay: () => 0,
-}));
+vi.mock("@/shared/utils/RetryBackoff", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/shared/utils/RetryBackoff")>();
+  return {
+    ...original,
+    RetryBackoff: class extends original.RetryBackoff {
+      wait() {
+        return new Promise<void>((resolve) => setTimeout(resolve, 0));
+      }
+    },
+  };
+});
 
 // Batches go out on the next tick instead of after 5 s
 vi.mock("@/shared/backend/BatchSender", async (importOriginal) => {

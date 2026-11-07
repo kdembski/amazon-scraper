@@ -1,6 +1,6 @@
 import _ from "lodash";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
+import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/RetryBackoff";
 import { NOT_FOUND_TO_DELETE } from "@/marketplaces/amazon/pdp/AmazonPdpCountryScraper";
 import { AmazonPdpScraper } from "@/marketplaces/amazon/pdp/AmazonPdpScraper";
 import { cronJobs } from "@@tests/support/cron";

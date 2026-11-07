@@ -3,6 +3,7 @@ import {
   AmazonAdPrice,
 } from "@/marketplaces/amazon/types/amazon.types";
 import { AmazonCountry } from "@/marketplaces/amazon/types/amazon.types";
+import { RetryBackoff } from "@/shared/utils/RetryBackoff";
 
 export const buildAmazonCountry = (overrides: Partial<AmazonCountry> = {}): AmazonCountry => ({
   countryId: 1,
@@ -26,7 +27,7 @@ export const buildPrice = (
   country: buildAmazonCountry(),
   complete: false,
   deleted: false,
-  failed: 0,
+  retry: new RetryBackoff(),
   missing: false,
   notFound: 0,
   ...overrides,

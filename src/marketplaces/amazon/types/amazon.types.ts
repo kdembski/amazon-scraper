@@ -1,5 +1,6 @@
 import type { Document } from "domhandler";
 import type { StopAt } from "@/shared/http/http.types";
+import type { RetryBackoff } from "@/shared/utils/RetryBackoff";
 
 export interface AmazonCountry {
   countryId: number;
@@ -55,7 +56,7 @@ export interface AmazonAdPrice {
   deleted: boolean;
   // A 404 from the last source
   missing: boolean;
-  failed: number;
+  retry: RetryBackoff;
   notFound: number;
 }
 

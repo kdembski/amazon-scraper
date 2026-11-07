@@ -2,8 +2,7 @@ import { CronJob } from "cron";
 import { ScraperNameResolver } from "@/shared/args/ScraperNameResolver";
 import { ApiService } from "@/shared/backend/ApiService";
 import { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
-import { getRetryDelay } from "@/shared/utils/retry";
-import { sleep } from "@/shared/utils/sleep";
+import { RetryBackoff } from "@/shared/utils/RetryBackoff";
 
 type ScraperConfig = {
   concurrency: number;
@@ -36,12 +35,14 @@ export class ScraperConfigService {
   }
 
   async load() {
-    for (let failed = 1; ; failed++) {
+    const retry = new RetryBackoff();
+    while (true) {
       try {
         return this.apply(await this.fetch());
       } catch (e) {
         console.error("config: load failed", e);
-        await sleep(getRetryDelay(failed));
+        retry.fail();
+        await retry.wait();
       }
     }
   }

@@ -8,6 +8,7 @@ import {
 import { AmazonPdpResultSender } from "@/marketplaces/amazon/pdp/AmazonPdpResultSender";
 import { MetricsService } from "@/shared/metrics/MetricsService";
 import { AdOutcome, ItemOutcome } from "@/shared/metrics/metrics.types";
+import { RetryBackoff } from "@/shared/utils/RetryBackoff";
 import _ from "lodash";
 
 export class AmazonPdpAdScraper {
@@ -60,7 +61,7 @@ export class AmazonPdpAdScraper {
       complete: false,
       deleted: false,
       missing: false,
-      failed: 0,
+      retry: new RetryBackoff(),
       notFound: 0,
     }));
   }

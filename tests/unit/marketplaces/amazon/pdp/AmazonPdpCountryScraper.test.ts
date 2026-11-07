@@ -3,7 +3,7 @@ import {
   AmazonPdpCountryScraper,
   NOT_FOUND_TO_DELETE,
 } from "@/marketplaces/amazon/pdp/AmazonPdpCountryScraper";
-import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
+import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/RetryBackoff";
 import { AmazonAdBuildResult } from "@/marketplaces/amazon/types/amazon.types";
 import type { MetricsService } from "@/shared/metrics/MetricsService";
 import { buildAd, buildAmazonCountry, buildPrice } from "@@tests/support/factories";
@@ -151,7 +151,7 @@ describe("AmazonPdpCountryScraper", () => {
       amazon.respond(0, data);
       await flush();
 
-      expect(price.failed).toBe(1);
+      expect(price.retry.failed).toBe(1);
       expect(outcome).not.toHaveBeenCalled();
 
       await vi.advanceTimersByTimeAsync(1000);
@@ -166,7 +166,7 @@ describe("AmazonPdpCountryScraper", () => {
       amazon.fail(0);
       await flush();
 
-      expect(price.failed).toBe(1);
+      expect(price.retry.failed).toBe(1);
       await vi.advanceTimersByTimeAsync(1000);
       expect(amazon.get).toHaveBeenCalledTimes(2);
     });
@@ -182,7 +182,7 @@ describe("AmazonPdpCountryScraper", () => {
       amazon.respond(0, html);
       await flush();
 
-      expect(price.failed).toBe(1);
+      expect(price.retry.failed).toBe(1);
       expect(increment).toHaveBeenCalledWith("responses", { country: "c1", outcome: "parse_error" });
       await vi.advanceTimersByTimeAsync(1000);
       expect(amazon.get).toHaveBeenCalledTimes(2);
@@ -190,7 +190,8 @@ describe("AmazonPdpCountryScraper", () => {
 
     it("after an exponential backoff delay", async () => {
       const { amazon, price, run } = setup();
-      price.failed = 2;
+      price.retry.fail();
+      price.retry.fail();
       run();
 
       amazon.fail(0);
@@ -221,7 +222,7 @@ describe("AmazonPdpCountryScraper", () => {
 
       for (let i = 0; i < MAX_FAILED_ATTEMPTS; i++) await failLast();
 
-      expect(price.failed).toBe(MAX_FAILED_ATTEMPTS);
+      expect(price.retry.failed).toBe(MAX_FAILED_ATTEMPTS);
       expect(price.value).toBeUndefined();
       expect(amazon.get).toHaveBeenCalledTimes(MAX_FAILED_ATTEMPTS);
       expect(outcome).toHaveBeenCalledWith("given_up");
@@ -235,7 +236,7 @@ describe("AmazonPdpCountryScraper", () => {
     for (let i = 0; i < NOT_FOUND_TO_DELETE; i++) await failLast(notFound);
 
     expect(price.notFound).toBe(NOT_FOUND_TO_DELETE);
-    expect(price.failed).toBe(NOT_FOUND_TO_DELETE - 1);
+    expect(price.retry.failed).toBe(NOT_FOUND_TO_DELETE - 1);
     expect(amazon.get).toHaveBeenCalledTimes(NOT_FOUND_TO_DELETE);
     expect(outcome).toHaveBeenCalledWith("deleted");
     expect(price.missing).toBe(true);
@@ -377,7 +378,7 @@ describe("AmazonPdpCountryScraper", () => {
       await flush();
 
       expect(amazon.requests[1].url).toBe("c1/awd/B0TESTASIN");
-      expect(price.failed).toBe(0);
+      expect(price.retry.failed).toBe(0);
       expect(calls(increment, "source_fallback")).toEqual([["source_fallback", { country: "c1" }]]);
       amazon.respond(1, html);
       await flush();

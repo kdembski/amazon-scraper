@@ -7,7 +7,7 @@ import { ScraperConfigService } from "@/shared/backend/ScraperConfigService";
 import { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
 import { MetricsService } from "@/shared/metrics/MetricsService";
 import { ResponseOutcome } from "@/shared/metrics/metrics.types";
-import { getRetryDelay, MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
+import { RetryBackoff } from "@/shared/utils/RetryBackoff";
 import { sleep } from "@/shared/utils/sleep";
 
 type PlpBuildResult = { isValid: boolean; ads: AmazonPlpAd[] };
@@ -29,15 +29,18 @@ export class AmazonPlpPageFetcher {
     build: (document: Document) => T,
     stopAt?: string[]
   ): Promise<{ page?: T; failed: number }> {
-    for (let failed = 0; failed < MAX_FAILED_ATTEMPTS; failed++) {
-      if (failed) await sleep(getRetryDelay(failed));
+    const retry = new RetryBackoff();
 
+    while (!retry.isExhausted) {
       const html = await this.get(url, referer, stopAt);
       const page = html !== undefined && this.build(html, build);
-      if (page) return { page, failed };
+      if (page) return { page, failed: retry.failed };
+
+      retry.fail();
+      if (!retry.isExhausted) await retry.wait();
     }
 
-    return { failed: MAX_FAILED_ATTEMPTS };
+    return { failed: retry.failed };
   }
 
   private build<T extends PlpBuildResult>(

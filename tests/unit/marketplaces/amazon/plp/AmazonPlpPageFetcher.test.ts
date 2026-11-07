@@ -3,7 +3,7 @@ import type { Document } from "domhandler";
 import { AmazonPlpPageFetcher } from "@/marketplaces/amazon/plp/AmazonPlpPageFetcher";
 import type { MetricsService } from "@/shared/metrics/MetricsService";
 import { find } from "@/shared/utils/html";
-import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
+import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/RetryBackoff";
 import { fakeAmazonService, fakeScraperConfigService, fakeTokenBucketQueue } from "@@tests/support/fakes";
 import { botWallPage, captchaPage, interstitialPage } from "@@tests/support/html";
 

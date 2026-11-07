@@ -3,8 +3,7 @@ import { ApiService } from "@/shared/backend/ApiService";
 import { MetricsService } from "@/shared/metrics/MetricsService";
 import type { RequestOutcome } from "@/shared/metrics/metrics.types";
 import { toRequestOutcome } from "@/shared/metrics/toRequestOutcome";
-import { getRetryDelay, MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
-import { sleep } from "@/shared/utils/sleep";
+import { RetryBackoff } from "@/shared/utils/RetryBackoff";
 
 // Buffers items for one backend path and posts them together
 export class BatchSender<T> {
@@ -56,7 +55,7 @@ export class BatchSender<T> {
 
   private async send(items: T[]) {
     const key = randomUUID();
-    let failed = 0;
+    const retry = new RetryBackoff();
     while (true) {
       const startedAt = Date.now();
       try {
@@ -66,14 +65,14 @@ export class BatchSender<T> {
         return;
       } catch (e: any) {
         this.countRequest(toRequestOutcome(e), startedAt);
-        failed++;
+        retry.fail();
         const status = e?.response?.status;
-        if ((status && status < 500) || failed >= MAX_FAILED_ATTEMPTS) {
+        if ((status && status < 500) || retry.isExhausted) {
           console.error(`backend: ${items.length} items for ${this.path} dropped`, status ?? e?.message);
           this.metricsService.increment("backend_items", { outcome: "dropped" }, items.length);
           return;
         }
-        await sleep(getRetryDelay(failed));
+        await retry.wait();
       }
     }
   }
