@@ -56,22 +56,27 @@ export class BatchSender<T> {
   private async send(items: T[]) {
     const key = randomUUID();
     const retry = new RetryBackoff();
+
     while (true) {
       const startedAt = Date.now();
+
       try {
         await this.apiService.send(this.path, this.toBody(items), key);
+
         this.countRequest("ok", startedAt);
         this.metricsService.increment("backend_items", { outcome: "sent" }, items.length);
         return;
       } catch (e: any) {
         this.countRequest(toRequestOutcome(e), startedAt);
         retry.fail();
+
         const status = e?.response?.status;
         if ((status && status < 500) || retry.isExhausted) {
           console.error(`backend: ${items.length} items for ${this.path} dropped`, status ?? e?.message);
           this.metricsService.increment("backend_items", { outcome: "dropped" }, items.length);
           return;
         }
+
         await retry.wait();
       }
     }

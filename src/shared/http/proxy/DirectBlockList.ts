@@ -1,6 +1,6 @@
 import type { Route } from "@/shared/http/http.types";
 
-const BLOCK_TIME = 10 * 60 * 1000;
+const BLOCK_TIME = 3 * 60 * 1000;
 
 export class DirectBlockList {
   // "<route> <host>" pairs blocked by the host, until the given time

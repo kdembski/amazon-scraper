@@ -32,5 +32,6 @@ Tests: `src/a/X.ts` → `tests/unit/a/X.test.ts`, one file per source file. Buil
 - 2 spaces, double quotes, semicolons, `lodash` as `_`. Comments in English.
 - Brace-less arrows only when the function fits on one line.
 - No `else if`, no `else` after a return: early returns.
+- A blank line between consecutive logical steps of a function body; a guard `if` stays with the value it checks.
 - No comments explaining why; reasoning goes in the reply or commit.
 - Commit messages: short, only what changed. No `Co-Authored-By` lines.

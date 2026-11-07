@@ -31,6 +31,7 @@ export class ScraperNameResolver {
     return NAME_PREFIX ? `${NAME_PREFIX}-${fullName}` : fullName;
   }
 
+  // Replica number from the container's reverse DNS name ("...-<name>-2." gives "2")
   private async getReplica(name?: string) {
     const address = this.getInterfaces().eth0?.find((i) => i.family === "IPv4")?.address;
     if (!name || !address) return;

@@ -87,7 +87,7 @@ Shared:
 - `TokenBucketQueue` – `concurrency` and `rps` limits from the config.
 - `ProxyService.getAgent(host, proxyType)` – proxy with a free keep-alive connection to the host, otherwise random; missing type → `datacenter`. `direct` → no proxy, keep-alive agents per IP family (`ProxyAgentPool.getDirect(4 | 6)`, 15 s idle timeout), IPv4 and IPv6 in turn; IPv6 only when a TCP ping to `2606:4700:4700::1111:443` succeeds at each proxy list load (start, hourly; Docker network needs `enable_ipv6`). `mixedN/M` (e.g. `mixed1/2`) → `direct` for N minutes, then the `datacenter` pool for M minutes, by wall clock (all processes of a server switch together); `mixedN` = `mixedN/N`. While the host blocks every direct family, `direct` and `mixedN/M` use the `datacenter` pool.
 - Route choice: `ProxyRouteSelector`; idle proxy order: `FreeProxyTracker`.
-- Block (`ProxyAgentPool.block`, `DirectBlockList`): a 403 or 429 (`ScrapingClient`) on a direct agent closes its idle connections to the host and blocks the direct family + host for 10 min: its connections are closed when freed and picks skip it (all direct families blocked → `datacenter`). 503 and captcha do not block; proxy agents are never blocked. Amazon limits IPv6 per /64, so the direct IPv6 agent stands for the whole /64.
+- Block (`ProxyAgentPool.block`, `DirectBlockList`): a 403 or 429 (`ScrapingClient`) on a direct agent closes its idle connections to the host and blocks the direct family + host for 3 min: its connections are closed when freed and picks skip it (all direct families blocked → `datacenter`). 503 and captcha do not block; proxy agents are never blocked. Amazon limits IPv6 per /64, so the direct IPv6 agent stands for the whole /64.
 
 ## Where to look
 

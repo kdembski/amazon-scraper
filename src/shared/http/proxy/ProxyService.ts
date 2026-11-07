@@ -37,11 +37,8 @@ export class ProxyService {
     return ProxyService.instance;
   }
 
-  // Proxy of the pool whose idle connection to the host was freed last, else
-  // a random one; "direct" connects without a proxy
-  // over the server's IPv4 and IPv6 in turn, "mixedN/M" directly for N minutes
-  // and through datacenter proxies for the next M (M = N when left out); both fall back
-  // to datacenter proxies while the host blocks every direct family
+  // Direct agent when the route selector gives one, else the pool's proxy freed
+  // last for the host, else a random one
   getAgent(host: string, proxyType = "datacenter") {
     const direct = this.routes.getDirect(host, proxyType);
     if (direct) return direct;
