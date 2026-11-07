@@ -38,16 +38,11 @@ vi.mock("@/shared/backend/BatchSender", async (importOriginal) => {
   };
 });
 
-// Retry sleeps (0 ms) run at once; longer ones, like the PDP loop, wait on a
-// fake interval, so a test advances them like the queue stats and they stop
-// for good once the fake timers are dropped
+// Sleeps, like the PDP loop, wait on a fake interval, so a test advances them
+// like the queue stats and they stop for good once the fake timers are dropped
 vi.mock("@/shared/utils/sleep", () => ({
   sleep: (ms: number) =>
     new Promise<void>((resolve) => {
-      if (!ms) {
-        setTimeout(resolve, 0);
-        return;
-      }
       const id = setInterval(() => {
         clearInterval(id);
         resolve();

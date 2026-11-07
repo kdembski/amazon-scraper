@@ -19,8 +19,7 @@ export class RetryBackoff {
     return this.failed >= MAX_FAILED_ATTEMPTS;
   }
 
-  // Exponential backoff with jitter: 1s, 2s, 4s ... capped at 60s, each
-  // randomized to 50-100% so retries of one batch do not fire together
+  // Exponential backoff with jitter: 1s, 2s, 4s ... capped at 60s, randomized to 50-100%
   get delay() {
     const exponent = Math.max(this.failed - 1, 0);
     const delay = Math.min(BASE_DELAY * 2 ** exponent, MAX_DELAY);
