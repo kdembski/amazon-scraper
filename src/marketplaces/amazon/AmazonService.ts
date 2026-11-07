@@ -15,10 +15,6 @@ export class AmazonService {
     return AmazonService.instance;
   }
 
-  get queueService() {
-    return this.scrapingClient.queueService;
-  }
-
   get<T>(url: string, referer: string, request: Omit<ScrapingRequest, "referer" | "labels"> = {}) {
     return this.scrapingClient.get<T>(`${this.baseUrl}${url}`, {
       ...request,

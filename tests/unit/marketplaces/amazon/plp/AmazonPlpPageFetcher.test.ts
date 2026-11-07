@@ -4,7 +4,7 @@ import { AmazonPlpPageFetcher } from "@/marketplaces/amazon/plp/AmazonPlpPageFet
 import type { MetricsService } from "@/shared/metrics/MetricsService";
 import { find } from "@/shared/utils/html";
 import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
-import { fakeAmazonService, fakeScraperConfigService } from "@@tests/support/fakes";
+import { fakeAmazonService, fakeScraperConfigService, fakeTokenBucketQueue } from "@@tests/support/fakes";
 import { botWallPage, captchaPage, interstitialPage } from "@@tests/support/html";
 
 const ad = { asin: "B0A", name: "Product", image: "B0A.jpg", categoryName: "electronics" };
@@ -14,13 +14,15 @@ const invalid = { isValid: false, ads: [] };
 const setup = ({ batchSize = 50 } = {}) => {
   const amazon = fakeAmazonService();
   const config = fakeScraperConfigService({ batchSize });
+  const queue = fakeTokenBucketQueue();
   const increment = vi.fn();
   const fetcher = new AmazonPlpPageFetcher(
     amazon.service,
+    queue.service,
     config.service,
     { increment } as unknown as MetricsService
   );
-  return { amazon, fetcher, increment };
+  return { amazon, queue, fetcher, increment };
 };
 
 const responses = (increment: ReturnType<typeof vi.fn>) =>
@@ -131,14 +133,14 @@ describe("AmazonPlpPageFetcher", () => {
   });
 
   it("waits while the request queue is full", async () => {
-    const { amazon, fetcher } = setup({ batchSize: 2 });
-    amazon.queueService.queue.push(vi.fn(), vi.fn());
+    const { amazon, queue, fetcher } = setup({ batchSize: 2 });
+    queue.queue.push(vi.fn(), vi.fn());
 
     fetcher.fetch("url", "ref", () => valid);
     await vi.advanceTimersByTimeAsync(3000);
     expect(amazon.requests).toHaveLength(0);
 
-    amazon.queueService.queue.pop();
+    queue.queue.pop();
     await vi.advanceTimersByTimeAsync(1000);
     expect(amazon.requests).toHaveLength(1);
   });

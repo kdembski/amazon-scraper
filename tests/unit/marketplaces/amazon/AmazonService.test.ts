@@ -3,14 +3,13 @@ import { AmazonService } from "@/marketplaces/amazon/AmazonService";
 import type { ScrapingClient } from "@/shared/http/ScrapingClient";
 
 const setup = () => {
-  const queueService = { pending: 0 };
-  const client = { get: vi.fn(), queueService };
+  const client = { get: vi.fn() };
   // The constructor is private, it is only called through getInstance()
   const Service = AmazonService as unknown as new (
     ...deps: unknown[]
   ) => AmazonService;
   const service = new Service(client as unknown as ScrapingClient);
-  return { service, client, queueService };
+  return { service, client };
 };
 
 describe("AmazonService", () => {
@@ -38,10 +37,5 @@ describe("AmazonService", () => {
     client.get.mockResolvedValue("<html>");
 
     await expect(service.get("de/x", "de/")).resolves.toBe("<html>");
-  });
-
-  it("exposes the scraping client queue", () => {
-    const { service, queueService } = setup();
-    expect(service.queueService).toBe(queueService);
   });
 });

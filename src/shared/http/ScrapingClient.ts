@@ -2,7 +2,6 @@ import axios from "axios";
 import type { Readable } from "node:stream";
 import { setImmediate } from "node:timers/promises";
 import _ from "lodash";
-import { ScraperConfigService } from "@/shared/backend/ScraperConfigService";
 import { ProxyService } from "@/shared/http/proxy/ProxyService";
 import { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
 import { MetricsService } from "@/shared/metrics/MetricsService";
@@ -19,16 +18,10 @@ export class ScrapingClient {
   );
 
   private constructor(
-    configService = ScraperConfigService.getInstance(),
     private proxyService = ProxyService.getInstance(),
-    public queueService = new TokenBucketQueue(
-      configService.get().concurrency,
-      configService.get().rps
-    ),
+    private queueService = TokenBucketQueue.getInstance(),
     private metricsService = MetricsService.getInstance()
-  ) {
-    queueService.start();
-  }
+  ) {}
 
   public static getInstance(): ScrapingClient {
     if (!ScrapingClient.instance) {

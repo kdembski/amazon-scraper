@@ -17,7 +17,7 @@ const setup = () => {
   ) => ScraperConfigService;
   const service = new Service(
     api.service,
-    () => queue as unknown as TokenBucketQueue,
+    queue as unknown as TokenBucketQueue,
     { getScraperName: async () => "amazon-pdp-1" }
   );
   return { service, get: api.get, queue };

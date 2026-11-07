@@ -7,6 +7,7 @@ import { AmazonTwisterAdBuilder } from "@/marketplaces/amazon/pdp/builders/Amazo
 import { AmazonPlpBuilder } from "@/marketplaces/amazon/plp/AmazonPlpBuilder";
 import { AmazonService } from "@/marketplaces/amazon/AmazonService";
 import { ProxyService } from "@/shared/http/proxy/ProxyService";
+import { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
 import type { StopAt } from "@/shared/http/http.types";
 import { AmazonAdBuilder, AmazonAdBuildResult } from "@/marketplaces/amazon/types/amazon.types";
 import { buildAd, buildAmazonCountry } from "@@tests/support/factories";
@@ -121,7 +122,7 @@ describe("live Amazon", () => {
 
     await ProxyService.getInstance().loadProxies();
     amazon = AmazonService.getInstance();
-    amazon.queueService.concurrency = 4;
+    TokenBucketQueue.getInstance().concurrency = 4;
   });
 
   it("finds the buy box offer in the offers fragment", async () => {

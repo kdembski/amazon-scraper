@@ -4,29 +4,29 @@ import type { AmazonPdpAdScraper } from "@/marketplaces/amazon/pdp/AmazonPdpAdSc
 import type { MetricsService } from "@/shared/metrics/MetricsService";
 import { buildAd, buildAmazonCountry } from "@@tests/support/factories";
 import {
-  fakeAmazonService,
   fakeApiService,
   fakeScraperConfigService,
   fakeAmazonCountryService,
+  fakeTokenBucketQueue,
 } from "@@tests/support/fakes";
 
 const setup = ({ batchSize = 50 } = {}) => {
   const api = fakeApiService();
   const country = fakeAmazonCountryService();
-  const amazon = fakeAmazonService();
+  const queue = fakeTokenBucketQueue();
   const config = fakeScraperConfigService({ batchSize });
   const adExecute = vi.fn();
   const adScraper = { execute: adExecute } as unknown as AmazonPdpAdScraper;
   const increment = vi.fn();
   const scraper = new AmazonPdpScraper(
     api.service,
-    amazon.service,
+    queue.service,
     adScraper,
     country.service,
     config.service,
     { increment } as unknown as MetricsService
   );
-  return { api, country, amazon, adExecute, scraper, increment };
+  return { api, country, queue, adExecute, scraper, increment };
 };
 
 type Fakes = Pick<ReturnType<typeof setup>, "api" | "country">;
@@ -168,8 +168,8 @@ describe("AmazonPdpScraper", () => {
     });
 
     it("waits while the queue is longer than a tenth of the batch", async () => {
-      const { api, country, amazon, scraper } = setup({ batchSize: 50 });
-      amazon.queueService.queue.push(...Array.from({ length: 6 }, () => vi.fn()));
+      const { api, country, queue, scraper } = setup({ batchSize: 50 });
+      queue.queue.push(...Array.from({ length: 6 }, () => vi.fn()));
 
       await scraper.scrape();
       expect(country.getCountries).not.toHaveBeenCalled();

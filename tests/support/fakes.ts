@@ -6,6 +6,7 @@ import type { ApiService } from "@/shared/backend/ApiService";
 import type { ScraperConfigService } from "@/shared/backend/ScraperConfigService";
 import type { AmazonCountryService } from "@/marketplaces/amazon/AmazonCountryService";
 import type { StopAt } from "@/shared/http/http.types";
+import type { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
 import type { AmazonAdBuilder, AmazonAdBuildResult } from "@/marketplaces/amazon/types/amazon.types";
 
 export function fakeApiService() {
@@ -45,20 +46,25 @@ type FakeRequest = {
 // Records every request so a test can answer it with respond() / fail()
 export function fakeAmazonService() {
   const requests: FakeRequest[] = [];
-  const queueService = { queue: [] as Function[] };
   const get = vi.fn((url: string, referer: string, options: FakeRequest["options"] = {}) => {
     return new Promise<string>((resolve, reject) => {
       requests.push({ url, referer, options, resolve, reject });
     });
   });
-  const service = { get, queueService } as unknown as AmazonService;
+  const service = { get } as unknown as AmazonService;
 
   const respond = (index: number, data: string) => requests[index].resolve(data);
   const fail = (index: number, error: any = new Error("Network error")) => {
     requests[index].reject(error);
   };
 
-  return { service, get, queueService, requests, respond, fail };
+  return { service, get, requests, respond, fail };
+}
+
+export function fakeTokenBucketQueue() {
+  const queue = [] as Function[];
+  const service = { queue } as unknown as TokenBucketQueue;
+  return { service, queue };
 }
 
 export function fakeScraperConfigService({ batchSize = 50 } = {}) {

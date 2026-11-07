@@ -3,7 +3,6 @@ import { Readable } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { StopAt } from "@/shared/http/http.types";
 import { ScrapingClient } from "@/shared/http/ScrapingClient";
-import type { ScraperConfigService } from "@/shared/backend/ScraperConfigService";
 import type { ProxyService } from "@/shared/http/proxy/ProxyService";
 import type { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
 
@@ -26,13 +25,11 @@ const setup = () => {
   } as unknown as ProxyService;
   const requests: Promise<unknown>[] = [];
   const queue = {
-    start: vi.fn(),
     request: vi.fn((callback: () => Promise<unknown>) => {
       requests.push(callback());
     }),
   };
   const service = new Client(
-    {} as ScraperConfigService,
     proxy,
     queue as unknown as TokenBucketQueue
   );
@@ -47,11 +44,6 @@ describe("ScrapingClient", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-  });
-
-  it("starts the request queue", () => {
-    const { queue } = setup();
-    expect(queue.start).toHaveBeenCalled();
   });
 
   describe("get", () => {
@@ -148,7 +140,6 @@ describe("ScrapingClient", () => {
       const setupMetrics = () => {
         const metrics = { increment: vi.fn() };
         const queue = {
-          start: vi.fn(),
           request: vi.fn(),
         };
         const requests: Promise<unknown>[] = [];
@@ -162,7 +153,6 @@ describe("ScrapingClient", () => {
           setCountry: vi.fn(),
         };
         const service = new Client(
-          {} as ScraperConfigService,
           proxy,
           queue,
           metrics
@@ -244,13 +234,11 @@ describe("ScrapingClient", () => {
         const metrics = { increment: vi.fn() };
         const requests: Promise<unknown>[] = [];
         const queue = {
-          start: vi.fn(),
           request: vi.fn((cb: () => Promise<unknown>) => {
             requests.push(cb());
           }),
         };
         const service = new Client(
-          {} as ScraperConfigService,
           { getAgent: vi.fn(), block: vi.fn(), getRoute: vi.fn(() => "proxy"), setCountry: vi.fn() },
           queue,
           metrics

@@ -1,10 +1,10 @@
 import { MarketplaceScraper } from "@/shared/interfaces/MarketplaceScraper";
 import { AmazonPdpAdScraper } from "@/marketplaces/amazon/pdp/AmazonPdpAdScraper";
-import { AmazonService } from "@/marketplaces/amazon/AmazonService";
 import { AmazonCountryService } from "@/marketplaces/amazon/AmazonCountryService";
 import { AmazonAd } from "@/marketplaces/amazon/types/amazon.types";
 import { ApiService } from "@/shared/backend/ApiService";
 import { ScraperConfigService } from "@/shared/backend/ScraperConfigService";
+import { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
 import { MetricsService } from "@/shared/metrics/MetricsService";
 import { sleep } from "@/shared/utils/sleep";
 
@@ -19,7 +19,7 @@ export class AmazonPdpScraper implements MarketplaceScraper {
 
   constructor(
     private apiService = ApiService.getInstance(),
-    private amazonService = AmazonService.getInstance(),
+    private queueService = TokenBucketQueue.getInstance(),
     private adScraper = new AmazonPdpAdScraper(),
     private countryService = AmazonCountryService.getInstance(),
     private configService = ScraperConfigService.getInstance(),
@@ -41,7 +41,7 @@ export class AmazonPdpScraper implements MarketplaceScraper {
     if (this.paused) return;
 
     const { batchSize } = this.configService.get();
-    if (this.amazonService.queueService.queue.length > batchSize / 10) return;
+    if (this.queueService.queue.length > batchSize / 10) return;
 
     try {
       const countries = await this.countryService.getCountries();

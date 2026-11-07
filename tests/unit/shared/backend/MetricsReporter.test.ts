@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MetricsReporter } from "@/shared/backend/MetricsReporter";
 import { MetricsService } from "@/shared/metrics/MetricsService";
 import type { ArgsService } from "@/shared/args/ArgsService";
-import type { ScrapingClient } from "@/shared/http/ScrapingClient";
+import type { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
 import type { ProxyService } from "@/shared/http/proxy/ProxyService";
 import type { Traffic } from "@/shared/http/http.types";
 import { cronJobs } from "@@tests/support/cron";
@@ -31,9 +31,7 @@ const setup = ({ target = "pdp", traffic = [] as Traffic[] } = {}) => {
   const api = fakeApiService();
   api.send.mockResolvedValue({});
   const metrics = MetricsService.getInstance();
-  const client = {
-    queueService: { pending: 12, queue: [() => 1, () => 2, () => 3] },
-  } as unknown as ScrapingClient;
+  const queue = { pending: 12, queue: [() => 1, () => 2, () => 3] } as unknown as TokenBucketQueue;
   const proxy = {
     collectTraffic: vi.fn(() => traffic),
     countConnections: vi.fn(() => 5),
@@ -69,7 +67,7 @@ const setup = ({ target = "pdp", traffic = [] as Traffic[] } = {}) => {
     args,
     api.service,
     metrics,
-    client,
+    queue,
     proxy,
     now,
     eventLoopDelay,

@@ -4,6 +4,7 @@ import { AmazonCaptchaDetector } from "@/marketplaces/amazon/AmazonCaptchaDetect
 import { AmazonService } from "@/marketplaces/amazon/AmazonService";
 import { AmazonPlpAd } from "@/marketplaces/amazon/types/amazon.types";
 import { ScraperConfigService } from "@/shared/backend/ScraperConfigService";
+import { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
 import { MetricsService } from "@/shared/metrics/MetricsService";
 import { ResponseOutcome } from "@/shared/metrics/metrics.types";
 import { getRetryDelay, MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
@@ -16,6 +17,7 @@ const QUEUE_FULL_DELAY = 1000;
 export class AmazonPlpPageFetcher {
   constructor(
     private amazonService = AmazonService.getInstance(),
+    private queueService = TokenBucketQueue.getInstance(),
     private configService = ScraperConfigService.getInstance(),
     private metricsService = MetricsService.getInstance(),
     private captchaDetector = new AmazonCaptchaDetector()
@@ -70,7 +72,7 @@ export class AmazonPlpPageFetcher {
 
   private async get(url: string, referer: string, stopAt?: string[]) {
     const { batchSize } = this.configService.get();
-    while (this.amazonService.queueService.queue.length >= batchSize) {
+    while (this.queueService.queue.length >= batchSize) {
       await sleep(QUEUE_FULL_DELAY);
     }
 

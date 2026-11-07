@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
+import { resetSingleton } from "@@tests/support/singleton";
 
 const setup = ({ concurrency = 2, rps = 0 } = {}) => new TokenBucketQueue(concurrency, rps);
 
@@ -19,6 +20,17 @@ describe("TokenBucketQueue", () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
+  });
+
+  it("is a singleton that starts its loop once", () => {
+    const start = vi.spyOn(TokenBucketQueue.prototype, "start").mockImplementation(() => {});
+    resetSingleton(TokenBucketQueue);
+
+    const queue = TokenBucketQueue.getInstance();
+
+    expect(TokenBucketQueue.getInstance()).toBe(queue);
+    expect(start).toHaveBeenCalledTimes(1);
+    resetSingleton(TokenBucketQueue);
   });
 
   describe("request", () => {

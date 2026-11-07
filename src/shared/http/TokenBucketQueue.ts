@@ -1,14 +1,24 @@
 export class TokenBucketQueue {
+  private static instance: TokenBucketQueue;
   queue: (() => any)[] = [];
   pending = 0;
   private tokens;
   private lastRefill = Date.now();
 
   constructor(
-    public concurrency: number,
+    public concurrency = 10,
     public rps = 0
   ) {
     this.tokens = rps;
+  }
+
+  public static getInstance(): TokenBucketQueue {
+    if (!TokenBucketQueue.instance) {
+      TokenBucketQueue.instance = new TokenBucketQueue();
+      TokenBucketQueue.instance.start();
+    }
+
+    return TokenBucketQueue.instance;
   }
 
   start() {

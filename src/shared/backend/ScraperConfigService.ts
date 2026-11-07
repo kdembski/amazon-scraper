@@ -1,7 +1,7 @@
 import { CronJob } from "cron";
 import { ArgsService } from "@/shared/args/ArgsService";
 import { ApiService } from "@/shared/backend/ApiService";
-import { ScrapingClient } from "@/shared/http/ScrapingClient";
+import { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
 import { getRetryDelay } from "@/shared/utils/retry";
 import { sleep } from "@/shared/utils/sleep";
 
@@ -19,7 +19,7 @@ export class ScraperConfigService {
 
   private constructor(
     private apiService = ApiService.getInstance(),
-    private getQueue = () => ScrapingClient.getInstance().queueService,
+    private queue = TokenBucketQueue.getInstance(),
     private argsService = ArgsService.getInstance()
   ) {}
 
@@ -81,9 +81,8 @@ export class ScraperConfigService {
       config[key] = value;
     });
 
-    const queue = this.getQueue();
-    queue.concurrency = config.concurrency;
-    if (config.rps !== queue.rps) queue.setRps(config.rps);
+    this.queue.concurrency = config.concurrency;
+    if (config.rps !== this.queue.rps) this.queue.setRps(config.rps);
     this.config = config;
   }
 }

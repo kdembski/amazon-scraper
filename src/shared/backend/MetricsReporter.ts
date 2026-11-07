@@ -1,7 +1,7 @@
 import { ArgsService } from "@/shared/args/ArgsService";
 import { ApiService } from "@/shared/backend/ApiService";
 import { ProxyService } from "@/shared/http/proxy/ProxyService";
-import { ScrapingClient } from "@/shared/http/ScrapingClient";
+import { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
 import { MetricsService } from "@/shared/metrics/MetricsService";
 import { tcpPing } from "@/shared/utils/tcpPing";
 import { CronJob } from "cron";
@@ -27,7 +27,7 @@ export class MetricsReporter {
     private argsService = ArgsService.getInstance(),
     private apiService = ApiService.getInstance(),
     private metricsService = MetricsService.getInstance(),
-    private scrapingClient = ScrapingClient.getInstance(),
+    private queueService = TokenBucketQueue.getInstance(),
     private proxyService = ProxyService.getInstance(),
     private now = () => new Date(),
     private eventLoopDelay = monitorEventLoopDelay({
@@ -70,7 +70,6 @@ export class MetricsReporter {
     const counters = this.metricsService.drain();
     if (counters.length === 0) return;
 
-    const { queueService } = this.scrapingClient;
     const eventLoopDelayMean = this.toDelayMs(this.eventLoopDelay.mean);
     const eventLoopDelayMax = this.toDelayMs(this.eventLoopDelay.max);
     this.eventLoopDelay.reset();
@@ -85,8 +84,8 @@ export class MetricsReporter {
         periodStart: this.periodStart.toISOString(),
         metrics: [
           ...counters,
-          { metric: "pending", value: queueService.pending },
-          { metric: "queue_length", value: queueService.queue.length },
+          { metric: "pending", value: this.queueService.pending },
+          { metric: "queue_length", value: this.queueService.queue.length },
           {
             metric: "open_connections",
             value: this.proxyService.countConnections(),
