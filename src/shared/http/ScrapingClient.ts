@@ -1,12 +1,13 @@
 import axios from "axios";
-import type http from "node:http";
 import type { Readable } from "node:stream";
+import { setImmediate } from "node:timers/promises";
 import _ from "lodash";
-import { ScraperConfigService } from "@/shared/backend/ScraperConfigService";
 import { ProxyService } from "@/shared/http/proxy/ProxyService";
+import { StopAtReader } from "@/shared/http/StopAtReader";
 import { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
 import { MetricsService } from "@/shared/metrics/MetricsService";
-import type { StopAt } from "@/shared/http/http.types";
+import { toRequestOutcome } from "@/shared/metrics/toRequestOutcome";
+import type { Route, ScrapingRequest } from "@/shared/http/http.types";
 import type { MetricLabels, RequestOutcome } from "@/shared/metrics/metrics.types";
 
 export class ScrapingClient {
@@ -18,18 +19,11 @@ export class ScrapingClient {
   );
 
   private constructor(
-    configService = ScraperConfigService.getInstance(),
     private proxyService = ProxyService.getInstance(),
-    public queueService = new TokenBucketQueue(
-      configService.get().concurrency,
-      configService.get().rps,
-      true,
-      () => proxyService.countConnections()
-    ),
-    private metricsService = MetricsService.getInstance()
-  ) {
-    queueService.start();
-  }
+    private queueService = TokenBucketQueue.getInstance(),
+    private metricsService = MetricsService.getInstance(),
+    private stopAtReader = new StopAtReader()
+  ) {}
 
   public static getInstance(): ScrapingClient {
     if (!ScrapingClient.instance) {
@@ -39,116 +33,62 @@ export class ScrapingClient {
     return ScrapingClient.instance;
   }
 
-  get<T>(
-    url: string,
-    referer?: string,
-    callback?: {
-      onSuccess?: (data: T) => void;
-      onError?: (e: any) => void;
-      isCancelled?: () => boolean;
-    },
-    labels: MetricLabels = {},
-    proxyType?: string,
-    stopAt?: StopAt
-  ) {
-    this.queueService.request(async () => {
-      if (callback?.isCancelled?.()) return;
-
-      let host: string;
-      let httpsAgent: http.Agent;
-      try {
-        host = new URL(url).hostname;
-        httpsAgent = this.proxyService.getAgent(host, proxyType);
-      } catch (e) {
-        callback?.onError?.(e);
-        return;
-      }
-      if (labels.country) this.proxyService.setCountry(host, labels.country);
-      const route = this.proxyService.getRoute(httpsAgent);
-      const userAgent = _.sample(this.userAgents);
-
-      const startedAt = Date.now();
-      let recorded = false;
-      const record = (outcome: RequestOutcome) => {
-        if (recorded) return;
-        recorded = true;
-        this.metricsService.increment("requests", { ...labels, outcome });
-        this.metricsService.increment(`requests_${route}`, { ...labels, outcome });
-        this.metricsService.increment(
-          "request_ms",
-          labels,
-          Date.now() - startedAt
-        );
-      };
-
-      return new Promise<void>(async (resolve) => {
-        return axios
-          .get<T>(url, {
-            httpsAgent,
-            // Hard limit for the whole request; axios `timeout` does not
-            // cover a proxy that hangs on CONNECT
-            signal: AbortSignal.timeout(this.timeout),
-            headers: {
-              "User-Agent": userAgent,
-              Referer: referer,
-              "Accept-Encoding": "gzip, deflate, br",
-            },
-            ...(stopAt && { responseType: "stream" }),
-          })
-          .then(async (response) => {
-            const data = stopAt
-              ? ((await this.read(response.data as Readable, stopAt)) as T)
-              : response.data;
-            record("ok");
-            callback?.onSuccess?.(data);
-          })
-          .catch((e) => {
-            if (stopAt) e?.response?.data?.resume?.();
-            if ([403, 429].includes(e?.response?.status)) this.proxyService.block(httpsAgent, host);
-            record(
-              e?.response?.status
-                ? `http_${e.response.status}`
-                : e?.code === "ERR_CANCELED"
-                  ? "timeout"
-                  : "network"
-            );
-            callback?.onError?.(e);
-          })
-          .finally(() => resolve());
+  // Resolves to undefined when the request was cancelled while queued
+  get<T>(url: string, request: ScrapingRequest = {}) {
+    return new Promise<T | undefined>((resolve, reject) => {
+      this.queueService.request(async () => {
+        await this.execute<T>(url, request).then(resolve, reject);
+        await setImmediate();
       });
     });
   }
 
-  // Text of the stream up to the chunk that completes the markers in order
-  private read(stream: Readable, stopAt: StopAt) {
-    return new Promise<string>((resolve, reject) => {
-      let text = "";
-      let next = 0;
-      let from = 0;
+  private async execute<T>(
+    url: string,
+    { referer, labels = {}, proxyType, stopAt, isCancelled }: ScrapingRequest
+  ): Promise<T | undefined> {
+    if (isCancelled?.()) return;
 
-      stream.setEncoding("utf8");
-      stream.on("data", (chunk: string) => {
-        text += chunk;
-        while (next < stopAt.length) {
-          const markers = _.castArray(stopAt[next]);
-          const found = _.minBy(
-            markers
-              .map((marker) => ({ marker, index: text.indexOf(marker, from) }))
-              .filter(({ index }) => index !== -1),
-            "index"
-          );
-          if (!found) {
-            from = Math.max(from, text.length - _.max(markers.map((marker) => marker.length))!);
-            return;
-          }
-          from = found.index + found.marker.length;
-          next++;
-        }
-        stream.destroy();
-        resolve(text);
+    const host = new URL(url).hostname;
+    const httpsAgent = this.proxyService.getAgent(host, proxyType);
+    if (labels.country) this.proxyService.setCountry(host, labels.country);
+    const route = this.proxyService.getRoute(httpsAgent);
+    const startedAt = Date.now();
+
+    try {
+      const response = await axios.get<T>(url, {
+        httpsAgent,
+        // Hard limit for the whole request; axios `timeout` does not
+        // cover a proxy that hangs on CONNECT
+        signal: AbortSignal.timeout(this.timeout),
+        headers: {
+          "User-Agent": _.sample(this.userAgents),
+          Referer: referer,
+          "Accept-Encoding": "gzip, deflate, br",
+        },
+        ...(stopAt && { responseType: "stream" }),
       });
-      stream.on("end", () => resolve(text));
-      stream.on("error", reject);
-    });
+      const data = stopAt
+        ? ((await this.stopAtReader.read(response.data as Readable, stopAt)) as T)
+        : response.data;
+      this.record("ok", route, labels, startedAt);
+      return data;
+    } catch (e: any) {
+      if (stopAt) e?.response?.data?.resume?.();
+      if ([403, 429].includes(e?.response?.status)) this.proxyService.block(httpsAgent, host);
+      this.record(toRequestOutcome(e), route, labels, startedAt);
+      throw e;
+    }
+  }
+
+  private record(
+    outcome: RequestOutcome,
+    route: Route,
+    labels: MetricLabels,
+    startedAt: number
+  ) {
+    this.metricsService.increment("requests", { ...labels, outcome });
+    this.metricsService.increment(`requests_${route}`, { ...labels, outcome });
+    this.metricsService.increment("request_ms", labels, Date.now() - startedAt);
   }
 }

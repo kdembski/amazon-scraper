@@ -39,22 +39,4 @@ export class ApiService {
     const config = this.config({ timeout: SEND_TIMEOUT, headers });
     return (await axios.post<T>(this.url(path), data, config)).data;
   }
-
-  async post<T>(path: string, data: unknown, config: AxiosRequestConfig = {}) {
-    return axios
-      .post<T>(this.url(path), data, this.config(config))
-      .catch((e) => {
-        this.handleError(e);
-      });
-  }
-
-  private handleError(e: any) {
-    const { status, message, cause, response } = e;
-    console.error("Server:");
-    if (status) console.error("  " + status);
-    if (message) console.error("  " + message);
-    if (cause) console.error("  " + cause.toString());
-    if (response?.data)
-      console.error("  " + response.data.replaceAll("\n", " "));
-  }
 }

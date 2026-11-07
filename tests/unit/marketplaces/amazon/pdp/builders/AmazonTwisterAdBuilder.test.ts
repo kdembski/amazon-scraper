@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { AmazonTwisterAdBuilder } from "@/marketplaces/amazon/pdp/builders/AmazonTwisterAdBuilder";
 import { buildAd, buildAmazonCountry } from "@@tests/support/factories";
 import {
-  botWallPage,
   captchaPage,
   toDocument,
   twisterBuybox,
@@ -65,7 +64,6 @@ describe("AmazonTwisterAdBuilder", () => {
       );
 
       expect(build(response.slice(0, response.indexOf('desktop-return-info\\"')))).toEqual({
-        isCaptcha: false,
         isValid: true,
         price: 24.99,
         dispatchFrom: "Amazon",
@@ -90,6 +88,12 @@ describe("AmazonTwisterAdBuilder", () => {
     it("keeps a page without the buy box part", () => {
       expect(builder.trimHtml(captchaPage)).toBe(captchaPage);
     });
+
+    it("keeps a page whose buy box part has no buy box value", () => {
+      const response = '{ "FeatureName" : "desktop_buybox", "Value" : { "content" : {} } }&&&';
+
+      expect(builder.trimHtml(response)).toBe(response);
+    });
   });
 
   describe("build", () => {
@@ -99,7 +103,6 @@ describe("AmazonTwisterAdBuilder", () => {
       );
 
       expect(build(response)).toEqual({
-        isCaptcha: false,
         isValid: true,
         price: 24.99,
         dispatchFrom: "Amazon",
@@ -111,14 +114,13 @@ describe("AmazonTwisterAdBuilder", () => {
       const snsOnly = twisterResponse(twisterBuybox({ snsPrice: "22,49" }));
 
       expect(build(both).price).toBe(24.99);
-      expect(build(snsOnly)).toEqual({ isCaptcha: false, isValid: true });
+      expect(build(snsOnly)).toEqual({ isValid: true });
     });
 
     it("falls back to the add-to-cart price of a single-offer buy box", () => {
       const response = twisterResponse(twisterBuybox({ cartPrice: "30.07", soldBy: "HLSHMHY" }));
 
       expect(build(response)).toEqual({
-        isCaptcha: false,
         isValid: true,
         price: 30.07,
         dispatchFrom: "HLSHMHY",
@@ -132,25 +134,18 @@ describe("AmazonTwisterAdBuilder", () => {
 
     it("gives a valid result without a price when there is no offer", () => {
       expect(build(twisterResponse(twisterBuybox({ soldBy: "" })))).toEqual({
-        isCaptcha: false,
         isValid: true,
       });
     });
 
     it("rejects a buy box that hides the price", () => {
       expect(build(twisterResponse(twisterBuybox({ price: "24,99", hidden: true })))).toEqual({
-        isCaptcha: false,
         isValid: false,
       });
     });
 
-    it("detects a captcha", () => {
-      expect(build(captchaPage)).toEqual({ isCaptcha: true });
-      expect(build(botWallPage)).toEqual({ isCaptcha: true });
-    });
-
     it("rejects a response without the buy box part", () => {
-      expect(build("<div>error</div>")).toEqual({ isCaptcha: false, isValid: false });
+      expect(build("<div>error</div>")).toEqual({ isValid: false });
     });
   });
 });

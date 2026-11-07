@@ -1,6 +1,6 @@
 import _ from "lodash";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
+import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/RetryBackoff";
 import { cronJobs } from "@@tests/support/cron";
 import { newReleasesPage, plpPage } from "@@tests/support/html";
 import {

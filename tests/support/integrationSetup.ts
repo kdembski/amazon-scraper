@@ -4,11 +4,27 @@ import { cronJobs } from "@@tests/support/cron";
 // Crons are triggered by hand through cronJobs
 vi.mock("cron", async () => (await import("@@tests/support/cron")).cronModule);
 
-// Retries go out right away, so a country can fail MAX_FAILED_ATTEMPTS times within a test
-vi.mock("@/shared/utils/retry", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/shared/utils/retry")>()),
-  getRetryDelay: () => 0,
+// Tests run at any hour, the night pause would stop the PDP loop
+vi.mock("@/marketplaces/amazon/pdp/AmazonNightSchedule", () => ({
+  AmazonNightSchedule: class {
+    isNight() {
+      return false;
+    }
+  },
 }));
+
+// Retries go out right away, so a country can fail MAX_FAILED_ATTEMPTS times within a test
+vi.mock("@/shared/utils/RetryBackoff", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/shared/utils/RetryBackoff")>();
+  return {
+    ...original,
+    RetryBackoff: class extends original.RetryBackoff {
+      wait() {
+        return new Promise<void>((resolve) => setTimeout(resolve, 0));
+      }
+    },
+  };
+});
 
 // Batches go out on the next tick instead of after 5 s
 vi.mock("@/shared/backend/BatchSender", async (importOriginal) => {
@@ -22,16 +38,11 @@ vi.mock("@/shared/backend/BatchSender", async (importOriginal) => {
   };
 });
 
-// Retry sleeps (0 ms) run at once; longer ones, like the PDP loop, wait on a
-// fake interval, so a test advances them like the queue stats and they stop
-// for good once the fake timers are dropped
+// Sleeps, like the PDP loop, wait on a fake interval, so a test advances them
+// like the queue stats and they stop for good once the fake timers are dropped
 vi.mock("@/shared/utils/sleep", () => ({
   sleep: (ms: number) =>
     new Promise<void>((resolve) => {
-      if (!ms) {
-        setTimeout(resolve, 0);
-        return;
-      }
       const id = setInterval(() => {
         clearInterval(id);
         resolve();

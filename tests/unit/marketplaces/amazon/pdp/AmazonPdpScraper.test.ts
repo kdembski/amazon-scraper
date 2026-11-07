@@ -4,29 +4,29 @@ import type { AmazonPdpAdScraper } from "@/marketplaces/amazon/pdp/AmazonPdpAdSc
 import type { MetricsService } from "@/shared/metrics/MetricsService";
 import { buildAd, buildAmazonCountry } from "@@tests/support/factories";
 import {
-  fakeAmazonService,
   fakeApiService,
   fakeScraperConfigService,
   fakeAmazonCountryService,
+  fakeTokenBucketQueue,
 } from "@@tests/support/fakes";
 
 const setup = ({ batchSize = 50 } = {}) => {
   const api = fakeApiService();
   const country = fakeAmazonCountryService();
-  const amazon = fakeAmazonService();
+  const queue = fakeTokenBucketQueue();
   const config = fakeScraperConfigService({ batchSize });
   const adExecute = vi.fn();
   const adScraper = { execute: adExecute } as unknown as AmazonPdpAdScraper;
   const increment = vi.fn();
   const scraper = new AmazonPdpScraper(
     api.service,
-    amazon.service,
+    queue.service,
     adScraper,
     country.service,
     config.service,
     { increment } as unknown as MetricsService
   );
-  return { api, country, amazon, adExecute, scraper, increment };
+  return { api, country, queue, adExecute, scraper, increment };
 };
 
 type Fakes = Pick<ReturnType<typeof setup>, "api" | "country">;
@@ -90,27 +90,6 @@ describe("AmazonPdpScraper", () => {
   });
 
   describe("scrape", () => {
-    it.each([
-      ["2026-01-15T20:59:00Z", true],
-      ["2026-01-15T21:00:00Z", false],
-      ["2026-01-15T06:59:00Z", false],
-      ["2026-01-15T07:00:00Z", true],
-      ["2026-07-15T19:59:00Z", true],
-      ["2026-07-15T20:00:00Z", false],
-      ["2026-07-15T05:59:00Z", false],
-      ["2026-07-15T06:00:00Z", true],
-    ])("at %s loads a batch: %s", async (iso, loads) => {
-      vi.spyOn(console, "log").mockImplementation(() => {});
-      const { api, country, scraper } = setup();
-      country.getCountries.mockResolvedValue(countries);
-      api.get.mockResolvedValue([]);
-      vi.setSystemTime(new Date(iso));
-
-      await scraper.scrape();
-
-      expect(api.get).toHaveBeenCalledTimes(loads ? 1 : 0);
-    });
-
     it("loads no batch at night and resumes in the morning", async () => {
       const log = vi.spyOn(console, "log").mockImplementation(() => {});
       const { api, country, scraper } = setup();
@@ -167,9 +146,20 @@ describe("AmazonPdpScraper", () => {
       expect(adExecute).toHaveBeenCalledWith(ads[1], countries);
     });
 
+    it("loads a batch while the queue is at most a tenth of the batch", async () => {
+      const { api, country, queue, scraper } = setup({ batchSize: 50 });
+      country.getCountries.mockResolvedValue(countries);
+      api.get.mockResolvedValue([]);
+      queue.queue.push(...Array.from({ length: 5 }, () => vi.fn()));
+
+      await scraper.scrape();
+
+      expect(api.get).toHaveBeenCalledTimes(1);
+    });
+
     it("waits while the queue is longer than a tenth of the batch", async () => {
-      const { api, country, amazon, scraper } = setup({ batchSize: 50 });
-      amazon.queueService.queue.push(...Array.from({ length: 6 }, () => vi.fn()));
+      const { api, country, queue, scraper } = setup({ batchSize: 50 });
+      queue.queue.push(...Array.from({ length: 6 }, () => vi.fn()));
 
       await scraper.scrape();
       expect(country.getCountries).not.toHaveBeenCalled();

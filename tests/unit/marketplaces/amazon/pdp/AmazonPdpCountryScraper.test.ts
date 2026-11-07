@@ -1,13 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  AmazonPdpCountryScraper,
-  NOT_FOUND_TO_DELETE,
-} from "@/marketplaces/amazon/pdp/AmazonPdpCountryScraper";
-import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
+import { NOT_FOUND_TO_DELETE } from "@/marketplaces/amazon/pdp/AmazonCountryPrice";
+import { AmazonPdpCountryScraper } from "@/marketplaces/amazon/pdp/AmazonPdpCountryScraper";
+import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/RetryBackoff";
 import { AmazonAdBuildResult } from "@/marketplaces/amazon/types/amazon.types";
 import type { MetricsService } from "@/shared/metrics/MetricsService";
 import { buildAd, buildAmazonCountry, buildPrice } from "@@tests/support/factories";
 import { fakeAdBuilder, fakeAmazonService } from "@@tests/support/fakes";
+import { captchaPage } from "@@tests/support/html";
 
 const html = "<html><body></body></html>";
 const notFound = { status: 404 };
@@ -42,6 +41,20 @@ const calls = (increment: ReturnType<typeof vi.fn>, metric: string) =>
   increment.mock.calls.filter((call) => call[0] === metric);
 
 describe("AmazonPdpCountryScraper", () => {
+  it("treats a price of 0 as no data", async () => {
+    vi.useFakeTimers();
+    const { amazon, outcome, run, increment } = setup({ price: 0, isValid: true });
+    run();
+    await flush();
+
+    amazon.respond(0, html);
+    await flush();
+
+    expect(outcome).toHaveBeenCalledWith("no_data");
+    expect(increment).toHaveBeenCalledWith("responses", { country: "c1", outcome: "no_data" });
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     vi.useFakeTimers();
     vi.spyOn(Math, "random").mockReturnValue(1);
@@ -58,26 +71,20 @@ describe("AmazonPdpCountryScraper", () => {
     run();
 
     expect(builder.buildUrl).toHaveBeenCalledWith(price.country, ad);
-    expect(amazon.get).toHaveBeenCalledWith(
-      "c1/dp/B0TESTASIN",
-      "c1/ref",
-      {
-        onSuccess: expect.any(Function),
-        onError: expect.any(Function),
-        isCancelled: expect.any(Function),
-      },
-      "isp",
-      undefined
-    );
+    expect(amazon.get).toHaveBeenCalledWith("c1/dp/B0TESTASIN", "c1/ref", {
+      proxyType: "isp",
+      stopAt: undefined,
+      isCancelled: expect.any(Function),
+    });
   });
 
   it("passes the cancellation to the request", () => {
     const { amazon, cancel, run } = setup();
     run();
 
-    expect(amazon.requests[0].callback.isCancelled?.()).toBe(false);
+    expect(amazon.requests[0].options.isCancelled?.()).toBe(false);
     cancel();
-    expect(amazon.requests[0].callback.isCancelled?.()).toBe(true);
+    expect(amazon.requests[0].options.isCancelled?.()).toBe(true);
   });
 
   it("does not request a cancelled country", async () => {
@@ -107,7 +114,7 @@ describe("AmazonPdpCountryScraper", () => {
     });
 
     it("returns no_data for a country without an offer", async () => {
-      const { amazon, price, outcome, run } = setup({ isCaptcha: false, isValid: true });
+      const { amazon, price, outcome, run } = setup({ isValid: true });
       run();
 
       amazon.respond(0, html);
@@ -134,8 +141,8 @@ describe("AmazonPdpCountryScraper", () => {
   describe("retries", () => {
     it.each([
       ["an empty response", { price: 10 }, ""],
-      ["a captcha", { isCaptcha: true }, html],
-      ["an invalid response", { isCaptcha: false, isValid: false }, html],
+      ["a captcha", { price: 10 }, captchaPage],
+      ["an invalid response", { isValid: false }, html],
     ])("on %s", async (_name, result, data) => {
       const { amazon, price, outcome, run } = setup(result);
       run();
@@ -143,7 +150,7 @@ describe("AmazonPdpCountryScraper", () => {
       amazon.respond(0, data);
       await flush();
 
-      expect(price.failed).toBe(1);
+      expect(price.retry.failed).toBe(1);
       expect(outcome).not.toHaveBeenCalled();
 
       await vi.advanceTimersByTimeAsync(1000);
@@ -158,7 +165,7 @@ describe("AmazonPdpCountryScraper", () => {
       amazon.fail(0);
       await flush();
 
-      expect(price.failed).toBe(1);
+      expect(price.retry.failed).toBe(1);
       await vi.advanceTimersByTimeAsync(1000);
       expect(amazon.get).toHaveBeenCalledTimes(2);
     });
@@ -174,7 +181,7 @@ describe("AmazonPdpCountryScraper", () => {
       amazon.respond(0, html);
       await flush();
 
-      expect(price.failed).toBe(1);
+      expect(price.retry.failed).toBe(1);
       expect(increment).toHaveBeenCalledWith("responses", { country: "c1", outcome: "parse_error" });
       await vi.advanceTimersByTimeAsync(1000);
       expect(amazon.get).toHaveBeenCalledTimes(2);
@@ -182,7 +189,8 @@ describe("AmazonPdpCountryScraper", () => {
 
     it("after an exponential backoff delay", async () => {
       const { amazon, price, run } = setup();
-      price.failed = 2;
+      price.retry.fail();
+      price.retry.fail();
       run();
 
       amazon.fail(0);
@@ -213,7 +221,7 @@ describe("AmazonPdpCountryScraper", () => {
 
       for (let i = 0; i < MAX_FAILED_ATTEMPTS; i++) await failLast();
 
-      expect(price.failed).toBe(MAX_FAILED_ATTEMPTS);
+      expect(price.retry.failed).toBe(MAX_FAILED_ATTEMPTS);
       expect(price.value).toBeUndefined();
       expect(amazon.get).toHaveBeenCalledTimes(MAX_FAILED_ATTEMPTS);
       expect(outcome).toHaveBeenCalledWith("given_up");
@@ -227,7 +235,7 @@ describe("AmazonPdpCountryScraper", () => {
     for (let i = 0; i < NOT_FOUND_TO_DELETE; i++) await failLast(notFound);
 
     expect(price.notFound).toBe(NOT_FOUND_TO_DELETE);
-    expect(price.failed).toBe(NOT_FOUND_TO_DELETE - 1);
+    expect(price.retry.failed).toBe(NOT_FOUND_TO_DELETE - 1);
     expect(amazon.get).toHaveBeenCalledTimes(NOT_FOUND_TO_DELETE);
     expect(outcome).toHaveBeenCalledWith("deleted");
     expect(price.missing).toBe(true);
@@ -262,7 +270,7 @@ describe("AmazonPdpCountryScraper", () => {
   describe("metrics", () => {
     it.each([
       ["data", { price: 10 }],
-      ["no_data", { isCaptcha: false, isValid: true }],
+      ["no_data", { isValid: true }],
     ])("counts a response and an item as %s", async (result, buildResult) => {
       const { amazon, run, increment } = setup(buildResult);
       run();
@@ -277,8 +285,8 @@ describe("AmazonPdpCountryScraper", () => {
     });
 
     it.each([
-      ["captcha", { isCaptcha: true }, html],
-      ["invalid", { isCaptcha: false, isValid: false }, html],
+      ["captcha", { price: 10 }, captchaPage],
+      ["invalid", { isValid: false }, html],
       ["empty", { price: 10 }, ""],
     ])("counts a %s response without an item", async (outcome, result, data) => {
       const { amazon, run, increment } = setup(result);
@@ -369,7 +377,7 @@ describe("AmazonPdpCountryScraper", () => {
       await flush();
 
       expect(amazon.requests[1].url).toBe("c1/awd/B0TESTASIN");
-      expect(price.failed).toBe(0);
+      expect(price.retry.failed).toBe(0);
       expect(calls(increment, "source_fallback")).toEqual([["source_fallback", { country: "c1" }]]);
       amazon.respond(1, html);
       await flush();
@@ -422,7 +430,7 @@ describe("AmazonPdpCountryScraper", () => {
       run();
 
       expect(amazon.requests[0].url).toBe("c1/twister/B0TESTASIN");
-      expect(amazon.get.mock.calls[0][4]).toEqual(["a", "b"]);
+      expect(amazon.requests[0].options.stopAt).toEqual(["a", "b"]);
       amazon.respond(0, html);
       await flush();
 
@@ -436,7 +444,7 @@ describe("AmazonPdpCountryScraper", () => {
       run();
 
       expect(amazon.requests[0].url).toBe("c1/dp/B0TESTASIN");
-      expect(amazon.get.mock.calls[0][4]).toBeUndefined();
+      expect(amazon.requests[0].options.stopAt).toBeUndefined();
     });
 
     it("finishes a twister country without a price on a 404", async () => {

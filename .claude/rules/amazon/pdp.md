@@ -24,7 +24,7 @@ Goal: for every ASIN, get the price and the shipper (`dispatchFrom`) in every Am
 ## 2. Batch loop (`AmazonPdpScraper`)
 
 1. Calls `scrape()` every 5 s (`POLL_INTERVAL`).
-2. Night pause 22:00–8:00 `Europe/Warsaw` (`isNight()`, private) → skips; logs `pdp: night pause started` / `ended` on change. ASINs already loaded finish.
+2. Night pause 22:00–8:00 `Europe/Warsaw` (`AmazonNightSchedule`) → skips; logs `pdp: night pause started` / `ended` on change. ASINs already loaded finish.
 3. Request queue > `batchSize / 10` → skips, waits for the next tick.
 4. Gets countries: `AmazonCountryService` (`amazon/countries/scrap`, cached, refreshed every minute). A country has `tld`, `priority`, `active`, `proxyType`, `pdpSource`.
 5. Gets ASINs: `amazon/ads/scrap?batchSize=N` (`id`, `asin`, `skipCountryIds`: countries the backend remembers the ASIN missing in, 30 days).
@@ -33,7 +33,7 @@ Goal: for every ASIN, get the price and the shipper (`dispatchFrom`) in every Am
 
 ## 3. One ASIN (`AmazonPdpAdScraper`)
 
-1. Creates an `AmazonAdPrice` per country (`complete`, `deleted`, `missing`, `failed`, `notFound`), except `skipCountryIds`; none left → `ads{outcome=empty}`, done.
+1. Creates an `AmazonCountryPrice` per country (`complete`, `deleted`, `missing`, `retry`, `notFound`), except `skipCountryIds`, held in `AmazonAdPrices`; none left → `ads{outcome=empty}`, done.
 2. Groups countries into tiers by `priority`, highest first.
 3. Tier by tier: all countries of a tier in parallel, the next tier only after the previous one finishes.
 4. After each country, checks whether the ASIN is decided:
@@ -58,7 +58,7 @@ Goal: for every ASIN, get the price and the shipper (`dispatchFrom`) in every Am
    - `isValid === false` → retry (`invalid`).
    - parse exception → retry (`parse_error`).
    - price found → `data`, stores `value` + `dispatchFrom`.
-   - no price, valid page → `no_data`.
+   - no price or price 0, valid page → `no_data`.
 
 ## 5. Sources (builders, `pdp/builders/`)
 
@@ -69,6 +69,7 @@ Goal: for every ASIN, get the price and the shipper (`dispatchFrom`) in every Am
 | `awd` | `<tld>/gp/aw/d/X?th=1&psc=1` | Mobile page, HTML from `id="buybox"` → `AmazonBuyboxParser`. Download stops at `id="olpLinkWidget_feature_div"` after the buy box. |
 
 Shared:
+- `AmazonPageReader` (shared with PLP): empty, then captcha, then the builder, then `isValid`; counts every result in `responses`. Builders no longer see captcha pages.
 - `AmazonCaptchaDetector`: `form` with action `/errors/validateCaptcha` or `/errors_page/validateCaptcha`, or the Akamai interstitial (`meta[http-equiv='refresh']` with `bm-verify=`).
 - `AmazonBuyboxParser`: invalid when there is no buy box or `#priceNotAvailable`; price from `.apex-pricetopay-value` (skips subscription), fallback hidden cart input; shipper from `desktop-fulfiller-info`, fallback `desktop-merchant-info`.
 - `AmazonPriceParser`: `.a-price-whole` + `.a-price-fraction`, fallback accessibility label / `.a-offscreen`.
@@ -85,10 +86,11 @@ Shared:
 - `ScrapingClient.get()` – the only path to Amazon. Random Chrome User-Agent, Referer, hard 20 s timeout. With the builder's `stopAt` markers it reads a stream and destroys it (closes the connection) once they arrived in order; a step given as an array is done by whichever of its markers comes first.
 - `TokenBucketQueue` – `concurrency` and `rps` limits from the config.
 - `ProxyService.getAgent(host, proxyType)` – proxy with a free keep-alive connection to the host, otherwise random; missing type → `datacenter`. `direct` → no proxy, keep-alive agents per IP family (`ProxyAgentPool.getDirect(4 | 6)`, 15 s idle timeout), IPv4 and IPv6 in turn; IPv6 only when a TCP ping to `2606:4700:4700::1111:443` succeeds at each proxy list load (start, hourly; Docker network needs `enable_ipv6`). `mixedN/M` (e.g. `mixed1/2`) → `direct` for N minutes, then the `datacenter` pool for M minutes, by wall clock (all processes of a server switch together); `mixedN` = `mixedN/N`. While the host blocks every direct family, `direct` and `mixedN/M` use the `datacenter` pool.
-- Block (`ProxyAgentPool.block`): a 403 or 429 (`ScrapingClient`) on a direct agent closes its idle connections to the host and blocks the direct family + host for 10 min: its connections are closed when freed and picks skip it (all direct families blocked → `datacenter`). 503 and captcha do not block; proxy agents are never blocked. Amazon limits IPv6 per /64, so the direct IPv6 agent stands for the whole /64.
+- Route choice: `ProxyRouteSelector`; idle proxy order: `FreeProxyTracker`.
+- Block (`ProxyAgentPool.block`, `DirectBlockList`): a 403 or 429 (`ScrapingClient`) on a direct agent closes its idle connections to the host and blocks the direct family + host for 3 min: its connections are closed when freed and picks skip it (all direct families blocked → `datacenter`). 503 and captcha do not block; proxy agents are never blocked. Amazon limits IPv6 per /64, so the direct IPv6 agent stands for the whole /64.
 
 ## Where to look
 
 - Price not parsed → the source's builder + test in `tests/unit/marketplaces/amazon/pdp/builders/`.
 - Many `invalid` / `captcha` → `responses` metric per country.
-- ASIN "deleted" too early → `NOT_FOUND_TO_DELETE`, `isDeleted` (counts only `active`).
+- ASIN "deleted" too early → `AmazonCountryPrice.registerNotFound`, `AmazonAdPrices.isDeleted` (counts only `active`).

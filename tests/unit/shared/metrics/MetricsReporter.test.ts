@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { MetricsReporter } from "@/shared/backend/MetricsReporter";
+import { MetricsReporter } from "@/shared/metrics/MetricsReporter";
 import { MetricsService } from "@/shared/metrics/MetricsService";
 import type { ArgsService } from "@/shared/args/ArgsService";
-import type { ScrapingClient } from "@/shared/http/ScrapingClient";
+import type { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
 import type { ProxyService } from "@/shared/http/proxy/ProxyService";
 import type { Traffic } from "@/shared/http/http.types";
 import { cronJobs } from "@@tests/support/cron";
@@ -26,14 +26,11 @@ const gauges = [
 const setup = ({ target = "pdp", traffic = [] as Traffic[] } = {}) => {
   const args = {
     getTargetFlag: vi.fn(() => target),
-    getScraperName: vi.fn(async () => "amazon-pdp"),
   } as unknown as ArgsService;
   const api = fakeApiService();
-  api.post.mockResolvedValue({ status: 200 });
+  api.send.mockResolvedValue({});
   const metrics = MetricsService.getInstance();
-  const client = {
-    queueService: { pending: 12, queue: [() => 1, () => 2, () => 3] },
-  } as unknown as ScrapingClient;
+  const queue = { pending: 12, queue: [() => 1, () => 2, () => 3] } as unknown as TokenBucketQueue;
   const proxy = {
     collectTraffic: vi.fn(() => traffic),
     countConnections: vi.fn(() => 5),
@@ -45,21 +42,10 @@ const setup = ({ target = "pdp", traffic = [] as Traffic[] } = {}) => {
     new Date("2026-10-18T10:03:00.000Z"),
   ];
   const now = vi.fn(() => times.shift()!);
-  // Nanoseconds, including the 10 ms sampling interval
-  const eventLoopDelay = {
-    enable: vi.fn(),
-    reset: vi.fn(),
-    mean: 12_500_000,
-    max: 50_000_000,
+  const processMetrics = {
+    start: vi.fn(),
+    collect: vi.fn(async () => gauges.slice(3)),
   };
-  // Microseconds: 5 s of CPU between start() and the first send(), 60 s apart
-  const cpuUsage = vi
-    .fn()
-    .mockReturnValueOnce({ user: 1_000_000, system: 0 })
-    .mockReturnValue({ user: 4_000_000, system: 2_000_000 });
-  const memoryRss = vi.fn(() => 150 * 1024 * 1024);
-  const heapUsed = vi.fn(() => 90 * 1024 * 1024);
-  const ping = vi.fn(async (): Promise<number | undefined> => 24.5);
 
   // The constructor is private, it is only called through getInstance()
   const Reporter = MetricsReporter as unknown as new (
@@ -69,21 +55,19 @@ const setup = ({ target = "pdp", traffic = [] as Traffic[] } = {}) => {
     args,
     api.service,
     metrics,
-    client,
+    queue,
     proxy,
     now,
-    eventLoopDelay,
-    cpuUsage,
-    memoryRss,
-    heapUsed,
-    ping
+    processMetrics,
+    { get: async () => "amazon-pdp" }
   );
 
-  return { api, metrics, reporter, proxy, eventLoopDelay, ping };
+  return { api, metrics, reporter, proxy, processMetrics };
 };
 
 describe("MetricsReporter", () => {
   beforeEach(() => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
     cronJobs.length = 0;
     resetSingleton(MetricsService);
   });
@@ -113,7 +97,7 @@ describe("MetricsReporter", () => {
 
     await reporter.send();
 
-    expect(api.post).toHaveBeenCalledWith(
+    expect(api.send).toHaveBeenCalledWith(
       "scrapers/amazon-pdp/metrics",
       {
         marketplace: "amazon",
@@ -124,7 +108,7 @@ describe("MetricsReporter", () => {
           ...gauges,
         ],
       },
-      { timeout: 30000, headers: { "Idempotency-Key": expect.any(String) } }
+      expect.any(String)
     );
   });
 
@@ -138,67 +122,20 @@ describe("MetricsReporter", () => {
 
     await reporter.send();
 
-    expect(api.post.mock.calls[0][1].metrics.at(-1)).toEqual({ metric: "ads_in_flight", value: 7 });
+    expect(api.send.mock.calls[0][1].metrics.at(-1)).toEqual({ metric: "ads_in_flight", value: 7 });
   });
 
-  it("measures the event loop delay from the start and resets it after each send", async () => {
-    const { metrics, reporter, eventLoopDelay } = setup();
+  it("starts the process metrics with the period start and collects them only with counters", async () => {
+    const { metrics, reporter, processMetrics } = setup();
     reporter.start("amazon");
-    expect(eventLoopDelay.enable).toHaveBeenCalled();
+    expect(processMetrics.start).toHaveBeenCalledWith(new Date("2026-10-18T10:00:00.000Z"));
 
     await reporter.send();
-    expect(eventLoopDelay.reset).not.toHaveBeenCalled();
+    expect(processMetrics.collect).not.toHaveBeenCalled();
 
     metrics.increment("requests", { country: "de", outcome: "ok" });
     await reporter.send();
-    expect(eventLoopDelay.reset).toHaveBeenCalledTimes(1);
-  });
-
-  it.each([
-    [Number.NaN, 0],
-    [9_000_000, 0],
-    [10_040_000, 0],
-    [10_060_000, 0.1],
-  ])("reports an event loop delay of %d ns as %d ms", async (delay, expected) => {
-    const { api, metrics, reporter, eventLoopDelay } = setup();
-    eventLoopDelay.mean = delay;
-    metrics.increment("requests", { country: "de", outcome: "ok" });
-    reporter.start("amazon");
-
-    await reporter.send();
-
-    expect(api.post.mock.calls[0][1].metrics).toContainEqual({
-      metric: "event_loop_delay_mean_ms",
-      value: expected,
-    });
-  });
-
-  it("reports a failed ping instead of its time", async () => {
-    const { api, metrics, reporter, ping } = setup();
-    ping.mockResolvedValue(undefined);
-    metrics.increment("requests", { country: "de", outcome: "ok" });
-    reporter.start("amazon");
-
-    await reporter.send();
-
-    const sent = api.post.mock.calls[0][1].metrics;
-    expect(sent).toContainEqual({ metric: "ping_failed", value: 1 });
-    expect(sent).not.toContainEqual(expect.objectContaining({ metric: "ping_ms" }));
-  });
-
-  it("measures the CPU since the previous send", async () => {
-    const { api, metrics, reporter } = setup();
-    metrics.increment("requests", { country: "de", outcome: "ok" });
-    reporter.start("amazon");
-    await reporter.send();
-
-    metrics.increment("requests", { country: "de", outcome: "ok" });
-    await reporter.send();
-
-    expect(api.post.mock.calls[1][1].metrics).toContainEqual({
-      metric: "cpu_percent",
-      value: 0,
-    });
+    expect(processMetrics.collect).toHaveBeenCalledTimes(1);
   });
 
   it("sends the PLP flow", async () => {
@@ -208,7 +145,7 @@ describe("MetricsReporter", () => {
 
     await reporter.send();
 
-    expect(api.post.mock.calls[0][1].flow).toBe("plp");
+    expect(api.send.mock.calls[0][1].flow).toBe("plp");
   });
 
   it("adds the traffic that is above zero with its country and route", async () => {
@@ -222,7 +159,7 @@ describe("MetricsReporter", () => {
 
     await reporter.send();
 
-    expect(api.post.mock.calls[0][1].metrics).toEqual([
+    expect(api.send.mock.calls[0][1].metrics).toEqual([
       { metric: "bytes_in", country: "de", outcome: "direct6", value: 100 },
       { metric: "bytes_out", country: "fr", outcome: "proxy", value: 20 },
       ...gauges,
@@ -235,7 +172,7 @@ describe("MetricsReporter", () => {
 
     await reporter.send();
 
-    expect(api.post).not.toHaveBeenCalled();
+    expect(api.send).not.toHaveBeenCalled();
   });
 
   it("keeps the period start when there is nothing to send", async () => {
@@ -246,12 +183,12 @@ describe("MetricsReporter", () => {
     metrics.increment("requests", { country: "de", outcome: "ok" });
     await reporter.send();
 
-    expect(api.post.mock.calls[0][1].periodStart).toBe("2026-10-18T10:00:00.000Z");
+    expect(api.send.mock.calls[0][1].periodStart).toBe("2026-10-18T10:00:00.000Z");
   });
 
   it("resends a failed report unchanged with its key before the next one", async () => {
     const { api, metrics, reporter } = setup();
-    api.post.mockResolvedValueOnce(undefined);
+    api.send.mockRejectedValueOnce({ response: { status: 503 } });
     metrics.increment("requests", { country: "de", outcome: "ok" }, 2);
     reporter.start("amazon");
 
@@ -259,10 +196,10 @@ describe("MetricsReporter", () => {
     metrics.increment("requests", { country: "de", outcome: "ok" }, 3);
     await reporter.send();
 
-    const [failed, retry, next] = api.post.mock.calls;
+    const [failed, retry, next] = api.send.mock.calls;
     expect(retry[1]).toBe(failed[1]);
     expect(retry[2]).toEqual(failed[2]);
-    expect(next[2].headers["Idempotency-Key"]).not.toBe(failed[2].headers["Idempotency-Key"]);
+    expect(next[2]).not.toBe(failed[2]);
     expect(next[1].periodStart).toBe("2026-10-18T10:01:00.000Z");
     expect(next[1].metrics[0]).toEqual({
       metric: "requests",
@@ -274,7 +211,7 @@ describe("MetricsReporter", () => {
 
   it("keeps collecting while a failed report still does not go through", async () => {
     const { api, metrics, reporter } = setup();
-    api.post.mockResolvedValueOnce(undefined).mockResolvedValueOnce(undefined);
+    api.send.mockRejectedValueOnce(new Error("down")).mockRejectedValueOnce(new Error("down"));
     metrics.increment("requests", { country: "de", outcome: "ok" }, 2);
     reporter.start("amazon");
 
@@ -284,7 +221,7 @@ describe("MetricsReporter", () => {
     metrics.increment("requests", { country: "de", outcome: "ok" }, 4);
     await reporter.send();
 
-    const calls = api.post.mock.calls;
+    const calls = api.send.mock.calls;
     expect(calls).toHaveLength(4);
     expect(calls[2][1]).toBe(calls[0][1]);
     expect(calls[3][1].metrics[0]).toEqual({
@@ -293,6 +230,22 @@ describe("MetricsReporter", () => {
       outcome: "ok",
       value: 7,
     });
+  });
+
+  it("drops a report rejected with a 4xx and goes on with the next one", async () => {
+    const { api, metrics, reporter } = setup();
+    api.send.mockRejectedValueOnce({ response: { status: 400 } });
+    metrics.increment("requests", { country: "de", outcome: "ok" }, 2);
+    reporter.start("amazon");
+
+    await reporter.send();
+    metrics.increment("requests", { country: "de", outcome: "ok" }, 3);
+    await reporter.send();
+
+    const [rejected, next] = api.send.mock.calls;
+    expect(api.send).toHaveBeenCalledTimes(2);
+    expect(next[1]).not.toBe(rejected[1]);
+    expect(next[1].metrics[0].value).toBe(3);
   });
 
   it("moves the period start to the previous send after a successful one", async () => {
@@ -304,6 +257,20 @@ describe("MetricsReporter", () => {
     metrics.increment("requests", { country: "de", outcome: "ok" });
     await reporter.send();
 
-    expect(api.post.mock.calls[1][1].periodStart).toBe("2026-10-18T10:01:00.000Z");
+    expect(api.send.mock.calls[1][1].periodStart).toBe("2026-10-18T10:01:00.000Z");
+  });
+
+  it("resends a failed report even when there are no new counters", async () => {
+    const { api, metrics, reporter } = setup();
+    api.send.mockRejectedValueOnce(new Error("down"));
+    metrics.increment("requests", { country: "de", outcome: "ok" });
+    reporter.start("amazon");
+
+    await reporter.send();
+    await reporter.send();
+
+    const [failed, retry] = api.send.mock.calls;
+    expect(api.send).toHaveBeenCalledTimes(2);
+    expect(retry[1]).toBe(failed[1]);
   });
 });

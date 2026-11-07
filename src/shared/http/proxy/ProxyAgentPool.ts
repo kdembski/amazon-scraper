@@ -1,5 +1,7 @@
 import type http from "node:http";
 import type net from "node:net";
+import { DirectBlockList } from "@/shared/http/proxy/DirectBlockList";
+import { FreeProxyTracker } from "@/shared/http/proxy/FreeProxyTracker";
 import { MeteredAgent } from "@/shared/http/proxy/MeteredAgent";
 import { MeteredProxyAgent } from "@/shared/http/proxy/MeteredProxyAgent";
 import type { Route } from "@/shared/http/http.types";
@@ -8,15 +10,12 @@ export class ProxyAgentPool {
   private agents = new Map<string, MeteredProxyAgent>();
   // Direct agents per IP family, keyed "direct4" / "direct6"
   private directs = new Map<Route, MeteredAgent>();
-  // Per host, proxies in the order their idle connection was last freed
-  private freed = new Map<string, Set<string>>();
-  // "<direct key> <host>" pairs blocked by the host, until the given time
-  private blocked = new Map<string, number>();
   private idleTimeout = 15 * 1000;
-  private blockTime = 10 * 60 * 1000;
 
   constructor(
-    private onConnect: (socket: net.Socket, host: string, route: Route) => void
+    private onConnect: (socket: net.Socket, host: string, route: Route) => void,
+    private blockList = new DirectBlockList(),
+    private freeProxies = new FreeProxyTracker()
   ) {}
 
   get(url: string) {
@@ -31,7 +30,7 @@ export class ProxyAgentPool {
       agent.options.timeout = this.idleTimeout;
       agent.protocol = "https:";
       agent.on("free", (_socket, options: { host: string }) => {
-        this.markFree(url, options.host);
+        this.freeProxies.markFree(url, options.host);
       });
       this.agents.set(url, agent);
     }
@@ -49,7 +48,7 @@ export class ProxyAgentPool {
         (socket, host) => this.onConnect(socket, host, key)
       );
       agent.on("free", (socket: net.Socket, options: { host: string }) => {
-        if (this.isBlocked(key, options.host)) socket.destroy();
+        if (this.blockList.isBlocked(key, options.host)) socket.destroy();
       });
       this.directs.set(key, agent);
     }
@@ -58,7 +57,7 @@ export class ProxyAgentPool {
   }
 
   isDirectBlocked(family: 4 | 6, host: string) {
-    return this.isBlocked(this.getDirectKey(family), host);
+    return this.blockList.isBlocked(this.getDirectKey(family), host);
   }
 
   private getDirectKey(family: 4 | 6) {
@@ -81,22 +80,8 @@ export class ProxyAgentPool {
     );
   }
 
-  // Proxy with the most recently freed idle connection to the host, removed
-  // from the order so the next caller gets another one
   takeLastFree(host: string, accept: (url: string) => boolean) {
-    const urls = this.freed.get(host);
-    if (!urls) return;
-
-    for (const url of [...urls].reverse()) {
-      if (!this.hasFreeSocket(url, host)) {
-        urls.delete(url);
-        continue;
-      }
-      if (!accept(url)) continue;
-
-      urls.delete(url);
-      return url;
-    }
+    return this.freeProxies.takeLast(host, (url) => this.hasFreeSocket(url, host), accept);
   }
 
   // Closes the direct agent's idle connections to the host after a 403 or
@@ -105,27 +90,10 @@ export class ProxyAgentPool {
     const key = this.findDirectKey(agent);
     if (!key) return;
 
-    this.blocked.set(`${key} ${host}`, Date.now() + this.blockTime);
+    this.blockList.block(key, host);
     Object.entries(agent.freeSockets).forEach(([name, sockets]) => {
       if (name.startsWith(`${host}:`)) sockets?.forEach((socket) => socket.destroy());
     });
-  }
-
-  private isBlocked(directKey: string, host: string) {
-    const key = `${directKey} ${host}`;
-    const until = this.blocked.get(key);
-    if (!until) return false;
-    if (until > Date.now()) return true;
-
-    this.blocked.delete(key);
-    return false;
-  }
-
-  private markFree(url: string, host: string) {
-    const urls = this.freed.get(host) ?? new Set<string>();
-    urls.delete(url);
-    urls.add(url);
-    this.freed.set(host, urls);
   }
 
   retain(urls: string[]) {

@@ -5,23 +5,27 @@ import { AmazonPdpResultSender } from "@/marketplaces/amazon/pdp/AmazonPdpResult
 import { AmazonPlpAdSender } from "@/marketplaces/amazon/plp/AmazonPlpAdSender";
 import { ApiService } from "@/shared/backend/ApiService";
 import { AmazonCountryService } from "@/marketplaces/amazon/AmazonCountryService";
-import { MetricsReporter } from "@/shared/backend/MetricsReporter";
+import { MetricsReporter } from "@/shared/metrics/MetricsReporter";
 import { MetricsService } from "@/shared/metrics/MetricsService";
 import { ScrapingClient } from "@/shared/http/ScrapingClient";
 import { ArgsService } from "@/shared/args/ArgsService";
+import { ScraperNameResolver } from "@/shared/args/ScraperNameResolver";
 import { ScraperConfigService } from "@/shared/backend/ScraperConfigService";
 import type { ProxyAgentPool } from "@/shared/http/proxy/ProxyAgentPool";
 import { ProxyService } from "@/shared/http/proxy/ProxyService";
+import { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
 import { FakeAmazon } from "@@tests/support/fake/amazon";
 import { FakeBackend } from "@@tests/support/fake/backend";
 import { resetSingleton } from "@@tests/support/singleton";
 
 const singletons = [
   ArgsService,
+  ScraperNameResolver,
   ApiService,
   AmazonCountryService,
   ProxyService,
   ScrapingClient,
+  TokenBucketQueue,
   AmazonService,
   AmazonPdpResultSender,
   AmazonPlpAdSender,
@@ -60,12 +64,12 @@ export async function bootScraper(args: string[] = []) {
   singletons.forEach(resetSingleton);
 
   const scraper = await createScraper();
-  return { scraper, queue: ScrapingClient.getInstance().queueService };
+  return { scraper, queue: TokenBucketQueue.getInstance() };
 }
 
 export async function stopWorld({ backend, amazon }: World) {
   // The queue loop reschedules itself through start(), so this ends it
-  const queue = instanceOf(ScrapingClient)?.queueService;
+  const queue = instanceOf(TokenBucketQueue);
   if (queue) queue.start = () => {};
 
   const proxyService = instanceOf(ProxyService) as unknown as

@@ -2,7 +2,7 @@ import { AmazonPdpScraper } from "@/marketplaces/amazon/pdp/AmazonPdpScraper";
 import { AmazonPlpScraper } from "@/marketplaces/amazon/plp/AmazonPlpScraper";
 import type { Target } from "@/shared/args/args.types";
 import { ArgsService } from "@/shared/args/ArgsService";
-import { MetricsReporter } from "@/shared/backend/MetricsReporter";
+import { MetricsReporter } from "@/shared/metrics/MetricsReporter";
 import { ScraperConfigService } from "@/shared/backend/ScraperConfigService";
 import { ProxyService } from "@/shared/http/proxy/ProxyService";
 import { MarketplaceScraper } from "@/shared/interfaces/MarketplaceScraper";

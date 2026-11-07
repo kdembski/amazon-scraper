@@ -330,4 +330,13 @@ describe("ProxyService", () => {
     expect(track).toHaveBeenCalledWith(socket, "www.amazon.de", "direct4");
     resetSingleton(ProxyService);
   });
+
+  it("passes a block of an agent for a host to the pool", () => {
+    const { service, pool } = setup();
+    const agent = { direct: 4 };
+
+    service.block(agent as never, "www.amazon.de");
+
+    expect(pool.block).toHaveBeenCalledWith(agent, "www.amazon.de");
+  });
 });

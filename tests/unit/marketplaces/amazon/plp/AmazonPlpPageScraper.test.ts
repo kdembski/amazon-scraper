@@ -3,7 +3,7 @@ import { AmazonPlpPageScraper } from "@/marketplaces/amazon/plp/AmazonPlpPageScr
 import { AmazonPlpCrawl } from "@/marketplaces/amazon/plp/AmazonPlpCrawl";
 import type { AmazonPlpPageFetcher } from "@/marketplaces/amazon/plp/AmazonPlpPageFetcher";
 import type { MetricsService } from "@/shared/metrics/MetricsService";
-import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
+import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/RetryBackoff";
 import { fakeAmazonPlpAdSender } from "@@tests/support/fakes";
 
 type Reply = { lastPage?: number; asins?: string[]; failed?: number; givenUp?: boolean };
@@ -94,6 +94,18 @@ describe("AmazonPlpPageScraper", () => {
       expect(requests()).toHaveLength(seeds.length + 2);
     }
   );
+
+  it("paginates a range with 399 pages instead of splitting it", async () => {
+    const { requests, scraper, crawl } = setup(
+      (price) => ({ lastPage: price === "-999" ? 399 : 1 }),
+      true
+    );
+
+    await scraper.execute(crawl);
+
+    expect(requests()).not.toContainEqual({ price: "-499", number: 1 });
+    expect(requests().filter(({ price }) => price === "-999")).toHaveLength(399);
+  });
 
   it("splits the open range at double its minimum", async () => {
     const { requests, scraper, crawl } = setup((price) => ({

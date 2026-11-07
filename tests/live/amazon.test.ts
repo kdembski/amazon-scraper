@@ -1,12 +1,14 @@
-import { configDotenv } from "dotenv";
+import { existsSync } from "node:fs";
 import { parseDocument } from "htmlparser2";
 import { beforeAll, describe, expect, it, vi } from "vitest";
+import { AmazonCaptchaDetector } from "@/marketplaces/amazon/AmazonCaptchaDetector";
 import { AmazonAodAdBuilder } from "@/marketplaces/amazon/pdp/builders/AmazonAodAdBuilder";
 import { AmazonAwdAdBuilder } from "@/marketplaces/amazon/pdp/builders/AmazonAwdAdBuilder";
 import { AmazonTwisterAdBuilder } from "@/marketplaces/amazon/pdp/builders/AmazonTwisterAdBuilder";
 import { AmazonPlpBuilder } from "@/marketplaces/amazon/plp/AmazonPlpBuilder";
 import { AmazonService } from "@/marketplaces/amazon/AmazonService";
 import { ProxyService } from "@/shared/http/proxy/ProxyService";
+import { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
 import type { StopAt } from "@/shared/http/http.types";
 import { AmazonAdBuilder, AmazonAdBuildResult } from "@/marketplaces/amazon/types/amazon.types";
 import { buildAd, buildAmazonCountry } from "@@tests/support/factories";
@@ -19,7 +21,7 @@ import { buildAd, buildAmazonCountry } from "@@tests/support/factories";
 
 vi.mock("cron", async () => (await import("@@tests/support/cron")).cronModule);
 
-configDotenv({ quiet: true });
+if (existsSync(".env")) process.loadEnvFile();
 process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = "0";
 
 // LIVE_ASINS / LIVE_MARKETS override the defaults, comma separated
@@ -50,20 +52,20 @@ type Result = { code: string; asin: string } & (
 );
 
 let amazon: AmazonService;
+const captchaDetector = new AmazonCaptchaDetector();
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const fetchPage = (url: string, referer: string, stopAt?: StopAt) =>
-  new Promise<string>((resolve, reject) =>
-    amazon.get<string>(url, referer, { onSuccess: resolve, onError: reject }, undefined, stopAt)
-  );
+const fetchPage = (url: string, referer: string, stopAt?: StopAt) => {
+  return amazon.get<string>(url, referer, { stopAt }) as Promise<string>;
+};
 
 // Asks again through another random proxy when blocked, with a growing pause
 // so the test itself does not trigger throttling
 const scrape = async (
   url: string,
   referer: string,
-  build: (html: string) => AmazonAdBuildResult,
+  build: (html: string) => AmazonAdBuildResult & { isCaptcha?: boolean },
   { stopAt, retryInvalid = false }: { stopAt?: StopAt; retryInvalid?: boolean } = {}
 ) => {
   let blocked = "";
@@ -91,7 +93,10 @@ const scrapeAll = (builder: AmazonAdBuilder, codes: string[], retryInvalid = fal
         const result = await scrape(
           url,
           referer,
-          (html) => builder.build(parseDocument(builder.trimHtml(html))),
+          (html) => {
+            const document = parseDocument(builder.trimHtml(html));
+            return captchaDetector.detect(document) ? { isCaptcha: true } : builder.build(document);
+          },
           { stopAt: builder.stopAt, retryInvalid }
         );
         return { code, asin, ...result };
@@ -122,7 +127,7 @@ describe("live Amazon", () => {
 
     await ProxyService.getInstance().loadProxies();
     amazon = AmazonService.getInstance();
-    amazon.queueService.concurrency = 4;
+    TokenBucketQueue.getInstance().concurrency = 4;
   });
 
   it("finds the buy box offer in the offers fragment", async () => {

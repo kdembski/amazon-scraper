@@ -32,7 +32,6 @@ export interface AmazonAd {
 export interface AmazonAdBuildResult {
   price?: number;
   dispatchFrom?: string;
-  isCaptcha?: boolean;
   // False when the response is not the page we requested (e.g. bot challenge)
   isValid?: boolean;
 }
@@ -45,18 +44,6 @@ export interface AmazonAdBuilder {
   trimHtml(html: string): string;
   build(document: Document): AmazonAdBuildResult;
   buildUrl(country: AmazonCountry, ad: AmazonAd): { url: string; referer: string };
-}
-
-export interface AmazonAdPrice {
-  country: AmazonCountry;
-  value?: number;
-  dispatchFrom?: string;
-  complete: boolean;
-  deleted: boolean;
-  // A 404 from the last source
-  missing: boolean;
-  failed: number;
-  notFound: number;
 }
 
 export interface AmazonPdpPrice {

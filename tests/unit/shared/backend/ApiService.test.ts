@@ -125,77 +125,19 @@ describe("ApiService", () => {
     });
   });
 
-  describe("post", () => {
-    it("sends the request", async () => {
-      const service = setup();
-      mocked.post.mockResolvedValue({ data: "ok" });
-
-      await service.post("amazon/ads", { a: 1 });
-      expect(mocked.post).toHaveBeenCalledWith("http://api.test/amazon/ads", { a: 1 }, withAgent);
-    });
-
-    it("logs errors instead of throwing", async () => {
-      const error = vi.spyOn(console, "error").mockImplementation(() => {});
-      const service = setup();
-      mocked.post.mockRejectedValue({
-        status: 500,
-        message: "Request failed",
-        cause: new Error("socket hang up"),
-        response: { data: "line 1\nline 2" },
-      });
-
-      await expect(service.post("amazon/ads", { a: 1 })).resolves.toBeUndefined();
-      expect(error.mock.calls.map((args) => args[0])).toEqual([
-        "Server:",
-        "  500",
-        "  Request failed",
-        "  Error: socket hang up",
-        "  line 1 line 2",
-      ]);
-    });
-  });
-
   it("reuses one keep-alive agent for every request", async () => {
     const service = setup();
     mocked.get.mockResolvedValue({ data: {} });
     mocked.post.mockResolvedValue({ data: "ok" });
 
     await service.get("a");
-    await service.post("a", {});
     await service.send("a", {});
 
     const agents = [
       mocked.get.mock.calls[0][1]?.httpAgent,
       mocked.post.mock.calls[0][2]?.httpAgent,
-      mocked.post.mock.calls[1][2]?.httpAgent,
     ];
     expect(new Set(agents).size).toBe(1);
     expect(agents[0].keepAlive).toBe(true);
-  });
-
-  describe("post config", () => {
-    it("forwards the extra config together with the agent", async () => {
-      const service = setup();
-      mocked.post.mockResolvedValue({ data: "ok" });
-
-      await service.post("amazon/ads", { a: 1 }, { timeout: 5000 });
-      expect(mocked.post).toHaveBeenCalledWith(
-        "http://api.test/amazon/ads",
-        { a: 1 },
-        { ...withAgent, timeout: 5000 }
-      );
-    });
-
-    it("calls axios with only the agent without config", async () => {
-      const service = setup();
-      mocked.post.mockResolvedValue({ data: "ok" });
-
-      await service.post("amazon/ads", { a: 1 });
-      expect(mocked.post).toHaveBeenCalledWith(
-        "http://api.test/amazon/ads",
-        { a: 1 },
-        withAgent
-      );
-    });
   });
 });

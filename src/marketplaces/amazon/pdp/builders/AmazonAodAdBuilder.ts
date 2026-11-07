@@ -5,14 +5,12 @@ import {
   AmazonAdBuildResult,
 } from "@/marketplaces/amazon/types/amazon.types";
 import { AmazonCountry } from "@/marketplaces/amazon/types/amazon.types";
-import { AmazonCaptchaDetector } from "@/marketplaces/amazon/AmazonCaptchaDetector";
 import { AmazonDispatchFromNormalizer } from "@/marketplaces/amazon/pdp/builders/AmazonDispatchFromNormalizer";
 import { AmazonPriceParser } from "@/marketplaces/amazon/pdp/builders/AmazonPriceParser";
 import { find, text } from "@/shared/utils/html";
 
 export class AmazonAodAdBuilder implements AmazonAdBuilder {
   constructor(
-    private captchaDetector = new AmazonCaptchaDetector(),
     private priceParser = new AmazonPriceParser(),
     private dispatchFromNormalizer = new AmazonDispatchFromNormalizer()
   ) {}
@@ -26,23 +24,16 @@ export class AmazonAodAdBuilder implements AmazonAdBuilder {
   }
 
   build(document: Document): AmazonAdBuildResult {
-    const isCaptcha = this.captchaDetector.detect(document);
-
-    if (isCaptcha) {
-      return { isCaptcha };
-    }
-
     const isValid = !!find("#aod-container", document);
     const pinned = find("#aod-pinned-offer", document);
     const priceBox = pinned && find("[id^='aod-price-']", pinned);
 
     // Pinned offer without a price box means "no featured offers available"
     if (!isValid || !pinned || !priceBox) {
-      return { isCaptcha, isValid };
+      return { isValid };
     }
 
     return {
-      isCaptcha,
       isValid,
       price: this.priceParser.parse(priceBox),
       dispatchFrom: this.getDispatchFrom(pinned),

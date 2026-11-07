@@ -6,7 +6,6 @@ import {
   AmazonCountry,
 } from "@/marketplaces/amazon/types/amazon.types";
 import { AmazonBuyboxParser } from "@/marketplaces/amazon/pdp/builders/AmazonBuyboxParser";
-import { AmazonCaptchaDetector } from "@/marketplaces/amazon/AmazonCaptchaDetector";
 import { find } from "@/shared/utils/html";
 
 const BUYBOX = 'id="buybox"';
@@ -15,10 +14,7 @@ const AFTER_BUYBOX = 'id="olpLinkWidget_feature_div"';
 export class AmazonAwdAdBuilder implements AmazonAdBuilder {
   stopAt = [BUYBOX, AFTER_BUYBOX];
 
-  constructor(
-    private captchaDetector = new AmazonCaptchaDetector(),
-    private buyboxParser = new AmazonBuyboxParser()
-  ) {}
+  constructor(private buyboxParser = new AmazonBuyboxParser()) {}
 
   // Cuts the header and the related products that come before the buy box
   trimHtml(html: string) {
@@ -29,10 +25,6 @@ export class AmazonAwdAdBuilder implements AmazonAdBuilder {
   }
 
   build(document: Document): AmazonAdBuildResult {
-    if (this.captchaDetector.detect(document)) {
-      return { isCaptcha: true };
-    }
-
     return this.buyboxParser.parse(find("#buybox", document));
   }
 

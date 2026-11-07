@@ -1,12 +1,7 @@
 import { AmazonPlpBuilder } from "@/marketplaces/amazon/plp/AmazonPlpBuilder";
 import { AmazonPlpCrawl } from "@/marketplaces/amazon/plp/AmazonPlpCrawl";
 import { AmazonPlpPageFetcher } from "@/marketplaces/amazon/plp/AmazonPlpPageFetcher";
-import {
-  parsePriceRange,
-  PriceRange,
-  splitPriceRange,
-  toPriceFilter,
-} from "@/marketplaces/amazon/plp/priceRange";
+import { AmazonPriceRange } from "@/marketplaces/amazon/plp/AmazonPriceRange";
 import { MetricsService } from "@/shared/metrics/MetricsService";
 import { ItemOutcome } from "@/shared/metrics/metrics.types";
 
@@ -33,7 +28,7 @@ const SEEDS = [
   "200000-299999",
   "300000-499999",
   "500000-",
-].map(parsePriceRange);
+].map((range) => AmazonPriceRange.parse(range));
 
 export class AmazonPlpPageScraper {
   constructor(
@@ -46,11 +41,11 @@ export class AmazonPlpPageScraper {
     await Promise.all(SEEDS.map((range) => this.scrapeRange(crawl, range)));
   }
 
-  private async scrapeRange(crawl: AmazonPlpCrawl, range: PriceRange) {
+  private async scrapeRange(crawl: AmazonPlpCrawl, range: AmazonPriceRange) {
     const first = await this.scrapePage(crawl, range, 1);
     if (!first) return;
 
-    const halves = first.lastPage >= MAX_PAGES ? splitPriceRange(range) : undefined;
+    const halves = first.lastPage >= MAX_PAGES ? range.split() : undefined;
     if (halves) {
       await Promise.all(halves.map((half) => this.scrapeRange(crawl, half)));
       return;
@@ -62,9 +57,9 @@ export class AmazonPlpPageScraper {
     }
   }
 
-  private async scrapePage(crawl: AmazonPlpCrawl, range: PriceRange, number: number) {
+  private async scrapePage(crawl: AmazonPlpCrawl, range: AmazonPriceRange, number: number) {
     const page = number > 1 ? `&page=${number}` : "";
-    const url = `pl/s?i=${crawl.category}&rh=${toPriceFilter(range)}&s=date-desc-rank${page}`;
+    const url = `pl/s?i=${crawl.category}&rh=${range.toFilter()}&s=date-desc-rank${page}`;
     const referer = `pl/b?node=${Math.floor(Math.random() * 100000000000)}`;
 
     const result = await this.fetcher.fetch(

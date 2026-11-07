@@ -21,4 +21,12 @@ describe("AmazonDispatchFromNormalizer", () => {
     expect(normalizer.normalize("  ")).toBeUndefined();
     expect(normalizer.normalize(undefined)).toBeUndefined();
   });
+
+  it.each(["Amazon.co.uk", "AMAZON.DE", "amazon.com.tr"])("names %s plain Amazon", (value) => {
+    expect(normalizer.normalize(value)).toBe("Amazon");
+  });
+
+  it.each(["Amazon", "Amazon EU S.à r.l.", "Amazon.de Marketplace Seller"])("keeps %s", (value) => {
+    expect(normalizer.normalize(value)).toBe(value);
+  });
 });

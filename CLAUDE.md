@@ -19,9 +19,9 @@ Tests: `src/a/X.ts` → `tests/unit/a/X.test.ts`, one file per source file. Buil
 - Flags and backend config (`ScraperConfig`: `concurrency`, `rps`, `batchSize`) apply to every mode and marketplace; marketplace-specific behaviour goes in marketplace code.
 - `ScrapingClient.get()` is the only path to shops; `TokenBucketQueue` only for shop requests. Backend results go through `BatchSender`.
 - Bottleneck is open connections (NAT, conntrack): never disable keep-alive or shorten the 15 s idle timeout; set it via `agent.options.timeout` after construction (`HttpsProxyAgent` ignores the constructor option).
-- HTML parsing uses `htmlparser2` + `find`/`findAll`/`text` (`@/shared/utils/html`), no full DOM. Selectors break silently. `cleanUpPrice` assumes comma decimals; `dispatchFrom` is normalized to `Amazon`.
+- HTML parsing uses `htmlparser2` + `find`/`findAll`/`text` (`@/shared/utils/html`), no full DOM. Selectors break silently. `AmazonPriceParser` reads a separator followed by 1-2 final digits as decimal, any other as thousands; `dispatchFrom` is normalized to `Amazon`.
 - Flow docs: `.claude/rules/amazon/pdp.md`, `.claude/rules/amazon/plp.md`. A logic change in PDP/PLP updates the matching rule in the same commit.
-- Metrics: `.claude/rules/metrics.md`, updated with every metric change. Design: `docs/superpowers/specs/2026-10-18-scraper-metrics-design.md`.
+- Metrics: `.claude/rules/metrics.md`, updated with every metric change.
 
 ## Conventions
 
@@ -32,5 +32,6 @@ Tests: `src/a/X.ts` → `tests/unit/a/X.test.ts`, one file per source file. Buil
 - 2 spaces, double quotes, semicolons, `lodash` as `_`. Comments in English.
 - Brace-less arrows only when the function fits on one line.
 - No `else if`, no `else` after a return: early returns.
+- A blank line between consecutive logical steps of a function body; a guard `if` stays with the value it checks.
 - No comments explaining why; reasoning goes in the reply or commit.
 - Commit messages: short, only what changed. No `Co-Authored-By` lines.

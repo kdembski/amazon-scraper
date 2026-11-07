@@ -19,11 +19,10 @@ export class AmazonBuyboxParser {
     const price = buybox && this.getPrice(buybox);
 
     if (!isValid || !price) {
-      return { isCaptcha: false, isValid };
+      return { isValid };
     }
 
     return {
-      isCaptcha: false,
       isValid,
       price,
       dispatchFrom: this.getDispatchFrom(buybox),

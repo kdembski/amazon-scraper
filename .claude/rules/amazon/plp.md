@@ -52,7 +52,7 @@ Goal: find new ASINs in a category on amazon.pl (new releases + search listing) 
 2. All ranges in parallel.
 3. URL: `pl/s?i=<category>&rh=p_36%3A<min>-<max>&s=date-desc-rank[&page=N]` (newest first). Referer: random `pl/b?node=...`.
 4. Page 1 of a range:
-   - last page ≥ 400 (`MAX_PAGES`, Amazon's limit) → range split in half (`splitPriceRange`), recursion on both halves;
+   - last page ≥ 400 (`MAX_PAGES`, Amazon's limit) → range split in half (`AmazonPriceRange.split`), recursion on both halves;
    - an open range (`500000-`) splits into `[min, 2·min-1]` and `[2·min-]`, up to 1 000 000 zł;
    - a single-value range is not split.
 5. `allPages` → pages 2..lastPage sequentially; a given up page is skipped, the range goes on.
@@ -67,7 +67,7 @@ Goal: find new ASINs in a category on amazon.pl (new releases + search listing) 
 
 1. Backpressure: request queue ≥ `batchSize` → waits 1 s at a time.
 2. Request via `AmazonService.get()` (default proxy `datacenter`) with the builder's `stopAt` markers: the stream is destroyed once they arrived in order.
-3. Retries up to 6 attempts (`MAX_FAILED_ATTEMPTS`), backoff 1 s, 2 s, 4 s ... with jitter, on:
+3. `AmazonPageReader` (shared with PDP) turns the response into a page. Retries up to 6 attempts (`MAX_FAILED_ATTEMPTS`), backoff 1 s, 2 s, 4 s ... with jitter, on:
    - HTTP error / network / timeout (403 and 429 block the direct family for the host, see PDP 7);
    - empty response (`empty`);
    - captcha (`captcha`, `AmazonCaptchaDetector`, Akamai interstitial included), no block;
@@ -84,5 +84,5 @@ Goal: find new ASINs in a category on amazon.pl (new releases + search listing) 
 ## Where to look
 
 - 0 products, many `invalid` → selectors in `AmazonPlpBuilder` / `AmazonNewReleasesBuilder` (break silently) + test in `tests/unit/marketplaces/amazon/plp/`.
-- ASINs missing in a large category → `MAX_PAGES`, `SEEDS`, `splitPriceRange`.
+- ASINs missing in a large category → `MAX_PAGES`, `SEEDS`, `AmazonPriceRange.split`.
 - Category takes too long → `allPages` (first scrape) or range splitting.

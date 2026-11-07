@@ -56,4 +56,23 @@ describe("AmazonCountryService", () => {
     await cronJobs[0].onTick();
     expect(api.get).toHaveBeenCalledWith("amazon/countries/scrap");
   });
+
+  it("keeps the loaded countries when a reload fails", async () => {
+    const { api, service } = setup();
+    api.get.mockResolvedValueOnce(countries).mockRejectedValueOnce(new Error("down"));
+    await service.loadCountries();
+
+    await expect(cronJobs[0].onTick()).rejects.toThrow("down");
+
+    await expect(service.getCountries()).resolves.toEqual(countries);
+    expect(api.get).toHaveBeenCalledTimes(2);
+  });
+
+  it("loads again on the next use while the backend has no countries", async () => {
+    const { api, service } = setup();
+    api.get.mockResolvedValueOnce([]).mockResolvedValueOnce(countries);
+
+    await expect(service.getCountries()).resolves.toEqual([]);
+    await expect(service.getCountries()).resolves.toEqual(countries);
+  });
 });

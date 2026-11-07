@@ -139,4 +139,14 @@ describe("ProxyList", () => {
     expect(get).toHaveBeenCalledTimes(7);
     expect(done).toHaveBeenCalledWith({ datacenter: ["http://user:pass@1.1.1.1:8080"] });
   });
+
+  it("skips empty lines and reads windows line endings", async () => {
+    respond([plan(1, "default")], {
+      1: { data: "1.1.1.1:8080:u1:p1\r\n\r\n2.2.2.2:8081:u2:p2\n" },
+    });
+
+    await expect(new ProxyList().load()).resolves.toEqual({
+      datacenter: ["http://u1:p1@1.1.1.1:8080", "http://u2:p2@2.2.2.2:8081"],
+    });
+  });
 });

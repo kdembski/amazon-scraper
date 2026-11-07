@@ -1,9 +1,8 @@
 import { CronJob } from "cron";
-import { ArgsService } from "@/shared/args/ArgsService";
+import { ScraperNameResolver } from "@/shared/args/ScraperNameResolver";
 import { ApiService } from "@/shared/backend/ApiService";
-import { ScrapingClient } from "@/shared/http/ScrapingClient";
-import { getRetryDelay } from "@/shared/utils/retry";
-import { sleep } from "@/shared/utils/sleep";
+import { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
+import { RetryBackoff } from "@/shared/utils/RetryBackoff";
 
 type ScraperConfig = {
   concurrency: number;
@@ -19,8 +18,8 @@ export class ScraperConfigService {
 
   private constructor(
     private apiService = ApiService.getInstance(),
-    private getQueue = () => ScrapingClient.getInstance().queueService,
-    private argsService = ArgsService.getInstance()
+    private queue = TokenBucketQueue.getInstance(),
+    private nameResolver = ScraperNameResolver.getInstance()
   ) {}
 
   public static getInstance(): ScraperConfigService {
@@ -36,12 +35,14 @@ export class ScraperConfigService {
   }
 
   async load() {
-    for (let failed = 1; ; failed++) {
+    const retry = new RetryBackoff();
+    while (true) {
       try {
         return this.apply(await this.fetch());
       } catch (e) {
         console.error("config: load failed", e);
-        await sleep(getRetryDelay(failed));
+        retry.fail();
+        await retry.wait();
       }
     }
   }
@@ -60,7 +61,7 @@ export class ScraperConfigService {
 
   private async fetch() {
     return this.apiService.get<ScraperConfig>(
-      `scrapers/${await this.argsService.getScraperName()}/config`,
+      `scrapers/${await this.nameResolver.get()}/config`,
       { timeout: 10 * 1000 }
     );
   }
@@ -81,9 +82,8 @@ export class ScraperConfigService {
       config[key] = value;
     });
 
-    const queue = this.getQueue();
-    queue.concurrency = config.concurrency;
-    if (config.rps !== queue.rps) queue.setRps(config.rps);
+    this.queue.concurrency = config.concurrency;
+    if (config.rps !== this.queue.rps) this.queue.setRps(config.rps);
     this.config = config;
   }
 }

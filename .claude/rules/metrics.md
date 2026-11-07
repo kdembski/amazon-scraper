@@ -16,7 +16,7 @@ paths:
    2. takes the counters (`drain()`, reset); no counters → sends nothing;
    3. adds process metrics and gauges;
    4. `POST scrapers/<name>/metrics` with `{ marketplace, flow, periodStart, metrics: [...] }` and `Idempotency-Key`.
-   5. Send failure → the same report (same key) goes out again before a newer one.
+   5. 5xx / network failure → the same report (same key) goes out again before a newer one. 4xx → report dropped.
 4. Backend (`amazon-server`, `src/modules/monitoring/`) stores `ScraperMetric`, hourly report to Discord.
 
 Types: counters = sum over the minute; gauges = value at report time. `*_ms` as a counter = sum of durations (mean = `*_ms / event count`).
@@ -25,7 +25,7 @@ Types: counters = sum over the minute; gauges = value at report time. `*_ms` as 
 
 | Metric | Labels | What it describes |
 |---|---|---|
-| `requests` | `country` (from the URL: `de`, `co.uk`, `pl`...), `outcome`: `ok` / `timeout` / `network` / `http_<status>` | Every HTTP request to Amazon. `timeout` = 20 s exceeded. |
+| `requests` | `country` (from the URL: `de`, `co.uk`, `pl`...), `outcome`: `ok` / `timeout` / `network` / `http_<status>` | Every HTTP request to Amazon. `timeout` = 20 s exceeded or a connect timeout (`ETIMEDOUT`). |
 | `requests_proxy` / `requests_direct4` / `requests_direct6` | same as `requests` | The same requests split by route: through a proxy, direct over IPv4, direct over IPv6. Their sum = `requests`. |
 | `request_ms` | `country` | Sum of request durations (all outcomes). Mean = `request_ms / requests`. |
 | `connections` | `country`, `outcome`: route (`proxy` / `direct4` / `direct6`) | New sockets to shops opened in the minute. |
@@ -85,4 +85,4 @@ Types: counters = sum over the minute; gauges = value at report time. `*_ms` as 
 2. New outcome → type in `src/shared/metrics/metrics.types.ts`.
 3. Test in `tests/unit/...` for the source file.
 4. Backend: should the hourly report show it (`amazon-server`, `src/modules/monitoring/`).
-5. This file + `docs/superpowers/specs/2026-10-18-scraper-metrics-design.md`.
+5. This file.

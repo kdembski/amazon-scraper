@@ -1,20 +1,24 @@
 export class TokenBucketQueue {
+  private static instance: TokenBucketQueue;
   queue: (() => any)[] = [];
   pending = 0;
   private tokens;
   private lastRefill = Date.now();
 
   constructor(
-    public concurrency: number,
-    public rps = 0,
-    enableLogs = false,
-    private countConnections?: () => number
+    public concurrency = 10,
+    public rps = 0
   ) {
     this.tokens = rps;
+  }
 
-    if (enableLogs) {
-      setInterval(() => this.logState(), 1000);
+  public static getInstance(): TokenBucketQueue {
+    if (!TokenBucketQueue.instance) {
+      TokenBucketQueue.instance = new TokenBucketQueue();
+      TokenBucketQueue.instance.start();
     }
+
+    return TokenBucketQueue.instance;
   }
 
   start() {
@@ -75,19 +79,5 @@ export class TokenBucketQueue {
 
     this.tokens = Math.min(this.rps, this.tokens + refill);
     this.lastRefill = now;
-  }
-
-  private logState() {
-    const stats = [
-      `rps: ${this.rps || "-"}/s`,
-      `concurrency: ${this.concurrency}`,
-      `pending: ${this.pending}`,
-      ...(this.countConnections
-        ? [`connections: ${this.countConnections()}`]
-        : []),
-      `queue: ${this.queue.length}`,
-    ];
-    const text = stats.join(` | `);
-    console.log(text);
   }
 }

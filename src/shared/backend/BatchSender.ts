@@ -2,8 +2,8 @@ import { randomUUID } from "crypto";
 import { ApiService } from "@/shared/backend/ApiService";
 import { MetricsService } from "@/shared/metrics/MetricsService";
 import type { RequestOutcome } from "@/shared/metrics/metrics.types";
-import { getRetryDelay, MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
-import { sleep } from "@/shared/utils/sleep";
+import { toRequestOutcome } from "@/shared/metrics/toRequestOutcome";
+import { RetryBackoff } from "@/shared/utils/RetryBackoff";
 
 // Buffers items for one backend path and posts them together
 export class BatchSender<T> {
@@ -55,24 +55,29 @@ export class BatchSender<T> {
 
   private async send(items: T[]) {
     const key = randomUUID();
-    let failed = 0;
+    const retry = new RetryBackoff();
+
     while (true) {
       const startedAt = Date.now();
+
       try {
         await this.apiService.send(this.path, this.toBody(items), key);
+
         this.countRequest("ok", startedAt);
         this.metricsService.increment("backend_items", { outcome: "sent" }, items.length);
         return;
       } catch (e: any) {
-        this.countRequest(this.toOutcome(e), startedAt);
-        failed++;
+        this.countRequest(toRequestOutcome(e), startedAt);
+        retry.fail();
+
         const status = e?.response?.status;
-        if ((status && status < 500) || failed >= MAX_FAILED_ATTEMPTS) {
+        if ((status && status < 500) || retry.isExhausted) {
           console.error(`backend: ${items.length} items for ${this.path} dropped`, status ?? e?.message);
           this.metricsService.increment("backend_items", { outcome: "dropped" }, items.length);
           return;
         }
-        await sleep(getRetryDelay(failed));
+
+        await retry.wait();
       }
     }
   }
@@ -80,12 +85,5 @@ export class BatchSender<T> {
   private countRequest(outcome: RequestOutcome, startedAt: number) {
     this.metricsService.increment("backend_requests", { outcome });
     this.metricsService.increment("backend_send_ms", {}, Date.now() - startedAt);
-  }
-
-  private toOutcome(e: any): RequestOutcome {
-    const status = e?.response?.status;
-    if (status) return `http_${status}`;
-    if (e?.code === "ECONNABORTED" || e?.code === "ETIMEDOUT") return "timeout";
-    return "network";
   }
 }

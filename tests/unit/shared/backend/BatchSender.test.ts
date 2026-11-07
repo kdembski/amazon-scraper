@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BatchSender } from "@/shared/backend/BatchSender";
 import type { ApiService } from "@/shared/backend/ApiService";
 import type { MetricsService } from "@/shared/metrics/MetricsService";
-import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/retry";
+import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/RetryBackoff";
 
 const setup = ({ maxSize = 10 } = {}) => {
   const send = vi.fn().mockResolvedValue(undefined);

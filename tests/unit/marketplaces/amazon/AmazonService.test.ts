@@ -3,51 +3,39 @@ import { AmazonService } from "@/marketplaces/amazon/AmazonService";
 import type { ScrapingClient } from "@/shared/http/ScrapingClient";
 
 const setup = () => {
-  const queueService = { pending: 0 };
-  const client = { get: vi.fn(), queueService };
+  const client = { get: vi.fn() };
   // The constructor is private, it is only called through getInstance()
   const Service = AmazonService as unknown as new (
     ...deps: unknown[]
   ) => AmazonService;
   const service = new Service(client as unknown as ScrapingClient);
-  return { service, client, queueService };
+  return { service, client };
 };
 
 describe("AmazonService", () => {
-  it("prefixes url and referer with https://www.amazon. and delegates to the scraping client with the proxy type", () => {
+  it("prefixes url and referer with https://www.amazon. and adds the country label", () => {
     const { service, client } = setup();
-    const callback = { onSuccess: vi.fn() };
+    const isCancelled = () => false;
 
-    service.get("de/dp/B0TESTASIN", "de/s?k=B0TESTASIN", callback, "isp");
+    service.get("de/dp/B0TESTASIN", "de/s?k=B0TESTASIN", {
+      proxyType: "isp",
+      stopAt: ["a"],
+      isCancelled,
+    });
 
-    expect(client.get).toHaveBeenCalledWith(
-      "https://www.amazon.de/dp/B0TESTASIN",
-      "https://www.amazon.de/s?k=B0TESTASIN",
-      callback,
-      { country: "de" },
-      "isp",
-      undefined
-    );
+    expect(client.get).toHaveBeenCalledWith("https://www.amazon.de/dp/B0TESTASIN", {
+      referer: "https://www.amazon.de/s?k=B0TESTASIN",
+      labels: { country: "de" },
+      proxyType: "isp",
+      stopAt: ["a"],
+      isCancelled,
+    });
   });
 
-  it("passes the stop markers to the scraping client", () => {
+  it("returns the promise of the scraping client", async () => {
     const { service, client } = setup();
-    const callback = { onSuccess: vi.fn() };
+    client.get.mockResolvedValue("<html>");
 
-    service.get("de/x", "de/", callback, "isp", ["a"]);
-
-    expect(client.get).toHaveBeenCalledWith(
-      "https://www.amazon.de/x",
-      "https://www.amazon.de/",
-      callback,
-      { country: "de" },
-      "isp",
-      ["a"]
-    );
-  });
-
-  it("exposes the scraping client queue", () => {
-    const { service, queueService } = setup();
-    expect(service.queueService).toBe(queueService);
+    await expect(service.get("de/x", "de/")).resolves.toBe("<html>");
   });
 });

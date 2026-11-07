@@ -1,7 +1,4 @@
 import { ChildProcess, execFileSync, spawn } from "child_process";
-import { mkdtempSync, rmSync } from "fs";
-import { tmpdir } from "os";
-import { join } from "path";
 import { fileURLToPath } from "url";
 import { FakeAmazon } from "@@tests/support/fake/amazon";
 import { FakeBackend } from "@@tests/support/fake/backend";
@@ -62,19 +59,12 @@ export async function spawnScraper(
 }
 
 function runNode(args: string[], env: Record<string, string>) {
-  // Outside the repo, so dotenv does not pick up a local .env
-  const cwd = mkdtempSync(join(tmpdir(), "amazon-scraper-e2e-"));
   const child: ChildProcess = spawn(process.execPath, [entry, ...args], {
-    cwd,
     env: { ...process.env, ...env },
     stdio: ["ignore", "pipe", "pipe"],
   });
 
-  const cleanup = () => {
-    child.kill();
-    child.once("exit", () => rmSync(cwd, { recursive: true, force: true }));
-  };
-  return { child, cleanup };
+  return { child, cleanup: () => child.kill() };
 }
 
 function runContainer(args: string[], env: Record<string, string>) {

@@ -17,8 +17,8 @@ const setup = () => {
   ) => ScraperConfigService;
   const service = new Service(
     api.service,
-    () => queue as unknown as TokenBucketQueue,
-    { getScraperName: async () => "amazon-pdp-1" }
+    queue as unknown as TokenBucketQueue,
+    { get: async () => "amazon-pdp-1" }
   );
   return { service, get: api.get, queue };
 };
@@ -123,5 +123,19 @@ describe("ScraperConfigService", () => {
     expect(cronJobs[0].start).toHaveBeenCalled();
     await cronJobs[0].onTick();
     expect(get).toHaveBeenCalledWith("scrapers/amazon-pdp-1/config", { timeout: 10_000 });
+  });
+
+  it("rejects a fraction and a missing field and keeps the rest", async () => {
+    const { service, get } = setup();
+    get
+      .mockResolvedValueOnce(config)
+      .mockResolvedValueOnce({ concurrency: 1.5, batchSize: 200 });
+    await service.load();
+
+    await service.refresh();
+
+    expect(service.get()).toEqual({ concurrency: 150, rps: 150, batchSize: 200 });
+    expect(console.warn).toHaveBeenCalledWith("config: invalid concurrency 1.5");
+    expect(console.warn).toHaveBeenCalledWith("config: invalid rps undefined");
   });
 });

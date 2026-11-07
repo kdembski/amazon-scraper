@@ -1,4 +1,4 @@
-import type { StopAt } from "@/shared/http/http.types";
+import type { ScrapingRequest } from "@/shared/http/http.types";
 import { ScrapingClient } from "@/shared/http/ScrapingClient";
 
 export class AmazonService {
@@ -15,28 +15,11 @@ export class AmazonService {
     return AmazonService.instance;
   }
 
-  get queueService() {
-    return this.scrapingClient.queueService;
-  }
-
-  get<T>(
-    url: string,
-    referer?: string,
-    callback?: {
-      onSuccess?: (data: T) => void;
-      onError?: (e: any) => void;
-      isCancelled?: () => boolean;
-    },
-    proxyType?: string,
-    stopAt?: StopAt
-  ) {
-    this.scrapingClient.get<T>(
-      `${this.baseUrl}${url}`,
-      `${this.baseUrl}${referer}`,
-      callback,
-      { country: url.split("/")[0] },
-      proxyType,
-      stopAt
-    );
+  get<T>(url: string, referer: string, request: Omit<ScrapingRequest, "referer" | "labels"> = {}) {
+    return this.scrapingClient.get<T>(`${this.baseUrl}${url}`, {
+      ...request,
+      referer: `${this.baseUrl}${referer}`,
+      labels: { country: url.split("/")[0] },
+    });
   }
 }

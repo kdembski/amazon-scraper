@@ -266,7 +266,7 @@ describe("ProxyAgentPool", () => {
       expect(pool.isDirectBlocked(6, de)).toBe(true);
       expect(pool.isDirectBlocked(4, de)).toBe(false);
       expect(pool.isDirectBlocked(6, "www.amazon.fr")).toBe(false);
-      vi.advanceTimersByTime(10 * 60 * 1000 - 1);
+      vi.advanceTimersByTime(3 * 60 * 1000 - 1);
       expect(pool.isDirectBlocked(6, de)).toBe(true);
       vi.advanceTimersByTime(1);
       expect(pool.isDirectBlocked(6, de)).toBe(false);
@@ -281,6 +281,28 @@ describe("ProxyAgentPool", () => {
       direct.listeners("free").at(-1)?.(socket, { host: de });
 
       expect(socket.destroy).toHaveBeenCalled();
+    });
+
+    it("keeps the connections a blocked direct agent holds to other hosts", () => {
+      const pool = new ProxyAgentPool(vi.fn());
+      const direct = pool.getDirect(4);
+      const other = { destroy: vi.fn() };
+      (direct.freeSockets as unknown as Pool)["www.amazon.fr:443:::::"] = [other];
+
+      pool.block(direct, de);
+      direct.listeners("free").at(-1)?.(other, { host: "www.amazon.fr" });
+
+      expect(other.destroy).not.toHaveBeenCalled();
+    });
+
+    it("keeps connections of a direct agent freed while it is not blocked", () => {
+      const pool = new ProxyAgentPool(vi.fn());
+      const direct = pool.getDirect(6);
+      const socket = { destroy: vi.fn() };
+
+      direct.listeners("free").at(-1)?.(socket, { host: de });
+
+      expect(socket.destroy).not.toHaveBeenCalled();
     });
   });
 
