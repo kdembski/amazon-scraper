@@ -31,6 +31,8 @@ const SEEDS = [
 ].map((range) => AmazonPriceRange.parse(range));
 
 export class AmazonPlpPageScraper {
+  private lastPages = new Map<string, number>();
+
   constructor(
     private fetcher = new AmazonPlpPageFetcher(),
     private builder = new AmazonPlpBuilder(),
@@ -42,17 +44,21 @@ export class AmazonPlpPageScraper {
   }
 
   private async scrapeRange(crawl: AmazonPlpCrawl, range: AmazonPriceRange) {
+    const key = `${crawl.category}:${range.toFilter()}`;
     const first = await this.scrapePage(crawl, range, 1);
-    if (!first) return;
+    if (first) this.lastPages.set(key, first.lastPage);
 
-    const halves = first.lastPage >= MAX_PAGES ? range.split() : undefined;
+    const lastPage = this.lastPages.get(key);
+    if (lastPage === undefined) return;
+
+    const halves = lastPage >= MAX_PAGES ? range.split() : undefined;
     if (halves) {
       await Promise.all(halves.map((half) => this.scrapeRange(crawl, half)));
       return;
     }
 
     if (!crawl.allPages) return;
-    for (let number = 2; number <= first.lastPage; number++) {
+    for (let number = 2; number <= lastPage; number++) {
       await this.scrapePage(crawl, range, number);
     }
   }

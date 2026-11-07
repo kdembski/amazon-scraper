@@ -94,6 +94,47 @@ describe("AmazonPlpPageScraper", () => {
     }
   );
 
+  it("splits a given up range by its last page from an earlier run", async () => {
+    let run = 1;
+    const { requests, scraper, crawl } = setup((price) => ({
+      lastPage: price === "-999" ? 400 : 1,
+      givenUp: run === 2 && price === "-999",
+    }));
+    await scraper.execute(crawl);
+    run = 2;
+
+    await scraper.execute(crawl);
+
+    const second = requests().slice(seeds.length + 2);
+    expect(second).toContainEqual({ price: "-499", number: 1 });
+    expect(second).toContainEqual({ price: "500-999", number: 1 });
+    expect(second).toHaveLength(seeds.length + 2);
+  });
+
+  it("does not split a given up range without a known last page", async () => {
+    const { requests, scraper, crawl } = setup((price) => ({
+      lastPage: price === "-999" ? 400 : 1,
+      givenUp: price === "-999",
+    }));
+
+    await scraper.execute(crawl);
+
+    expect(requests()).not.toContainEqual({ price: "-499", number: 1 });
+    expect(requests()).toHaveLength(seeds.length);
+  });
+
+  it("keeps the last pages of each category apart", async () => {
+    const { requests, scraper, crawl, sender } = setup((price) => ({
+      lastPage: price === "-999" ? 400 : 1,
+      givenUp: requests().length > seeds.length + 2 && price === "-999",
+    }));
+    await scraper.execute(crawl);
+
+    await scraper.execute(new AmazonPlpCrawl("toys", false, sender.service));
+
+    expect(requests().slice(seeds.length + 2)).toHaveLength(seeds.length);
+  });
+
   it("paginates a range with 399 pages instead of splitting it", async () => {
     const { requests, scraper, crawl } = setup(
       (price) => ({ lastPage: price === "-999" ? 399 : 1 }),

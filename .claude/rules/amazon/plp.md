@@ -55,6 +55,7 @@ Goal: find new ASINs in a category on amazon.pl (search listing; new releases is
    - last page ≥ 400 (`MAX_PAGES`, Amazon's limit) → range split in half (`AmazonPriceRange.split`), recursion on both halves;
    - an open range (`500000-`) splits into `[min, 2·min-1]` and `[2·min-]`, up to 1 000 000 zł;
    - a single-value range is not split.
+   - the last page of every range (per category) is kept in memory between runs; a given up page 1 uses the last known value to split or paginate, none known → range skipped.
 5. `allPages` → pages 2..lastPage sequentially; a given up page is skipped, the range goes on.
 6. Parsing (`AmazonPlpBuilder`):
    - products: `div[role='listitem']` (ASIN `data-asin`, `img`, name `a > h2 > span`);
