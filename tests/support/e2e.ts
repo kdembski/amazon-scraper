@@ -29,7 +29,7 @@ export async function spawnScraper(
   const env = {
     API_URL: backend.url,
     PROXY_LIST_URL: `${backend.url}/proxies`,
-    name: "e2e",
+    NAME: "e2e",
   };
 
   const { child, cleanup } =
