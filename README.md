@@ -1,4 +1,5 @@
 # amazon-scraper
+<img width="1294" height="617" alt="2" src="https://github.com/user-attachments/assets/806653a1-9f1e-4de6-bd07-837e33fcd2ca" />
 
 Stateless worker that scrapes Amazon through rotating proxies. It gets work from the backend (`API_URL`) and sends results back.
 
