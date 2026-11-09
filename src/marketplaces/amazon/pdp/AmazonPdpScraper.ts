@@ -9,7 +9,9 @@ import { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
 import { MetricsService } from "@/shared/metrics/MetricsService";
 import { sleep } from "@/shared/utils/sleep";
 
-const POLL_INTERVAL = 5 * 1000;
+const POLL_INTERVAL = 1000;
+const QUEUE_SECONDS = 5;
+const MIN_LOAD_SHARE = 4;
 
 export class AmazonPdpScraper implements MarketplaceScraper {
   readonly marketplace = "amazon";
@@ -39,13 +41,17 @@ export class AmazonPdpScraper implements MarketplaceScraper {
     }
     if (this.paused) return;
 
-    const { batchSize } = this.configService.get();
-    if (this.queueService.queue.length > batchSize / 10) return;
+    const { batchSize, rps, concurrency } = this.configService.get();
+    const lowWater = rps ? rps * QUEUE_SECONDS : concurrency * 2;
+    if (this.queueService.queue.length >= lowWater) return;
+
+    const missing = batchSize - this.adScraper.inFlight;
+    if (missing < Math.max(batchSize / MIN_LOAD_SHARE, 1)) return;
 
     try {
       const countries = await this.countryService.getCountries();
       const ads = await this.apiService.get<AmazonAd[]>(
-        `amazon/ads/scrap?batchSize=${batchSize}`
+        `amazon/ads/scrap?batchSize=${missing}`
       );
       this.metricsService.increment("batch_load", { outcome: ads.length ? "ok" : "empty" });
       ads.forEach((ad) => this.adScraper.execute(ad, countries));

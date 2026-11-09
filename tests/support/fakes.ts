@@ -67,8 +67,8 @@ export function fakeTokenBucketQueue() {
   return { service, queue };
 }
 
-export function fakeScraperConfigService({ batchSize = 50 } = {}) {
-  const get = vi.fn(() => ({ concurrency: 10, rps: 0, batchSize }));
+export function fakeScraperConfigService({ batchSize = 50, rps = 0, concurrency = 10 } = {}) {
+  const get = vi.fn(() => ({ concurrency, rps, batchSize }));
   const service = { get } as unknown as ScraperConfigService;
   return { service, get };
 }
