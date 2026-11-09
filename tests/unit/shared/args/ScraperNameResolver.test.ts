@@ -19,7 +19,7 @@ describe("ScraperNameResolver", () => {
   };
 
   beforeEach(() => {
-    vi.stubEnv("name", "amazon-pdp");
+    vi.stubEnv("NAME", "amazon-pdp");
     vi.stubEnv("NAME_PREFIX", "");
   });
 

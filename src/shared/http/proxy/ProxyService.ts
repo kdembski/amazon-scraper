@@ -6,13 +6,16 @@ import { ProxyList } from "@/shared/http/proxy/ProxyList";
 import { ProxyRouteSelector } from "@/shared/http/proxy/ProxyRouteSelector";
 import { ProxyTrafficMeter } from "@/shared/http/proxy/ProxyTrafficMeter";
 import { tcpPing } from "@/shared/utils/tcpPing";
+import type { ProxyPlan } from "@/shared/http/http.types";
 
 // IPv6 address of one.one.one.one, reachable only when the server has IPv6
 const IPV6_PING_HOST = "2606:4700:4700::1111";
 
 export class ProxyService {
   private static instance: ProxyService;
-  private pools: Record<string, string[]> = {};
+  private plans: ProxyPlan[] = [];
+  private urls = new Set<string>();
+  private totalWeight = 0;
   private loading?: Promise<void>;
 
   private constructor(
@@ -37,16 +40,14 @@ export class ProxyService {
     return ProxyService.instance;
   }
 
-  // Direct agent when the route selector gives one, else the pool's proxy freed
-  // last for the host, else a random one
+  // Direct agent when the route selector gives one, else the proxy freed last
+  // for the host, else a random one of a plan picked by weight
   getAgent(host: string, proxyType = "datacenter") {
     const direct = this.routes.getDirect(host, proxyType);
     if (direct) return direct;
 
-    const proxies = this.getProxies(proxyType);
     const url =
-      this.pool.takeLastFree(host, (url) => proxies.includes(url)) ??
-      this.getRandomProxy(proxies);
+      this.pool.takeLastFree(host, (url) => this.urls.has(url)) ?? this.getRandomProxy();
 
     return this.pool.get(url);
   }
@@ -63,14 +64,18 @@ export class ProxyService {
     this.meter.setCountry(host, country);
   }
 
-  private getProxies(proxyType: string) {
-    return this.pools[proxyType]?.length
-      ? this.pools[proxyType]
-      : (this.pools.datacenter ?? []);
+  private getRandomProxy() {
+    const { urls } = this.pickPlan();
+    return urls[Math.floor(Math.random() * urls.length)];
   }
 
-  private getRandomProxy(proxies: string[]) {
-    return proxies[Math.floor(Math.random() * proxies.length)];
+  // Plan with a chance proportional to its weight; any plan when all are 0
+  private pickPlan() {
+    let left = Math.random() * this.totalWeight;
+    const plan = this.plans.find((plan) => (left -= plan.weight) < 0);
+    if (plan) return plan;
+
+    return this.plans[Math.floor(Math.random() * this.plans.length)] ?? { urls: [] };
   }
 
   countConnections() {
@@ -83,14 +88,15 @@ export class ProxyService {
 
   loadProxies() {
     this.loading ??= Promise.all([this.list.load(), this.pingIpv6()])
-      .then(([pools, ipv6]) => {
-        this.pools = pools;
-        this.pool.retain(_.flatten(Object.values(pools)));
+      .then(([plans, ipv6]) => {
+        this.plans = plans.filter((plan) => plan.urls.length);
+        this.urls = new Set(this.plans.flatMap((plan) => plan.urls));
+        this.totalWeight = _.sumBy(this.plans, "weight");
+        this.pool.retain([...this.urls]);
         this.routes.directFamilies = ipv6 === undefined ? [4] : [4, 6];
         console.log(
-          "Proxies: " +
-            _.map(pools, (urls, type) => `${type} ${urls.length}`).join(", ") +
-            `, direct IPv${this.routes.directFamilies.join("+IPv")}`
+          `Proxies: datacenter ${this.urls.size} (${this.describePlans()}), ` +
+            `direct IPv${this.routes.directFamilies.join("+IPv")}`
         );
       })
       .finally(() => {
@@ -98,5 +104,14 @@ export class ProxyService {
       });
 
     return this.loading;
+  }
+
+  private describePlans() {
+    return this.plans
+      .map((plan) => {
+        const share = this.totalWeight ? plan.weight / this.totalWeight : 0;
+        return `${plan.urls.length} ${Math.round(share * 100)}%`;
+      })
+      .join(", ");
   }
 }

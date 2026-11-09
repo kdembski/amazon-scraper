@@ -26,7 +26,7 @@ Copy `.env.example` to `.env` and fill it in:
 | `API_URL`, `API_TOKEN` | backend URL and token |
 | `PROXY_API_KEY`, `PROXY_API_KEY2` | Webshare API keys |
 | `PROXY_LIST_URL` | optional: own proxy list instead of Webshare |
-| `name`, `NAME_PREFIX` | scraper name (local runs; Docker Compose sets it per service) |
+| `NAME`, `NAME_PREFIX` | scraper name (local runs; Docker Compose sets it per service) |
 | `PDP_COUNT`, `PLP_COUNT` | number of replicas in Docker Compose |
 
 Locally:

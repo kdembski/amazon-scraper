@@ -25,7 +25,7 @@ export class ScraperNameResolver {
   }
 
   private async resolve() {
-    const { name, NAME_PREFIX } = process.env;
+    const { NAME: name, NAME_PREFIX } = process.env;
     const replica = await this.getReplica(name);
     const fullName = replica ? `${name}-${replica}` : name;
     return NAME_PREFIX ? `${NAME_PREFIX}-${fullName}` : fullName;
