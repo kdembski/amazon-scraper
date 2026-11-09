@@ -7,7 +7,7 @@ import { MetricsService } from "@/shared/metrics/MetricsService";
 import { AdOutcome, ItemOutcome } from "@/shared/metrics/metrics.types";
 
 export class AmazonPdpAdScraper {
-  private inFlight = 0;
+  inFlight = 0;
 
   constructor(
     private countryScraper = new AmazonPdpCountryScraper(),
