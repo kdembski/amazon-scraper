@@ -28,6 +28,14 @@ describe("StopAtReader", () => {
     await expect(read(["<a><", "b>x&&", "&y", "rest"])).resolves.toBe("<a><b>x&&&y");
   });
 
+  it("cuts at a marker split across more than two chunks", async () => {
+    await expect(read(["<b>x&", "&", "&y", "rest"])).resolves.toBe("<b>x&&&y");
+  });
+
+  it("finds the next marker in the rest of the chunk with the previous one", async () => {
+    await expect(read(["<a>&&&<b>", "x", "&&&y", "rest"])).resolves.toBe("<a>&&&<b>x&&&y");
+  });
+
   it("ignores a later marker seen before the earlier one", async () => {
     await expect(read(["&&&", "<b>", "x&&&", "rest"])).resolves.toBe("&&&<b>x&&&");
   });
