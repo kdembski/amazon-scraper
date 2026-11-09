@@ -20,3 +20,10 @@ export type Traffic = {
   bytesIn: number;
   bytesOut: number;
 };
+
+// Proxies of one datacenter plan; weight is the bandwidth left per ms of its
+// billing period
+export type ProxyPlan = {
+  urls: string[];
+  weight: number;
+};

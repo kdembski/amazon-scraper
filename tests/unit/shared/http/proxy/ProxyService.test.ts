@@ -9,7 +9,12 @@ import { resetSingleton } from "@@tests/support/singleton";
 vi.mock("cron", async () => (await import("@@tests/support/cron")).cronModule);
 
 const urls = ["http://u1:p1@1.1.1.1:8080", "http://u2:p2@2.2.2.2:8081"];
-const ispUrls = ["http://u3:p3@3.3.3.3:8082"];
+const otherUrls = ["http://u3:p3@3.3.3.3:8082"];
+const unknownUrl = "http://u9:p9@9.9.9.9:8089";
+const plans = [
+  { urls, weight: 3 },
+  { urls: otherUrls, weight: 1 },
+];
 
 const setup = () => {
   const meter = {
@@ -29,7 +34,7 @@ const setup = () => {
     block: vi.fn(),
     getRoute: vi.fn(),
   };
-  const list = { load: vi.fn().mockResolvedValue({ datacenter: urls, isp: ispUrls }) };
+  const list = { load: vi.fn().mockResolvedValue(plans) };
   const pingIpv6 = vi.fn<() => Promise<number | undefined>>().mockResolvedValue(undefined);
 
   resetSingleton(ProxyService);
@@ -80,28 +85,28 @@ describe("ProxyService", () => {
   });
 
   describe("loadProxies", () => {
-    it("keeps only the agents of the proxies of all loaded pools", async () => {
+    it("keeps only the agents of the proxies of all loaded plans", async () => {
       const { service, pool } = setup();
 
       await service.loadProxies();
 
-      expect(pool.retain).toHaveBeenCalledWith([...urls, ...ispUrls]);
+      expect(pool.retain).toHaveBeenCalledWith([...urls, ...otherUrls]);
     });
 
-    it("logs the number of proxies of every pool and the direct IP families", async () => {
+    it("logs the number of proxies, the share of every plan and the direct IP families", async () => {
       const { service, pingIpv6 } = setup();
 
       await service.loadProxies();
       pingIpv6.mockResolvedValue(12);
       await service.loadProxies();
 
-      expect(console.log).toHaveBeenCalledWith("Proxies: datacenter 2, isp 1, direct IPv4");
-      expect(console.log).toHaveBeenCalledWith("Proxies: datacenter 2, isp 1, direct IPv4+IPv6");
+      expect(console.log).toHaveBeenCalledWith("Proxies: datacenter 3 (2 75%, 1 25%), direct IPv4");
+      expect(console.log).toHaveBeenCalledWith("Proxies: datacenter 3 (2 75%, 1 25%), direct IPv4+IPv6");
     });
 
     it("lets a second caller share the load in progress", async () => {
       const { service, list } = setup();
-      let respond!: (pools: Record<string, string[]>) => void;
+      let respond!: (loaded: typeof plans) => void;
       list.load.mockReturnValueOnce(new Promise((resolve) => (respond = resolve)));
 
       const first = vi.fn();
@@ -109,7 +114,7 @@ describe("ProxyService", () => {
       service.loadProxies().then(first);
       service.loadProxies().then(second);
 
-      respond({ datacenter: urls });
+      respond(plans);
       await vi.advanceTimersByTimeAsync(0);
       expect(first).toHaveBeenCalled();
       expect(second).toHaveBeenCalled();
@@ -127,16 +132,47 @@ describe("ProxyService", () => {
   });
 
   describe("getAgent", () => {
-    it("returns the pool agent of a random loaded proxy without idle connections", async () => {
+    it("returns the pool agent of a random proxy of a plan picked by weight without idle connections", async () => {
       const { service, pool } = setup();
       await service.loadProxies();
 
       vi.spyOn(Math, "random").mockReturnValue(0);
       expect(service.getAgent("www.amazon.de")).toEqual({ url: urls[0] });
 
-      vi.spyOn(Math, "random").mockReturnValue(0.99);
+      vi.spyOn(Math, "random").mockReturnValue(0.74);
       expect(service.getAgent("www.amazon.de")).toEqual({ url: urls[1] });
-      expect(pool.get).toHaveBeenCalledTimes(2);
+
+      vi.spyOn(Math, "random").mockReturnValue(0.75);
+      expect(service.getAgent("www.amazon.de")).toEqual({ url: otherUrls[0] });
+      expect(pool.get).toHaveBeenCalledTimes(3);
+    });
+
+    it("never picks a plan with no bandwidth left", async () => {
+      const { service, list } = setup();
+      list.load.mockResolvedValueOnce([{ urls, weight: 0 }, { urls: otherUrls, weight: 1 }]);
+      await service.loadProxies();
+
+      vi.spyOn(Math, "random").mockReturnValue(0);
+      expect(service.getAgent("www.amazon.de")).toEqual({ url: otherUrls[0] });
+    });
+
+    it("picks any plan when none has bandwidth left", async () => {
+      const { service, list } = setup();
+      list.load.mockResolvedValueOnce([{ urls, weight: 0 }, { urls: otherUrls, weight: 0 }]);
+      await service.loadProxies();
+
+      vi.spyOn(Math, "random").mockReturnValue(0.99);
+      expect(service.getAgent("www.amazon.de")).toEqual({ url: otherUrls[0] });
+    });
+
+    it("skips a plan without proxies", async () => {
+      const { service, list, pool } = setup();
+      list.load.mockResolvedValueOnce([{ urls: [], weight: 9 }, { urls, weight: 1 }]);
+      await service.loadProxies();
+
+      vi.spyOn(Math, "random").mockReturnValue(0);
+      expect(service.getAgent("www.amazon.de")).toEqual({ url: urls[0] });
+      expect(pool.retain).toHaveBeenCalledWith(urls);
     });
 
     it("returns the proxy whose idle connection to the host was freed last", async () => {
@@ -149,26 +185,16 @@ describe("ProxyService", () => {
       expect(pool.takeLastFree).toHaveBeenCalledWith("www.amazon.de", expect.any(Function));
     });
 
-    it.each([
-      ["datacenter", urls[0], ispUrls[0]],
-      ["isp", ispUrls[0], urls[0]],
-    ])("accepts only idle proxies of the %s pool", async (proxyType, accepted, rejected) => {
+    it("accepts only idle proxies of the loaded plans", async () => {
       const { service, pool } = setup();
       await service.loadProxies();
 
-      service.getAgent("www.amazon.de", proxyType);
+      service.getAgent("www.amazon.de");
       const accept = pool.takeLastFree.mock.calls[0][1];
 
-      expect(accept(accepted)).toBe(true);
-      expect(accept(rejected)).toBe(false);
-    });
-
-    it("picks from the pool of the proxy type", async () => {
-      const { service } = setup();
-      await service.loadProxies();
-
-      vi.spyOn(Math, "random").mockReturnValue(0);
-      expect(service.getAgent("www.amazon.de", "isp")).toEqual({ url: ispUrls[0] });
+      expect(accept(urls[0])).toBe(true);
+      expect(accept(otherUrls[0])).toBe(true);
+      expect(accept(unknownUrl)).toBe(false);
     });
 
     describe("direct", () => {
@@ -258,7 +284,7 @@ describe("ProxyService", () => {
         const accept = pool.takeLastFree.mock.calls[0][1];
 
         expect(accept(urls[0])).toBe(true);
-        expect(accept(ispUrls[0])).toBe(false);
+        expect(accept(unknownUrl)).toBe(false);
       });
 
       it("falls back to datacenter proxies while the host blocks direct connections", async () => {
@@ -273,15 +299,13 @@ describe("ProxyService", () => {
     });
 
     it.each([
-      ["an unknown", { datacenter: urls }, "residential"],
-      ["a mixed without a window", { datacenter: urls }, "mixed"],
-      ["a mixed with a zero window", { datacenter: urls }, "mixed0"],
-      ["a mixed with a zero direct window", { datacenter: urls }, "mixed0/2"],
-      ["a malformed mixed", { datacenter: urls }, "mixed1/"],
-      ["an empty", { datacenter: urls, isp: [] }, "isp"],
-    ])("falls back to the datacenter pool for %s pool", async (_name, pools, proxyType) => {
-      const { service, list } = setup();
-      list.load.mockResolvedValueOnce(pools);
+      ["an unknown", "isp"],
+      ["a mixed without a window", "mixed"],
+      ["a mixed with a zero window", "mixed0"],
+      ["a mixed with a zero direct window", "mixed0/2"],
+      ["a malformed mixed", "mixed1/"],
+    ])("uses datacenter proxies for %s proxy type", async (_name, proxyType) => {
+      const { service } = setup();
       await service.loadProxies();
 
       vi.spyOn(Math, "random").mockReturnValue(0);
