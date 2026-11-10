@@ -26,32 +26,32 @@ Goal: for every ASIN, get the price and the shipper (`dispatchFrom`) in every Am
 1. Calls `scrape()` every second (`POLL_INTERVAL`), the next tick after the previous one finished.
 2. Night pause 23:00–7:00 `Europe/Warsaw` (`AmazonNightSchedule`) → skips; logs `pdp: night pause started` / `ended` on change. ASINs already loaded finish.
 3. `batchSize` = most ASINs in flight (`AmazonPdpAdScraper.inFlight`, also those in backoff or waiting for a later tier). Skips the tick while the request queue holds ≥ `rps × 5` requests (5 s of work; `concurrency × 2` when `rps` is 0) or fewer than `batchSize / 4` ASINs are missing to `batchSize`.
-4. Gets countries: `AmazonCountryService` (`amazon/countries/scrap`, cached, refreshed every minute). A country has `tld`, `priority`, `active`, `proxyType`, `pdpSource`.
-5. Gets the missing ASINs: `amazon/ads/scrap?batchSize=<batchSize - inFlight>` (`id`, `asin`, `skipCountryIds`: countries the backend remembers the ASIN missing in, 30 days).
+4. Gets countries: `AmazonCountryService` (`amazon/countries/scrap`, cached, refreshed every minute). A country has `tld`, `active` and `routes`; a route has `id`, `priority` (unique per country), `proxyType`, `pdpSource` (one source) and `maxAttempts`.
+5. Gets the missing ASINs: `amazon/ads/scrap?batchSize=<batchSize - inFlight>` (`id`, `asin`, `skipRouteIds`: routes the backend remembers the ASIN missing in, 30 days).
 6. Each ASIN → `AmazonPdpAdScraper.execute(ad, countries)` (no `await`, in parallel).
 7. Metric `batch_load`: `ok` / `empty` / `failed`.
 
 ## 3. One ASIN (`AmazonPdpAdScraper`)
 
-1. Creates an `AmazonCountryPrice` per country (`complete`, `deleted`, `missing`, `retry`, `notFound`), except `skipCountryIds`, held in `AmazonAdPrices`; none left → `ads{outcome=empty}`, done.
-2. Groups countries into tiers by `priority`, highest first.
-3. Tier by tier: all countries of a tier in parallel, the next tier only after the previous one finishes.
-4. After each country, checks whether the ASIN is decided:
+1. Creates an `AmazonCountryPrice` per country (`complete`, `deleted`, `missingRouteIds`, `retry`, `notFound`, `pastAttempts`) with its routes minus `skipRouteIds`, highest `priority` first; a country without a route left is skipped. Held in `AmazonAdPrices`; none left → `ads{outcome=empty}`, done.
+2. Tiers = route priorities of all countries, highest first.
+3. Tier by tier: every country not complete whose current route has the tier's priority, in parallel; the next tier only after the previous one finishes.
+4. A route ending with a final 404 (added to `missingRouteIds`) while the country has another route → `route_fallback`, the country moves to its next route (new `retry` with that route's `maxAttempts`, `notFound` = 0) and runs in that route's lower tier. Any other outcome (`data`, `no_data` from a page, `given_up`) ends the country, no fallback.
+5. After each country, checks whether the ASIN is decided:
    - all **active** countries `deleted` → sends `deleted(id)`, done (`ads{outcome=deleted}`);
    - all countries `complete` **or** ≥ 4 countries with a price (`PRICES_TO_COMPLETE`) → sends prices, done (`prices` / `empty`);
    - otherwise keeps waiting.
-5. Once decided, `isCancelled()` = true: queued requests are dropped, further tiers do not start.
+6. Once decided, `isCancelled()` = true: queued requests are dropped, further tiers do not start (a lower-priority route may never run).
 
-## 4. One country (`AmazonPdpCountryScraper`)
+## 4. One route of a country (`AmazonPdpCountryScraper`)
 
-1. Source list from `country.pdpSource`, e.g. `"twister,awd"`. Unknown names skipped, empty = `aod`.
+1. Builder from `route.pdpSource`; unknown = `aod`.
 2. Loop until an outcome or cancellation:
-   1. `builder.buildUrl()` → request via `AmazonService.get()` with the country's `proxyType`.
-   2. **404 and a next source exists** → switches to the next source (`source_fallback`), not counted as a failure.
-   3. Result → outcome (see below). Outcome present → country done.
-   4. No outcome → `failed++`; at 6 (`MAX_FAILED_ATTEMPTS`) → `given_up`; otherwise backoff 1 s, 2 s, 4 s ... max 60 s, with jitter.
+   1. `builder.buildUrl()` → request via `AmazonService.get()` with the route's `proxyType`.
+   2. Result → outcome (see below). Outcome present → route done; `items` / `item_attempts` counted unless the country falls back (attempts include the routes already left).
+   3. No outcome → `failed++`; at `route.maxAttempts` → `given_up`; otherwise backoff 1 s, 2 s, 4 s ... max 60 s, with jitter.
 3. Result mapping:
-   - 404 from the last source: `twister` → `no_data`; others → `notFound++`, at 2 (`NOT_FOUND_TO_DELETE`) in an active country, at 1 in an inactive one → `deleted`, before that retry. Both final cases set `missing`.
+   - 404: `twister` → `no_data`; others → `notFound++`, at 2 (`NOT_FOUND_TO_DELETE`) in an active country, at 1 in an inactive one → `deleted`, before that retry. Both final cases add the route to `missingRouteIds`.
    - other HTTP error / timeout / network → retry; 403 and 429 also block the direct family for the host (see 7).
    - empty response → retry (`responses{outcome=empty}`).
    - captcha → retry (`captcha`), no block.
@@ -78,7 +78,7 @@ Shared:
 ## 6. Sending results (`AmazonPdpResultSender`)
 
 1. `BatchSender` on `amazon/ads/batch`, max 1000 items, flush every 5 s or when full.
-2. Body: `{ prices: [{ id, prices: [{ adId, countryId, value, dispatchFrom }], missingCountryIds }], deleted: [id] }`. Only countries with a price are sent; `missingCountryIds` = countries with `missing` (backend stores them in `AmazonAdMissing`).
+2. Body: `{ prices: [{ id, prices: [{ adId, countryId, value, dispatchFrom }], missingRouteIds }], deleted: [id] }`. Only countries with a price are sent; `missingRouteIds` = routes that ended with a final 404 (backend stores them in `AmazonAdMissing`).
 3. 5xx / network error → retry with the same `Idempotency-Key` (max 6). 4xx → dropped (`backend_items{outcome=dropped}`).
 
 ## 7. HTTP layer (shared)
@@ -93,4 +93,4 @@ Shared:
 
 - Price not parsed → the source's builder + test in `tests/unit/marketplaces/amazon/pdp/builders/`.
 - Many `invalid` / `captcha` → `responses` metric per country.
-- ASIN "deleted" too early → `AmazonCountryPrice.registerNotFound`, `AmazonAdPrices.isDeleted` (counts only `active`).
+- ASIN "deleted" too early → `AmazonCountryPrice.registerNotFound`, `AmazonAdPrices.isDeleted` (counts only `active`; a country is `deleted` only when its last route ends `deleted`).

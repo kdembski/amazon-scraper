@@ -4,7 +4,7 @@ import { MAX_FAILED_ATTEMPTS } from "@/shared/utils/RetryBackoff";
 import { NOT_FOUND_TO_DELETE } from "@/marketplaces/amazon/pdp/AmazonCountryPrice";
 import { AmazonPdpScraper } from "@/marketplaces/amazon/pdp/AmazonPdpScraper";
 import { cronJobs } from "@@tests/support/cron";
-import { buildAd, buildAmazonCountry } from "@@tests/support/factories";
+import { buildAd, buildAmazonCountry, buildRoute } from "@@tests/support/factories";
 import { aodPage, awdPage, captchaPage, twisterBuybox, twisterResponse } from "@@tests/support/html";
 import {
   bootScraper,
@@ -123,9 +123,9 @@ describe("PDP", () => {
     );
   });
 
-  it("skips the countries the backend remembers the ASIN missing in", async () => {
+  it("skips the routes the backend remembers the ASIN missing in", async () => {
     world.backend.onSequence("GET", "amazon/ads/scrap", [
-      { body: [{ ...ad, skipCountryIds: [2] }] },
+      { body: [{ ...ad, skipRouteIds: [2] }] },
       { body: [] },
     ]);
     world.amazon.respondPerCountry(offers);
@@ -139,7 +139,7 @@ describe("PDP", () => {
     expect(world.amazon.requestsTo("fr")).toHaveLength(0);
   });
 
-  it("reports the countries with a final 404 as missing", async () => {
+  it("reports the routes with a final 404 as missing", async () => {
     world.backend.on("GET", "amazon/countries/scrap", [
       buildAmazonCountry({ countryId: 1, tld: "de" }),
       buildAmazonCountry({ countryId: 2, tld: "fr", active: false }),
@@ -153,13 +153,20 @@ describe("PDP", () => {
     const sent = await world.backend.waitForPrices(7);
 
     expect(sent.body).toEqual({ prices: [price(1, 24.99, "Amazon")] });
-    expect(world.backend.findMissingCountryIds(7)).toEqual([2, 3]);
+    expect(world.backend.findMissingRouteIds(7)).toEqual([2, 3]);
   });
 
-  it("asks gp/aw/d after a twister 404", async () => {
+  it("falls back to the gp/aw/d route after a 404 on the twister route", async () => {
     world.backend.on("GET", "amazon/countries/scrap", [
       buildAmazonCountry({ countryId: 1, tld: "de" }),
-      buildAmazonCountry({ countryId: 2, tld: "fr", pdpSource: "twister,awd" }),
+      buildAmazonCountry({
+        countryId: 2,
+        tld: "fr",
+        routes: [
+          buildRoute({ id: 20, priority: 1, pdpSource: "twister" }),
+          buildRoute({ id: 21, priority: 0, pdpSource: "awd" }),
+        ],
+      }),
       buildAmazonCountry({ countryId: 3, tld: "it" }),
     ]);
     world.amazon.respond(({ country, url }) => {
@@ -176,6 +183,7 @@ describe("PDP", () => {
       "fr/gp/aw/d/B0TESTASIN?th=1&psc=1"
     );
     expect(world.amazon.requestsTo("fr")[1].headers.referer).toBe("https://www.amazon.fr/");
+    expect(world.backend.findMissingRouteIds(7)).toEqual([20]);
   });
 
   it("leaves out a country without an offer", async () => {
@@ -324,7 +332,10 @@ describe("PDP", () => {
     world.backend.on(
       "GET",
       "amazon/countries/scrap",
-      sixCountries.map((country, i) => ({ ...country, priority: i < 3 ? 0 : 1 }))
+      sixCountries.map((country, i) => ({
+        ...country,
+        routes: country.routes.map((route) => ({ ...route, priority: i < 3 ? 0 : 1 })),
+      }))
     );
     world.amazon.respondPerCountry({
       de: [aodPage({ price: "1,00" })],

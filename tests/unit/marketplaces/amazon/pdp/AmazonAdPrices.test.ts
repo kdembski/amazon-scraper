@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AmazonAdPrices } from "@/marketplaces/amazon/pdp/AmazonAdPrices";
 import { AmazonCountryPrice } from "@/marketplaces/amazon/pdp/AmazonCountryPrice";
-import { buildAmazonCountry, buildPrice } from "@@tests/support/factories";
+import { buildAmazonCountry, buildPrice, buildRoute } from "@@tests/support/factories";
 
 const pricesOf = (...prices: AmazonCountryPrice[]) => new AmazonAdPrices(prices);
 
@@ -55,12 +55,26 @@ describe("AmazonAdPrices", () => {
   });
 
   describe("tiers", () => {
-    it("groups countries by priority, highest first", () => {
-      const at = (countryId: number, priority: number) =>
-        buildPrice({ country: buildAmazonCountry({ countryId, priority }) });
-      const [low, high, alsoLow] = [at(1, 0), at(2, 5), at(3, 0)];
+    const at = (countryId: number, priority: number) =>
+      buildPrice({ country: buildAmazonCountry({ countryId, priority }) });
 
-      expect(pricesOf(low, high, alsoLow).tiers()).toEqual([[high], [low, alsoLow]]);
+    it("lists the route priorities of all countries once, highest first", () => {
+      const twoRoutes = buildPrice({
+        country: buildAmazonCountry({
+          countryId: 4,
+          routes: [buildRoute({ id: 40, priority: 5 }), buildRoute({ id: 41, priority: 2 })],
+        }),
+      });
+
+      expect(pricesOf(at(1, 0), twoRoutes, at(3, 0)).priorities()).toEqual([5, 2, 0]);
+    });
+
+    it("pendingAt holds the countries not complete whose current route has the priority", () => {
+      const [low, high, alsoLow, done] = [at(1, 0), at(2, 5), at(3, 0), buildPrice({ complete: true })];
+      const prices = pricesOf(low, high, alsoLow, done);
+
+      expect(prices.pendingAt(0)).toEqual([low, alsoLow]);
+      expect(prices.pendingAt(5)).toEqual([high]);
     });
   });
 
@@ -76,18 +90,18 @@ describe("AmazonAdPrices", () => {
           { adId: 7, countryId: 1, value: 19.99, dispatchFrom: "Amazon" },
           { adId: 7, countryId: 3, value: 21.5, dispatchFrom: undefined },
         ],
-        missingCountryIds: [],
+        missingRouteIds: [],
       });
     });
 
     it("is empty when no country has a price", () => {
-      expect(pricesOf(at(1), at(2)).toResult(7)).toEqual({ prices: [], missingCountryIds: [] });
+      expect(pricesOf(at(1), at(2)).toResult(7)).toEqual({ prices: [], missingRouteIds: [] });
     });
 
-    it("holds the countries the ad is missing in", () => {
-      const prices = pricesOf(at(1, { missing: true }), at(2), at(3, { missing: true }));
+    it("holds the routes the ad is missing in", () => {
+      const prices = pricesOf(at(1, { missingRouteIds: [10, 11] }), at(2), at(3, { missingRouteIds: [30] }));
 
-      expect(prices.toResult(7).missingCountryIds).toEqual([1, 3]);
+      expect(prices.toResult(7).missingRouteIds).toEqual([10, 11, 30]);
     });
   });
 });

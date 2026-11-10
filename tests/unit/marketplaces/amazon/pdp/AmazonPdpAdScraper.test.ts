@@ -5,7 +5,7 @@ import type { AmazonCountryPrice } from "@/marketplaces/amazon/pdp/AmazonCountry
 import type { ItemOutcome } from "@/shared/metrics/metrics.types";
 import type { MetricsService } from "@/shared/metrics/MetricsService";
 import { RetryBackoff } from "@/shared/utils/RetryBackoff";
-import { buildAd, buildAmazonCountry } from "@@tests/support/factories";
+import { buildAd, buildAmazonCountry, buildRoute } from "@@tests/support/factories";
 import { fakeAmazonPdpResultSender } from "@@tests/support/fakes";
 
 const setup = (count: number, priorities: number[] = [], active: boolean[] = []) => {
@@ -65,15 +65,23 @@ describe("AmazonPdpAdScraper", () => {
     expect(execute).toHaveBeenCalledTimes(2);
     countries.forEach((country, i) =>
       expect(execute.mock.calls[i]).toEqual([
-        { country, complete: false, deleted: false, missing: false, retry: expect.any(RetryBackoff), notFound: 0 },
+        expect.objectContaining({
+          country,
+          complete: false,
+          deleted: false,
+          missingRouteIds: [],
+          retry: expect.any(RetryBackoff),
+          notFound: 0,
+          pastAttempts: 0,
+        }),
         ad,
         expect.any(Function),
       ])
     );
   });
 
-  describe("skipped countries", () => {
-    const setupSkip = (skipCountryIds: number[]) => {
+  describe("skipped routes", () => {
+    const setupSkip = (skipRouteIds: number[]) => {
       const sender = fakeAmazonPdpResultSender();
       const execute = vi.fn((_price: AmazonCountryPrice) => new Promise<ItemOutcome | undefined>(() => {}));
       const increment = vi.fn();
@@ -83,18 +91,18 @@ describe("AmazonPdpAdScraper", () => {
         { increment, gauge: vi.fn() } as unknown as MetricsService
       );
       const countries = [1, 2, 3].map((countryId) => buildAmazonCountry({ countryId }));
-      const result = scraper.execute(buildAd({ id: 7, skipCountryIds }), countries);
+      const result = scraper.execute(buildAd({ id: 7, skipRouteIds }), countries);
       return { execute, increment, result };
     };
 
-    it("does not scrape the countries the ad is missing in", () => {
+    it("does not scrape countries whose every route the ad is missing in", () => {
       const { execute } = setupSkip([1, 3]);
 
       expect(execute).toHaveBeenCalledTimes(1);
       expect(execute.mock.calls[0][0]).toMatchObject({ country: { countryId: 2 } });
     });
 
-    it("finishes an ad missing in every country as empty", async () => {
+    it("finishes an ad missing in every route as empty", async () => {
       const { execute, increment, result } = setupSkip([1, 2, 3]);
 
       await result;
@@ -343,6 +351,70 @@ describe("AmazonPdpAdScraper", () => {
       runs[2].finish("deleted");
       await flush();
       expect(sender.deleted).toHaveBeenCalledWith(7);
+      expect(done).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("route fallback", () => {
+    const setupRoutes = () => {
+      const sender = fakeAmazonPdpResultSender();
+      const runs: { price: AmazonCountryPrice; route: string; finish: (outcome?: ItemOutcome) => void }[] = [];
+      const execute = vi.fn(
+        (price: AmazonCountryPrice) =>
+          new Promise<ItemOutcome | undefined>((finish) =>
+            runs.push({ price, route: `${price.country.tld}:${price.route!.id}`, finish })
+          )
+      );
+      const increment = vi.fn();
+      const scraper = new AmazonPdpAdScraper(
+        { execute } as unknown as AmazonPdpCountryScraper,
+        sender.service,
+        { increment, gauge: vi.fn() } as unknown as MetricsService
+      );
+      const de = buildAmazonCountry({
+        countryId: 1,
+        tld: "de",
+        routes: [buildRoute({ id: 10, priority: 3 }), buildRoute({ id: 11, priority: 1 })],
+      });
+      const fr = buildAmazonCountry({ countryId: 2, tld: "fr", priority: 2 });
+      const done = vi.fn();
+      scraper.execute(buildAd({ id: 7 }), [de, fr]).then(done);
+      const started = () => runs.map((run) => run.route);
+      return { sender, runs, increment, done, started };
+    };
+
+    it("runs the next route of a country in its lower tier after a 404", async () => {
+      const { sender, runs, increment, done, started } = setupRoutes();
+      expect(started()).toEqual(["de:10"]);
+
+      runs[0].price.markMissing();
+      runs[0].finish("deleted");
+      await flush();
+      expect(started()).toEqual(["de:10", "fr:2"]);
+      expect(increment).toHaveBeenCalledWith("route_fallback", { country: "de" });
+      expect(sender.deleted).not.toHaveBeenCalled();
+
+      runs[1].finish("no_data");
+      await flush();
+      expect(started()).toEqual(["de:10", "fr:2", "de:11"]);
+
+      runs[2].price.value = 10;
+      runs[2].finish("data");
+      await flush();
+      expect(sender.prices).toHaveBeenCalledWith(7, sent([1]), [10]);
+      expect(done).toHaveBeenCalledTimes(1);
+    });
+
+    it.each(["given_up", "no_data"] as const)("does not fall back after %s", async (outcome) => {
+      const { sender, runs, done, started } = setupRoutes();
+
+      runs[0].finish(outcome);
+      await flush();
+      runs[1].finish("no_data");
+      await flush();
+
+      expect(started()).toEqual(["de:10", "fr:2"]);
+      expect(sender.prices).toHaveBeenCalledWith(7, [], []);
       expect(done).toHaveBeenCalledTimes(1);
     });
   });
