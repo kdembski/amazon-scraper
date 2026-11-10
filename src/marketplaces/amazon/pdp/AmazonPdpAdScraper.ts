@@ -20,8 +20,8 @@ export class AmazonPdpAdScraper {
   execute(ad: AmazonAd, countries: AmazonCountry[]) {
     const prices = new AmazonAdPrices(
       countries
-        .filter((country) => !ad.skipCountryIds?.includes(country.countryId))
-        .map((country) => new AmazonCountryPrice(country))
+        .map((country) => new AmazonCountryPrice(country, ad.skipRouteIds))
+        .filter((price) => price.route)
     );
     if (prices.isEmpty) {
       this.metricsService.increment("ads", { outcome: "empty" });
@@ -47,17 +47,18 @@ export class AmazonPdpAdScraper {
         resolve();
       };
 
-      this.scrapeTiers(prices.tiers(), scrapeCountry, isCancelled);
+      this.scrapeTiers(prices, scrapeCountry, isCancelled);
     });
   }
 
+  // A country that falls back to a lower-priority route joins that tier
   private async scrapeTiers(
-    tiers: AmazonCountryPrice[][],
+    prices: AmazonAdPrices,
     scrapeCountry: (price: AmazonCountryPrice) => Promise<void>,
     isCancelled: () => boolean
   ) {
-    for (const tier of tiers) {
-      await Promise.all(tier.map(scrapeCountry));
+    for (const priority of prices.priorities()) {
+      await Promise.all(prices.pendingAt(priority).map(scrapeCountry));
       if (isCancelled()) return;
     }
   }
@@ -69,6 +70,12 @@ export class AmazonPdpAdScraper {
     prices: AmazonAdPrices,
     ad: AmazonAd
   ): AdOutcome | undefined {
+    if (price.isFallingBack) {
+      this.metricsService.increment("route_fallback", { country: price.country.tld });
+      price.nextRoute();
+      return;
+    }
+
     price.finish(outcome);
 
     if (prices.isDeleted) {
@@ -79,7 +86,7 @@ export class AmazonPdpAdScraper {
     if (!prices.isDecided) return;
 
     const result = prices.toResult(ad.id);
-    this.resultSender.prices(ad.id, result.prices, result.missingCountryIds);
+    this.resultSender.prices(ad.id, result.prices, result.missingRouteIds);
     return result.prices.length ? "prices" : "empty";
   }
 }

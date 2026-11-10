@@ -1,13 +1,19 @@
 import type { Document } from "domhandler";
 import type { StopAt } from "@/shared/http/http.types";
 
+export interface AmazonCountryRoute {
+  id: number;
+  priority: number;
+  proxyType: string;
+  pdpSource: string;
+  maxAttempts: number;
+}
+
 export interface AmazonCountry {
   countryId: number;
   tld: string;
   active: boolean;
-  proxyType: string;
-  pdpSource: string;
-  priority: number;
+  routes: AmazonCountryRoute[];
 }
 
 export interface AmazonAdCategory {
@@ -26,7 +32,7 @@ export interface AmazonPlpAd {
 export interface AmazonAd {
   id: number;
   asin: string;
-  skipCountryIds?: number[];
+  skipRouteIds?: number[];
 }
 
 export interface AmazonAdBuildResult {

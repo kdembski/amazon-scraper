@@ -1,7 +1,7 @@
 import { AmazonPdpPrice } from "@/marketplaces/amazon/types/amazon.types";
 import { BatchSender } from "@/shared/backend/BatchSender";
 
-type AmazonPdpResult = { id: number; prices?: AmazonPdpPrice[]; missingCountryIds?: number[] };
+type AmazonPdpResult = { id: number; prices?: AmazonPdpPrice[]; missingRouteIds?: number[] };
 
 const MAX_BATCH_SIZE = 1000;
 
@@ -27,13 +27,13 @@ export class AmazonPdpResultSender {
     return {
       prices: results
         .filter((result) => result.prices)
-        .map(({ id, prices, missingCountryIds }) => ({ id, prices, missingCountryIds })),
+        .map(({ id, prices, missingRouteIds }) => ({ id, prices, missingRouteIds })),
       deleted: results.filter((result) => !result.prices).map((result) => result.id),
     };
   }
 
-  prices(id: number, prices: AmazonPdpPrice[], missingCountryIds: number[] = []) {
-    this.sender.add({ id, prices, missingCountryIds });
+  prices(id: number, prices: AmazonPdpPrice[], missingRouteIds: number[] = []) {
+    this.sender.add({ id, prices, missingRouteIds });
   }
 
   deleted(id: number) {

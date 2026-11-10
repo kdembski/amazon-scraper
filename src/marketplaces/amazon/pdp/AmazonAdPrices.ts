@@ -24,21 +24,20 @@ export class AmazonAdPrices {
     return this.prices.filter((price) => price.hasPrice);
   }
 
-  // Groups of countries with the same priority, highest first
-  tiers() {
-    return _.orderBy(
-      Object.values(_.groupBy(this.prices, (price) => price.country.priority)),
-      (tier) => tier[0].country.priority,
-      "desc"
-    );
+  // Route priorities of all countries, highest first
+  priorities() {
+    return _.orderBy(_.uniq(this.prices.flatMap((price) => price.priorities)), _.identity, "desc");
+  }
+
+  // Countries still waiting whose current route has this priority
+  pendingAt(priority: number) {
+    return this.prices.filter((price) => !price.complete && price.route?.priority === priority);
   }
 
   toResult(adId: number) {
     return {
       prices: this.withPrice.map((price) => price.toPdpPrice(adId)),
-      missingCountryIds: this.prices
-        .filter((price) => price.missing)
-        .map((price) => price.country.countryId),
+      missingRouteIds: this.prices.flatMap((price) => price.missingRouteIds),
     };
   }
 }

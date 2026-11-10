@@ -102,11 +102,11 @@ export class FakeBackend {
       .filter((request) => request !== undefined);
   }
 
-  findMissingCountryIds(id: number) {
+  findMissingRouteIds(id: number) {
     return this.find("POST", "amazon/ads/batch")
       .flatMap((request) => request.body.prices)
       .filter((item: { id: number }) => item.id === id)
-      .flatMap((item: { missingCountryIds?: number[] }) => item.missingCountryIds ?? []);
+      .flatMap((item: { missingRouteIds?: number[] }) => item.missingRouteIds ?? []);
   }
 
   findDeleted(id: number) {

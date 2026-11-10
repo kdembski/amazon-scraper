@@ -7,7 +7,6 @@ import type { AmazonCountryPrice } from "@/marketplaces/amazon/pdp/AmazonCountry
 import { AmazonAd, AmazonAdBuilder } from "@/marketplaces/amazon/types/amazon.types";
 import { MetricsService } from "@/shared/metrics/MetricsService";
 import { ItemOutcome } from "@/shared/metrics/metrics.types";
-import _ from "lodash";
 
 type FetchResult =
   | { ok: true; data: string }
@@ -30,22 +29,15 @@ export class AmazonPdpCountryScraper {
     ad: AmazonAd,
     isCancelled: () => boolean
   ): Promise<ItemOutcome | undefined> {
-    const sources = this.getSources(price.country.pdpSource);
-    let builder = sources.shift()!;
+    const builder = this.builders[price.route!.pdpSource] ?? this.builders.aod;
 
     while (!isCancelled()) {
       const result = await this.fetch(builder, ad, price, isCancelled);
       if (isCancelled()) return;
 
-      if (!result.ok && result.status === 404 && sources.length) {
-        this.metricsService.increment("source_fallback", { country: price.country.tld });
-        builder = sources.shift()!;
-        continue;
-      }
-
       const outcome = this.toOutcome(result, price, builder);
       if (outcome) {
-        this.countItem(price, outcome);
+        if (!price.isFallingBack) this.countItem(price, outcome);
         return outcome;
       }
 
@@ -59,14 +51,6 @@ export class AmazonPdpCountryScraper {
     }
   }
 
-  // "twister,awd": the next source is asked on a 404
-  private getSources(pdpSource: string) {
-    const sources = _.compact(
-      pdpSource.split(",").map((source) => this.builders[source.trim()])
-    );
-    return sources.length ? sources : [this.builders.aod];
-  }
-
   private async fetch(
     builder: AmazonAdBuilder,
     ad: AmazonAd,
@@ -77,7 +61,7 @@ export class AmazonPdpCountryScraper {
 
     try {
       const data = await this.amazonService.get<string>(url, referer, {
-        proxyType: price.country.proxyType,
+        proxyType: price.route!.proxyType,
         stopAt: builder.stopAt,
         isCancelled,
       });
@@ -95,7 +79,7 @@ export class AmazonPdpCountryScraper {
     if (!result.ok) {
       if (result.status !== 404) return;
       if (builder.notFoundIsNoData) {
-        price.missing = true;
+        price.markMissing();
         return "no_data";
       }
       return price.registerNotFound() ? "deleted" : undefined;
@@ -115,7 +99,7 @@ export class AmazonPdpCountryScraper {
 
   private countItem(price: AmazonCountryPrice, outcome: ItemOutcome) {
     const labels = { country: price.country.tld, outcome };
-    const attempts = outcome === "given_up" ? price.retry.failed : price.retry.failed + 1;
+    const attempts = price.pastAttempts + (outcome === "given_up" ? price.retry.failed : price.retry.failed + 1);
     this.metricsService.increment("items", labels);
     this.metricsService.increment("item_attempts", labels, attempts);
   }
