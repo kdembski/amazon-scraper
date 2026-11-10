@@ -1,7 +1,7 @@
 import _ from "lodash";
 import type { AmazonCountryPrice } from "@/marketplaces/amazon/pdp/AmazonCountryPrice";
 
-const PRICES_TO_COMPLETE = 4;
+const PRICES_TO_COMPLETE = 5;
 
 // State of one ASIN across its countries
 export class AmazonAdPrices {

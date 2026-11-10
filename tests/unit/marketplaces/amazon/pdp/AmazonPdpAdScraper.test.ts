@@ -178,36 +178,36 @@ describe("AmazonPdpAdScraper", () => {
     expect(done).toHaveBeenCalledTimes(1);
   });
 
-  it("sends the prices once 4 countries have one and cancels the rest", async () => {
-    const { sender, runs, done, withPrice } = setup(6);
+  it("sends the prices once 5 countries have one and cancels the rest", async () => {
+    const { sender, runs, done, withPrice } = setup(7);
 
-    [0, 1, 2, 3].forEach((i) => withPrice(i));
+    [0, 1, 2, 3, 4].forEach((i) => withPrice(i));
     await flush();
 
     expect(sender.prices).toHaveBeenCalledTimes(1);
-    expect(sender.prices).toHaveBeenCalledWith(7, sent([1, 2, 3, 4]), []);
+    expect(sender.prices).toHaveBeenCalledWith(7, sent([1, 2, 3, 4, 5]), []);
     expect(done).toHaveBeenCalledTimes(1);
-    expect(runs[4].isCancelled()).toBe(true);
+    expect(runs[5].isCancelled()).toBe(true);
 
     // Late results of the cancelled countries change nothing
-    withPrice(4);
-    runs[5].finish("deleted");
+    withPrice(5);
+    runs[6].finish("deleted");
     await flush();
 
     expect(sender.prices).toHaveBeenCalledTimes(1);
     expect(sender.deleted).not.toHaveBeenCalled();
   });
 
-  it("keeps scraping while fewer than 4 countries have a price", async () => {
-    const { sender, runs, withPrice } = setup(5);
+  it("keeps scraping while fewer than 5 countries have a price", async () => {
+    const { sender, runs, withPrice } = setup(6);
 
     runs[0].finish("no_data");
-    [1, 2, 3].forEach((i) => withPrice(i));
+    [1, 2, 3, 4].forEach((i) => withPrice(i));
     await flush();
     expect(sender.prices).not.toHaveBeenCalled();
-    expect(runs[4].isCancelled()).toBe(false);
+    expect(runs[5].isCancelled()).toBe(false);
 
-    withPrice(4);
+    withPrice(5);
     await flush();
     expect(sender.prices).toHaveBeenCalledTimes(1);
   });
@@ -308,25 +308,26 @@ describe("AmazonPdpAdScraper", () => {
       expect(done).toHaveBeenCalledTimes(1);
     });
 
-    it("never starts lower priority countries once 4 have a price", async () => {
-      const { sender, runs, done, withPrice } = setup(6, [2, 2, 1, 1, 1, 0]);
+    it("never starts lower priority countries once 5 have a price", async () => {
+      const { sender, runs, done, withPrice } = setup(7, [2, 2, 1, 1, 1, 1, 0]);
 
       withPrice(0);
       withPrice(1);
       await flush();
-      expect(started(runs)).toEqual(["c1", "c2", "c3", "c4", "c5"]);
+      expect(started(runs)).toEqual(["c1", "c2", "c3", "c4", "c5", "c6"]);
 
       withPrice(2);
       withPrice(3);
+      withPrice(4);
       await flush();
 
-      expect(sender.prices).toHaveBeenCalledWith(7, sent([1, 2, 3, 4]), []);
+      expect(sender.prices).toHaveBeenCalledWith(7, sent([1, 2, 3, 4, 5]), []);
       expect(done).toHaveBeenCalledTimes(1);
-      expect(runs[4].isCancelled()).toBe(true);
+      expect(runs[5].isCancelled()).toBe(true);
 
-      runs[4].finish("no_data");
+      runs[5].finish("no_data");
       await flush();
-      expect(started(runs)).toHaveLength(5);
+      expect(started(runs)).toHaveLength(6);
     });
 
     it("deletes the ad without starting lower priority inactive countries", async () => {

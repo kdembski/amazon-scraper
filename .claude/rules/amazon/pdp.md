@@ -39,7 +39,7 @@ Goal: for every ASIN, get the price and the shipper (`dispatchFrom`) in every Am
 4. A route ending with a final 404 (added to `missingRouteIds`) while the country has another route → `route_fallback`, the country moves to its next route (new `retry` with that route's `maxAttempts`, `notFound` = 0) and runs in that route's lower tier. Any other outcome (`data`, `no_data` from a page, `given_up`) ends the country, no fallback.
 5. After each country, checks whether the ASIN is decided:
    - all **active** countries `deleted` → sends `deleted(id)`, done (`ads{outcome=deleted}`);
-   - all countries `complete` **or** ≥ 4 countries with a price (`PRICES_TO_COMPLETE`) → sends prices, done (`prices` / `empty`);
+   - all countries `complete` **or** ≥ 5 countries with a price (`PRICES_TO_COMPLETE`) → sends prices, done (`prices` / `empty`);
    - otherwise keeps waiting.
 6. Once decided, `isCancelled()` = true: queued requests are dropped, further tiers do not start (a lower-priority route may never run).
 
