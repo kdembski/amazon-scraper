@@ -24,15 +24,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        host: ${{ fromJSON(vars.DEPLOY_HOSTS) }}
+        server: ${{ fromJSON(vars.DEPLOY_HOSTS) }}
     steps:
       - uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ matrix.host }}
+          host: ${{ matrix.server.host }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           script: |
             set -e
-            cd ${{ vars.DEPLOY_PATH }}
+            cd ${{ matrix.server.path }}
             git pull --ff-only
             docker compose up -d --build --remove-orphans
