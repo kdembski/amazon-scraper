@@ -32,13 +32,13 @@ export class AmazonPageReader {
     }
 
     try {
-      const document = parseDocument(trim ? trim(html) : html);
-      if (this.captchaDetector.detect(document)) {
+      const trimmed = trim ? trim(html) : html;
+      if (this.captchaDetector.detect(trimmed)) {
         count("captcha");
         return;
       }
 
-      const page = build(document);
+      const page = build(parseDocument(trimmed));
       if (page.isValid === false) {
         count("invalid");
         return;

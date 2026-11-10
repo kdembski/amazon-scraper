@@ -6,7 +6,31 @@ import { toDocument, twisterBuybox } from "@@tests/support/html";
 const parser = new AmazonBuyboxParser();
 const parse = (body: string) => parser.parse(find("#box", toDocument(`<div id="box">${body}</div>`)));
 
+// Buy box as Amazon orders it: price, delivery and cart (the middle), offer rows
+const withMiddle = (top = twisterBuybox({ price: "24,99", soldBy: "" })) =>
+  `${top}<div id="deliveryBlockContainer">Delivery tomorrow</div><div id="addToCart_feature_div">Cart</div>${twisterBuybox({ shipsFrom: "Amazon.de", soldBy: "Shop" })}`;
+
 describe("AmazonBuyboxParser", () => {
+  describe("trim", () => {
+    it("cuts the middle between the price and the offer rows", () => {
+      const trimmed = parser.trim(withMiddle());
+
+      expect(trimmed).not.toContain("Delivery tomorrow");
+      expect(trimmed).not.toContain("Cart");
+      expect(parse(trimmed)).toEqual({ isValid: true, price: 24.99, dispatchFrom: "Amazon" });
+    });
+
+    it.each([
+      ["a subscription", withMiddle(twisterBuybox({ price: "24,99", snsPrice: "20,00", soldBy: "" }))],
+      ["a hidden price", withMiddle(twisterBuybox({ price: "24,99", hidden: true, soldBy: "" }))],
+      ["no middle", twisterBuybox({ price: "24,99", shipsFrom: "Amazon.de" })],
+      ["offer rows before the middle", `${twisterBuybox({ shipsFrom: "Amazon.de" })}<div id="deliveryBlockContainer"></div>${twisterBuybox({ price: "24,99", soldBy: "" })}`],
+    ])("keeps a buy box with %s whole", (_name, html) => {
+      expect(parser.trim(html)).toBe(html);
+    });
+  });
+
+
   it("is invalid without a buy box", () => {
     expect(parser.parse(null)).toEqual({ isValid: false });
   });

@@ -94,8 +94,8 @@ const scrapeAll = (builder: AmazonAdBuilder, codes: string[], retryInvalid = fal
           url,
           referer,
           (html) => {
-            const document = parseDocument(builder.trimHtml(html));
-            return captchaDetector.detect(document) ? { isCaptcha: true } : builder.build(document);
+            const trimmed = builder.trimHtml(html);
+            return captchaDetector.detect(trimmed) ? { isCaptcha: true } : builder.build(parseDocument(trimmed));
           },
           { stopAt: builder.stopAt, retryInvalid }
         );

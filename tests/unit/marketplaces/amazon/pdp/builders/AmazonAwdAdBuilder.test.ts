@@ -26,7 +26,7 @@ describe("AmazonAwdAdBuilder", () => {
   it("stops downloading after the buy box and deletes the country on a 404", () => {
     const source: AmazonAdBuilder = builder;
 
-    expect(source.stopAt).toEqual(['id="buybox"', 'id="olpLinkWidget_feature_div"']);
+    expect(source.stopAt).toEqual(['id="buybox"', ['desktop-return-info"', 'id="olpLinkWidget_feature_div"']]);
     expect(source.notFoundIsNoData).toBeFalsy();
   });
 
@@ -36,6 +36,15 @@ describe("AmazonAwdAdBuilder", () => {
 
       expect(html.startsWith('<div id="buybox">')).toBe(true);
       expect(html).not.toContain("related");
+    });
+
+    it("cuts the middle of the buy box", () => {
+      const buybox = `${twisterBuybox({ price: "24,99", soldBy: "" })}<div id="deliveryBlockContainer">Delivery</div>${twisterBuybox({ soldBy: "Amazon.fr" })}`;
+
+      const html = builder.trimHtml(awdPage(buybox));
+
+      expect(html).not.toContain("Delivery");
+      expect(builder.build(toDocument(html))).toEqual({ isValid: true, price: 24.99, dispatchFrom: "Amazon" });
     });
 
     it("keeps a page without the buy box", () => {

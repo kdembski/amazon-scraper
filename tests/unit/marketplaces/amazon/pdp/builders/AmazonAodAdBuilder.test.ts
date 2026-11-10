@@ -56,6 +56,43 @@ describe("AmazonAodAdBuilder", () => {
       expect(builder.build(toDocument(trimmed)).price).toBe(24.99);
     });
 
+    it("cuts the header before the pinned offer and keeps the container", () => {
+      const html = `<div id="aod-container"><div id="aod-header">Header</div>${aodPage(priceToPay()).replace('<div id="aod-container">', "")}<div id="aod-filter"></div>`;
+
+      const trimmed = builder.trimHtml(html);
+
+      expect(trimmed).not.toContain("aod-header");
+      expect(trimmed.startsWith('<div id="aod-container"><div id="aod-pinned-offer">')).toBe(true);
+      expect(builder.build(toDocument(trimmed))).toMatchObject({ isValid: true, price: 24.99 });
+    });
+
+    it("cuts delivery, cart and quantity between the price box and the shipper row", () => {
+      const middle = '<div id="mir-layout-DELIVERY_BLOCK">Delivery</div><div id="aod-offer-qty-component-0">Quantity</div>';
+      const html = aodPage(priceToPay(), `${middle}${shipsFrom('<span class="a-size-small">Amazon.de</span>')}`);
+
+      const trimmed = builder.trimHtml(html);
+
+      expect(trimmed).not.toContain("Delivery");
+      expect(trimmed).not.toContain("Quantity");
+      expect(builder.build(toDocument(trimmed))).toEqual({ isValid: true, price: 24.99, dispatchFrom: "Amazon" });
+    });
+
+    it("keeps the middle when the shipper row is missing", () => {
+      const html = aodPage(priceToPay(), '<div id="mir-layout-DELIVERY_BLOCK">Delivery</div>');
+
+      expect(builder.trimHtml(html)).toContain("Delivery");
+    });
+
+    it("keeps an invalid page without the container invalid", () => {
+      const html = `<div id="aod-pinned-offer"><div id="aod-price-0">${priceToPay()}</div></div>`;
+
+      expect(builder.build(toDocument(builder.trimHtml(html))).isValid).toBe(false);
+    });
+
+    it("cuts from the filters on when there is no pinned offer", () => {
+      expect(builder.trimHtml('<div id="aod-container"></div><div id="aod-filter"></div>')).toBe('<div id="aod-container"></div>');
+    });
+
     it("keeps html without the filters", () => {
       expect(builder.trimHtml(captchaPage)).toBe(captchaPage);
     });

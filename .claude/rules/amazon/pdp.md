@@ -64,14 +64,14 @@ Goal: for every ASIN, get the price and the shipper (`dispatchFrom`) in every Am
 
 | Source | URL | What it parses |
 |---|---|---|
-| `aod` | `<tld>/gp/product/ajax/aodAjaxMain/?asin=X&pc=dp` | `#aod-pinned-offer`: price from `[id^='aod-price-']`, shipper from `#aod-offer-shipsFrom`. HTML cut before `aod-filter`. Valid = `#aod-container` present. |
-| `twister` | `<tld>/gp/twister/ajaxv2?asinList=X&...` | JSON parts separated by `&&&`; takes `desktop_buybox` → `AmazonBuyboxParser`. Download stops inside the buy box part at the `desktop-return-info` row (after price and shipper; not the `-collapsed` accordion header), at the latest at the `&&&` that ends the part; the cut JSON string is decoded up to the cut. 404 = `no_data`. |
-| `awd` | `<tld>/gp/aw/d/X?th=1&psc=1` | Mobile page, HTML from `id="buybox"` → `AmazonBuyboxParser`. Download stops at `id="olpLinkWidget_feature_div"` after the buy box. |
+| `aod` | `<tld>/gp/product/ajax/aodAjaxMain/?asin=X&pc=dp` | `#aod-pinned-offer`: price from `[id^='aod-price-']`, shipper from `#aod-offer-shipsFrom`. Only the pinned offer is parsed: HTML from `id="aod-pinned-offer"` up to `aod-filter`, without the middle from `id="mir-layout-DELIVERY_BLOCK"` (after the price box) up to `#aod-offer-shipsFrom` (delivery, cart buttons, quantity), wrapped in an empty `#aod-container` when the page has one (no pinned offer → from the start up to `aod-filter`). Valid = `#aod-container` present. |
+| `twister` | `<tld>/gp/twister/ajaxv2?asinList=X&...` | JSON parts separated by `&&&`; takes `desktop_buybox` → `AmazonBuyboxParser`. Download stops inside the buy box part at the `desktop-return-info` row (after price and shipper; not the `-collapsed` accordion header), at the latest at the `&&&` that ends the part; the cut JSON string is decoded up to the cut, then `AmazonBuyboxParser.trim`. 404 = `no_data`. |
+| `awd` | `<tld>/gp/aw/d/X?th=1&psc=1` | Mobile page, HTML from `id="buybox"`, then `AmazonBuyboxParser.trim` → `AmazonBuyboxParser`. Download stops at the `desktop-return-info"` row after the shipper, at the latest at `id="olpLinkWidget_feature_div"` after the buy box. |
 
 Shared:
-- `AmazonPageReader` (shared with PLP): empty, then captcha, then the builder, then `isValid`; counts every result in `responses`. Builders no longer see captcha pages.
-- `AmazonCaptchaDetector`: `form` with action `/errors/validateCaptcha` or `/errors_page/validateCaptcha`, or the Akamai interstitial (`meta[http-equiv='refresh']` with `bm-verify=`).
-- `AmazonBuyboxParser`: invalid when there is no buy box or `#priceNotAvailable`; price from `.apex-pricetopay-value` (skips subscription), fallback hidden cart input; shipper from `desktop-fulfiller-info`, fallback `desktop-merchant-info`.
+- `AmazonPageReader` (shared with PLP): empty, then trim, then captcha (on the trimmed HTML), then the builder on the parsed trimmed HTML, then `isValid`; counts every result in `responses`. Builders no longer see captcha pages.
+- `AmazonCaptchaDetector`: parses the HTML only when it contains `validateCaptcha` or `bm-verify=`; then `form` with action `/errors/validateCaptcha` or `/errors_page/validateCaptcha`, or the Akamai interstitial (`meta[http-equiv='refresh']` with `bm-verify=`).
+- `AmazonBuyboxParser`: `trim` cuts the middle of the buy box HTML (from `id="deliveryBlockContainer"` up to the first `desktop-fulfiller-info` / `desktop-merchant-info` offer row: delivery, quantity, cart buttons); keeps it whole when the rows come first or it has `priceNotAvailable`, `snsAccordionRowMiddle` or `subscriptionPrice`. Invalid when there is no buy box or `#priceNotAvailable`; price from `.apex-pricetopay-value` (skips subscription), fallback hidden cart input; shipper from `desktop-fulfiller-info`, fallback `desktop-merchant-info`.
 - `AmazonPriceParser`: `.a-price-whole` + `.a-price-fraction`, fallback accessibility label / `.a-offscreen`.
 - `AmazonDispatchFromNormalizer`: `amazon.nl` etc. → `Amazon`.
 
