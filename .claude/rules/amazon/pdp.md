@@ -13,6 +13,45 @@ Goal: for every ASIN, get the price and the shipper (`dispatchFrom`) in every Am
 
 **A PDP logic change (`src/marketplaces/amazon/pdp/`, `AmazonService`, `AmazonCountryService`, shared HTTP/backend) updates this file in the same commit.**
 
+## Diagram
+
+```mermaid
+flowchart TD
+  tick["AmazonPdpScraper.scrape() every 1 s"] --> night{"23:00–7:00 Warsaw?"}
+  night -- yes --> skip["skip tick"]
+  night -- no --> load{"queue ≥ rps × 5<br/>or missing < batchSize / 4?"}
+  load -- yes --> skip
+  load -- no --> fetch["GET amazon/countries/scrap (cached)<br/>GET amazon/ads/scrap?batchSize=missing"]
+  fetch --> ad["AmazonPdpAdScraper.execute(ad) per ASIN, no await"]
+
+  ad --> routes["AmazonCountryPrice per country:<br/>routes minus skipRouteIds, highest priority first"]
+  routes --> tier["next tier: countries whose current route has this priority, in parallel"]
+  tier --> country["AmazonPdpCountryScraper: builder from route.pdpSource"]
+
+  country --> req["ScrapingClient.get() via TokenBucketQueue<br/>proxyType of the route, stopAt stream cut"]
+  req --> res{"result"}
+  res -- "404" --> nf{"final 404?<br/>(twister: no_data)"}
+  nf -- "no" --> retry
+  nf -- "yes, country has another route" --> fallback["route_fallback, next route<br/>in its lower tier"]
+  nf -- "yes, last route" --> deleted["deleted"]
+  res -- "other error / timeout / empty /<br/>captcha / invalid / parse_error" --> retry{"failed < maxAttempts?"}
+  retry -- yes --> backoff["backoff 1 s, 2 s, 4 s ... 60 s"] --> req
+  retry -- no --> givenup["given_up"]
+  res -- "200 page" --> parse["AmazonPageReader: trimHtml, captcha check,<br/>parseDocument, build"]
+  parse -- "price" --> data["data: value + dispatchFrom"]
+  parse -- "valid, no price" --> nodata["no_data"]
+  parse -- "captcha / invalid / parse_error" --> retry
+
+  data & nodata & givenup & deleted --> decided{"ASIN decided?"}
+  fallback --> tier
+  decided -- "all active countries deleted" --> sendDel["AmazonPdpResultSender.deleted(id)"]
+  decided -- "all countries complete or ≥ 5 prices" --> sendPrices["AmazonPdpResultSender.prices(id, prices, missingRouteIds)"]
+  decided -- "no" --> more{"tier finished?"}
+  more -- yes --> tier
+  sendDel & sendPrices --> cancel["isCancelled(): queued requests dropped, no further tiers"]
+  sendDel & sendPrices --> batch["BatchSender → POST amazon/ads/batch<br/>max 1000 items / 5 s"]
+```
+
 ## 1. Process start (`src/index.ts`, `src/marketplaces.ts`)
 
 1. `ArgsService` reads the `-t` flag (none = `pdp`).
@@ -39,7 +78,7 @@ Goal: for every ASIN, get the price and the shipper (`dispatchFrom`) in every Am
 4. A route ending with a final 404 (added to `missingRouteIds`) while the country has another route → `route_fallback`, the country moves to its next route (new `retry` with that route's `maxAttempts`, `notFound` = 0) and runs in that route's lower tier. Any other outcome (`data`, `no_data` from a page, `given_up`) ends the country, no fallback.
 5. After each country, checks whether the ASIN is decided:
    - all **active** countries `deleted` → sends `deleted(id)`, done (`ads{outcome=deleted}`);
-   - all countries `complete` **or** ≥ 4 countries with a price (`PRICES_TO_COMPLETE`) → sends prices, done (`prices` / `empty`);
+   - all countries `complete` **or** ≥ 5 countries with a price (`PRICES_TO_COMPLETE`) → sends prices, done (`prices` / `empty`);
    - otherwise keeps waiting.
 6. Once decided, `isCancelled()` = true: queued requests are dropped, further tiers do not start (a lower-priority route may never run).
 
@@ -64,14 +103,14 @@ Goal: for every ASIN, get the price and the shipper (`dispatchFrom`) in every Am
 
 | Source | URL | What it parses |
 |---|---|---|
-| `aod` | `<tld>/gp/product/ajax/aodAjaxMain/?asin=X&pc=dp` | `#aod-pinned-offer`: price from `[id^='aod-price-']`, shipper from `#aod-offer-shipsFrom`. HTML cut before `aod-filter`. Valid = `#aod-container` present. |
-| `twister` | `<tld>/gp/twister/ajaxv2?asinList=X&...` | JSON parts separated by `&&&`; takes `desktop_buybox` → `AmazonBuyboxParser`. Download stops inside the buy box part at the `desktop-return-info` row (after price and shipper; not the `-collapsed` accordion header), at the latest at the `&&&` that ends the part; the cut JSON string is decoded up to the cut. 404 = `no_data`. |
-| `awd` | `<tld>/gp/aw/d/X?th=1&psc=1` | Mobile page, HTML from `id="buybox"` → `AmazonBuyboxParser`. Download stops at `id="olpLinkWidget_feature_div"` after the buy box. |
+| `aod` | `<tld>/gp/product/ajax/aodAjaxMain/?asin=X&pc=dp` | `#aod-pinned-offer`: price from `[id^='aod-price-']`, shipper from `#aod-offer-shipsFrom`. Only the pinned offer is parsed: HTML from `id="aod-pinned-offer"` up to `aod-filter`, without the middle from `id="mir-layout-DELIVERY_BLOCK"` (after the price box) up to `#aod-offer-shipsFrom` (delivery, cart buttons, quantity), wrapped in an empty `#aod-container` when the page has one (no pinned offer → from the start up to `aod-filter`). Valid = `#aod-container` present. |
+| `twister` | `<tld>/gp/twister/ajaxv2?asinList=X&...` | JSON parts separated by `&&&`; takes `desktop_buybox` → `AmazonBuyboxParser`. Download stops inside the buy box part at the `desktop-return-info` row (after price and shipper; not the `-collapsed` accordion header), at the latest at the `&&&` that ends the part; the cut JSON string is decoded up to the cut, then `AmazonBuyboxParser.trim`. 404 = `no_data`. |
+| `awd` | `<tld>/gp/aw/d/X?th=1&psc=1` | Mobile page, HTML from `id="buybox"`, then `AmazonBuyboxParser.trim` → `AmazonBuyboxParser`. Download stops at the `desktop-return-info"` row after the shipper, at the latest at `id="olpLinkWidget_feature_div"` after the buy box. |
 
 Shared:
-- `AmazonPageReader` (shared with PLP): empty, then captcha, then the builder, then `isValid`; counts every result in `responses`. Builders no longer see captcha pages.
-- `AmazonCaptchaDetector`: `form` with action `/errors/validateCaptcha` or `/errors_page/validateCaptcha`, or the Akamai interstitial (`meta[http-equiv='refresh']` with `bm-verify=`).
-- `AmazonBuyboxParser`: invalid when there is no buy box or `#priceNotAvailable`; price from `.apex-pricetopay-value` (skips subscription), fallback hidden cart input; shipper from `desktop-fulfiller-info`, fallback `desktop-merchant-info`.
+- `AmazonPageReader` (shared with PLP): empty, then trim, then captcha (on the trimmed HTML), then the builder on the parsed trimmed HTML, then `isValid`; counts every result in `responses`. Builders no longer see captcha pages.
+- `AmazonCaptchaDetector`: parses the HTML only when it contains `validateCaptcha` or `bm-verify=`; then `form` with action `/errors/validateCaptcha` or `/errors_page/validateCaptcha`, or the Akamai interstitial (`meta[http-equiv='refresh']` with `bm-verify=`).
+- `AmazonBuyboxParser`: `trim` cuts the middle of the buy box HTML (from `id="deliveryBlockContainer"` up to the first `desktop-fulfiller-info` / `desktop-merchant-info` offer row: delivery, quantity, cart buttons); keeps it whole when the rows come first or it has `priceNotAvailable`, `snsAccordionRowMiddle` or `subscriptionPrice`. Invalid when there is no buy box or `#priceNotAvailable`; price from `.apex-pricetopay-value` (skips subscription), fallback hidden cart input; shipper from `desktop-fulfiller-info`, fallback `desktop-merchant-info`.
 - `AmazonPriceParser`: `.a-price-whole` + `.a-price-fraction`, fallback accessibility label / `.a-offscreen`.
 - `AmazonDispatchFromNormalizer`: `amazon.nl` etc. → `Amazon`.
 

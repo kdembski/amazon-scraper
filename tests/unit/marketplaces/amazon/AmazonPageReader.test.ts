@@ -63,6 +63,14 @@ describe("AmazonPageReader", () => {
     expect(counted()).toEqual([["responses", "de", "captcha"]]);
   });
 
+  it("looks for a captcha in the trimmed html", () => {
+    const { read, counted } = setup();
+
+    read(captchaPage, () => "<div></div>");
+
+    expect(counted()).toEqual([["responses", "de", "data"]]);
+  });
+
   it("counts an invalid page", () => {
     const { read, build, counted } = setup();
     build.mockReturnValue({ isValid: false });

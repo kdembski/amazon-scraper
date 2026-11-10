@@ -32,7 +32,7 @@ export class AmazonTwisterAdBuilder implements AmazonAdBuilder {
 
     const buybox = this.decode(html.slice(start + value.index! + value[0].length));
 
-    return `<div id="desktop_buybox">${buybox}</div>`;
+    return `<div id="desktop_buybox">${this.buyboxParser.trim(buybox)}</div>`;
   }
 
   // JSON string up to its closing quote or to the end of the text, without an

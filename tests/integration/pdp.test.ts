@@ -310,11 +310,11 @@ describe("PDP", () => {
 
     const sent = await world.backend.waitForPrices(7);
 
-    expect(sent.body.prices).toHaveLength(4);
+    expect(sent.body.prices).toHaveLength(5);
     expect(world.amazon.maxInFlight).toBe(2);
   });
 
-  it("sends the prices once 4 countries have one and drops the queued requests", async () => {
+  it("sends the prices once 5 countries have one and drops the queued requests", async () => {
     world.backend.on("GET", "scrapers/it/config", { concurrency: 1, rps: 0, batchSize: 10 });
     world.backend.on("GET", "amazon/countries/scrap", sixCountries);
     world.amazon.respond(() => aodPage({ price: "1,00" }));
@@ -323,8 +323,8 @@ describe("PDP", () => {
     const sent = await world.backend.waitForPrices(7);
     await sleep(100);
 
-    expect(sent.body.prices.map((price: { countryId: number }) => price.countryId)).toEqual([1, 2, 3, 4]);
-    expect(world.amazon.requests).toHaveLength(4);
+    expect(sent.body.prices.map((price: { countryId: number }) => price.countryId)).toEqual([1, 2, 3, 4, 5]);
+    expect(world.amazon.requests).toHaveLength(5);
   });
 
   it("asks lower priority countries only for the prices still missing", async () => {
@@ -342,7 +342,7 @@ describe("PDP", () => {
       fr: [aodPage({ price: "2,00" })],
       it: [aodPage({ price: "3,00" })],
       es: [aodPage({ price: "4,00" })],
-      nl: [aodPage()],
+      nl: [aodPage({ price: "5,00" })],
       se: [aodPage({ price: "6,00" })],
     });
     scrape();
@@ -350,7 +350,7 @@ describe("PDP", () => {
     const sent = await world.backend.waitForPrices(7);
     await sleep(100);
 
-    expect(sent.body.prices.map((price: { countryId: number }) => price.countryId)).toEqual([1, 2, 4, 6]);
+    expect(sent.body.prices.map((price: { countryId: number }) => price.countryId)).toEqual([1, 2, 4, 5, 6]);
     expect(world.amazon.requests.map((request) => request.country)).toEqual(["es", "nl", "se", "de", "fr"]);
   });
 

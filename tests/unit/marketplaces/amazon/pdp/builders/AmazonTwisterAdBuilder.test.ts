@@ -51,6 +51,15 @@ describe("AmazonTwisterAdBuilder", () => {
       expect(html).not.toContain("olp");
     });
 
+    it("cuts the middle of the buy box", () => {
+      const buybox = `${twisterBuybox({ price: "24,99", soldBy: "" })}<div id="deliveryBlockContainer">Delivery</div>${twisterBuybox({ shipsFrom: "Amazon" })}`;
+
+      const html = builder.trimHtml(twisterResponse(buybox));
+
+      expect(html).not.toContain("Delivery");
+      expect(build(twisterResponse(buybox))).toEqual({ isValid: true, price: 24.99, dispatchFrom: "Amazon" });
+    });
+
     it("reads a response cut right after the buy box", () => {
       const response = twisterResponse(twisterBuybox({ price: "24,99" }), { closed: false });
 

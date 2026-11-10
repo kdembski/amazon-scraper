@@ -13,6 +13,42 @@ Goal: find new ASINs in a category on amazon.pl (search listing; new releases is
 
 **A PLP logic change (`src/marketplaces/amazon/plp/`, `AmazonService`, shared HTTP/backend) updates this file in the same commit.**
 
+## Diagram
+
+```mermaid
+flowchart TD
+  loop["AmazonPlpScraper: non-stop, one category at a time"] --> cat["GET amazon/ads/categories/scrap → name, scrapedAt"]
+  cat -- "backend error / exception" --> wait["wait 60 s"] --> loop
+  cat --> crawl["AmazonPlpCrawl(name, allPages = !scrapedAt)"]
+  crawl --> seeds["19 seed price ranges (SEEDS), all in parallel"]
+
+  seeds --> page1["page 1 of the range"]
+  page1 --> fetch
+  fetch --> p1res{"page 1 result"}
+  p1res -- "given_up, last page known" --> split
+  p1res -- "given_up, none known" --> skipRange["range skipped"]
+  p1res -- "page" --> split{"lastPage ≥ 400 (MAX_PAGES)<br/>and range splittable?"}
+  split -- "yes" --> halves["AmazonPriceRange.split: two halves<br/>(open range: [min, 2·min-1] + [2·min-], up to 1 000 000 zł)"]
+  halves --> page1
+  split -- "no" --> all{"allPages?"}
+  all -- "no (later scrapes)" --> rangeDone["range done"]
+  all -- "yes (first scrape)" --> pages["pages 2..lastPage sequentially<br/>(given up page skipped)"]
+  pages --> fetch
+
+  subgraph fetcher ["Fetching a page (AmazonPlpPageFetcher)"]
+    fetch["request queue ≥ batchSize? wait 1 s"] --> req["AmazonService.get(), proxy datacenter<br/>pl/s?i=category&rh=p_36:min-max&s=date-desc-rank&page=N<br/>stopAt MAIN-FEEDBACK"]
+    req --> reader["AmazonPageReader: trim, captcha check,<br/>parseDocument, AmazonPlpBuilder"]
+    reader -- "HTTP error / timeout / empty /<br/>captcha / invalid" --> retry{"failed < 10?"}
+    retry -- yes --> backoff["backoff 1 s, 2 s, 4 s ... with jitter"] --> req
+    retry -- no --> givenup["given_up"]
+    reader -- "ok" --> page["products (div[role=listitem]) + lastPage"]
+  end
+
+  page --> post["crawl.post(ads): dedup by ASIN within the run"]
+  post --> sender["AmazonPlpAdSender → BatchSender<br/>POST amazon/ads, max 2000 / 5 s"]
+  rangeDone & skipRange --> catDone["all ranges done → next category"] --> loop
+```
+
 ## 1. Process start
 
 1. `npm start -- -t plp`.

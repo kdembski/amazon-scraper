@@ -23,11 +23,11 @@ describe("AmazonAdPrices", () => {
 
     it("is false while any country is not complete and prices are too few", () => {
       expect(pricesOf(buildPrice({ complete: true }), buildPrice()).isDecided).toBe(false);
-      expect(withValues([10, 10, 10, undefined]).isDecided).toBe(false);
+      expect(withValues([10, 10, 10, 10, undefined]).isDecided).toBe(false);
     });
 
-    it("is true once 4 countries have a price", () => {
-      expect(withValues([10, 10, undefined, 10, 10]).isDecided).toBe(true);
+    it("is true once 5 countries have a price", () => {
+      expect(withValues([10, 10, undefined, 10, 10, 10]).isDecided).toBe(true);
     });
   });
 
