@@ -29,7 +29,7 @@ jobs:
       - uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ matrix.server.host }}
-          username: ${{ secrets.SSH_USER }}
+          username: ${{ matrix.server.user }}
           key: ${{ secrets.SSH_KEY }}
           script: |
             set -e
