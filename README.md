@@ -28,6 +28,7 @@ Copy `.env.example` to `.env` and fill it in:
 | `PROXY_LIST_URL` | optional: own proxy list instead of Webshare |
 | `NAME`, `NAME_PREFIX` | scraper name (local runs; Docker Compose sets it per service) |
 | `PDP_COUNT`, `PLP_COUNT` | number of replicas in Docker Compose |
+| `PDP_HEAP_MB`, `PLP_HEAP_MB` | optional: `--max-old-space-size` per replica in MB (default 2048 / 4096) |
 
 Locally:
 

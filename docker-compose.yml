@@ -12,7 +12,7 @@ services:
     deploy:
       replicas: ${PDP_COUNT:?set PDP_COUNT in .env}
     environment:
-      NODE_OPTIONS: --max-old-space-size=2048
+      NODE_OPTIONS: --max-old-space-size=${PDP_HEAP_MB:-2048}
       NAME: amazon-pdp
   amazon-plp:
     <<: *amazon-scraper
@@ -20,7 +20,7 @@ services:
       replicas: ${PLP_COUNT:?set PLP_COUNT in .env}
     command: ["-t", "plp"]
     environment:
-      NODE_OPTIONS: --max-old-space-size=4096
+      NODE_OPTIONS: --max-old-space-size=${PLP_HEAP_MB:-4096}
       NAME: amazon-plp
 
 networks:
