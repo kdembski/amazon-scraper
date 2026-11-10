@@ -13,6 +13,45 @@ Goal: for every ASIN, get the price and the shipper (`dispatchFrom`) in every Am
 
 **A PDP logic change (`src/marketplaces/amazon/pdp/`, `AmazonService`, `AmazonCountryService`, shared HTTP/backend) updates this file in the same commit.**
 
+## Diagram
+
+```mermaid
+flowchart TD
+  tick["AmazonPdpScraper.scrape() every 1 s"] --> night{"23:00–7:00 Warsaw?"}
+  night -- yes --> skip["skip tick"]
+  night -- no --> load{"queue ≥ rps × 5<br/>or missing < batchSize / 4?"}
+  load -- yes --> skip
+  load -- no --> fetch["GET amazon/countries/scrap (cached)<br/>GET amazon/ads/scrap?batchSize=missing"]
+  fetch --> ad["AmazonPdpAdScraper.execute(ad) per ASIN, no await"]
+
+  ad --> routes["AmazonCountryPrice per country:<br/>routes minus skipRouteIds, highest priority first"]
+  routes --> tier["next tier: countries whose current route has this priority, in parallel"]
+  tier --> country["AmazonPdpCountryScraper: builder from route.pdpSource"]
+
+  country --> req["ScrapingClient.get() via TokenBucketQueue<br/>proxyType of the route, stopAt stream cut"]
+  req --> res{"result"}
+  res -- "404" --> nf{"final 404?<br/>(twister: no_data)"}
+  nf -- "no" --> retry
+  nf -- "yes, country has another route" --> fallback["route_fallback, next route<br/>in its lower tier"]
+  nf -- "yes, last route" --> deleted["deleted"]
+  res -- "other error / timeout / empty /<br/>captcha / invalid / parse_error" --> retry{"failed < maxAttempts?"}
+  retry -- yes --> backoff["backoff 1 s, 2 s, 4 s ... 60 s"] --> req
+  retry -- no --> givenup["given_up"]
+  res -- "200 page" --> parse["AmazonPageReader: trimHtml, captcha check,<br/>parseDocument, build"]
+  parse -- "price" --> data["data: value + dispatchFrom"]
+  parse -- "valid, no price" --> nodata["no_data"]
+  parse -- "captcha / invalid / parse_error" --> retry
+
+  data & nodata & givenup & deleted --> decided{"ASIN decided?"}
+  fallback --> tier
+  decided -- "all active countries deleted" --> sendDel["AmazonPdpResultSender.deleted(id)"]
+  decided -- "all countries complete or ≥ 5 prices" --> sendPrices["AmazonPdpResultSender.prices(id, prices, missingRouteIds)"]
+  decided -- "no" --> more{"tier finished?"}
+  more -- yes --> tier
+  sendDel & sendPrices --> cancel["isCancelled(): queued requests dropped, no further tiers"]
+  sendDel & sendPrices --> batch["BatchSender → POST amazon/ads/batch<br/>max 1000 items / 5 s"]
+```
+
 ## 1. Process start (`src/index.ts`, `src/marketplaces.ts`)
 
 1. `ArgsService` reads the `-t` flag (none = `pdp`).
