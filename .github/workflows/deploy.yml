@@ -26,6 +26,12 @@ jobs:
       matrix:
         server: ${{ fromJSON(vars.DEPLOY_HOSTS) }}
     steps:
+      - if: startsWith(matrix.server.host, '100.')
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
       - uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ matrix.server.host }}
