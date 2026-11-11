@@ -29,7 +29,7 @@ Types: counters = sum over the minute; gauges = value at report time. `*_ms` as 
 | `requests_proxy` / `requests_direct4` / `requests_direct6` | same as `requests` | The same requests split by route: through a proxy, direct over IPv4, direct over IPv6. Their sum = `requests`. |
 | `request_ms` | `country` | Sum of request durations (all outcomes). Mean = `request_ms / requests`. |
 | `connections` | `country`, `outcome`: route (`proxy` / `direct4` / `direct6`) | New sockets to shops opened in the minute. |
-| `bytes_in` / `bytes_out` | `country`, `outcome`: route (`proxy` / `direct4` / `direct6`) | Bytes received / sent through shop sockets (raw socket: TLS, CONNECT and headers included). |
+| `bytes_in` / `bytes_out` | `country`, `outcome`: route (`proxy` / `direct4` / `direct6`) | Bytes received / sent through shop sockets (raw socket: TLS, CONNECT and headers included). A socket is dropped from tracking on `close`, its last bytes go into the next report. |
 
 `connections` and `bytes_*` take the country from the host: `ScrapingClient` hands `ProxyService.setCountry(host, country)` the country of every request; a host never requested with a country has none. `outcome` holds the route there, not a result.
 
