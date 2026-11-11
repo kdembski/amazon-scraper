@@ -19,7 +19,7 @@ Goal: find new ASINs in a category on amazon.pl (search listing; new releases is
 flowchart TD
   loop["AmazonPlpScraper: non-stop, one category at a time"] --> cat["GET amazon/ads/categories/scrap → name, scrapedAt"]
   cat -- "backend error / exception" --> wait["wait 60 s"] --> loop
-  cat --> crawl["AmazonPlpCrawl(name, allPages = !scrapedAt)"]
+  cat --> crawl["AmazonPlpCrawl(name, allPages = true)"]
   crawl --> seeds["19 seed price ranges (SEEDS), all in parallel"]
 
   seeds --> page1["page 1 of the range"]
@@ -31,8 +31,8 @@ flowchart TD
   split -- "yes" --> halves["AmazonPriceRange.split: two halves<br/>(open range: [min, 2·min-1] + [2·min-], up to 1 000 000 zł)"]
   halves --> page1
   split -- "no" --> all{"allPages?"}
-  all -- "no (later scrapes)" --> rangeDone["range done"]
-  all -- "yes (first scrape)" --> pages["pages 2..lastPage sequentially<br/>(given up page skipped)"]
+  all -- "no" --> rangeDone["range done"]
+  all -- "yes (always)" --> pages["pages 2..lastPage sequentially<br/>(given up page skipped)"]
   pages --> fetch
 
   subgraph fetcher ["Fetching a page (AmazonPlpPageFetcher)"]
@@ -64,9 +64,7 @@ flowchart TD
 
 ## 3. One category (`AmazonPlpCategoryScraper`)
 
-1. Creates `AmazonPlpCrawl(name, allPages = !scrapedAt)`:
-   - `allPages = true` only on the category's first scrape (all pages);
-   - afterwards only the first page of each price range.
+1. Creates `AmazonPlpCrawl(name, allPages = true)`: all pages of each price range on every scrape; `scrapedAt` is not used.
 2. Listing only (`AmazonPlpPageScraper`). New releases (section 4) is disabled: `AmazonNewReleasesScraper` stays in the code but is not called.
 3. `crawl.post(ads)` – dedup by ASIN within the run, each ASIN sent once.
 
@@ -122,4 +120,4 @@ flowchart TD
 
 - 0 products, many `invalid` → selectors in `AmazonPlpBuilder` / `AmazonNewReleasesBuilder` (break silently) + test in `tests/unit/marketplaces/amazon/plp/`.
 - ASINs missing in a large category → `MAX_PAGES`, `SEEDS`, `AmazonPriceRange.split`.
-- Category takes too long → `allPages` (first scrape) or range splitting.
+- Category takes too long → `allPages` or range splitting.
