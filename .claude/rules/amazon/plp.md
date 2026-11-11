@@ -22,14 +22,16 @@ flowchart TD
   cat --> crawl["AmazonPlpCrawl(name, allPages = true)"]
   crawl --> seeds["19 seed price ranges (SEEDS), all in parallel"]
 
-  seeds --> page1["page 1 of the range"]
+  seeds --> known{"split before (lastPage ≥ 400)<br/>and halves' last pages sum ≥ 400?"}
+  known -- "yes" --> halves
+  known -- "no" --> page1["page 1 of the range"]
   page1 --> fetch
   fetch --> p1res{"page 1 result"}
   p1res -- "given_up, last page known" --> split
   p1res -- "given_up, none known" --> skipRange["range skipped"]
   p1res -- "page" --> split{"lastPage ≥ 400 (MAX_PAGES)<br/>and range splittable?"}
   split -- "yes" --> halves["AmazonPriceRange.split: two halves<br/>(open range: [min, 2·min-1] + [2·min-], up to 1 000 000 zł)"]
-  halves --> page1
+  halves --> known
   split -- "no" --> all{"allPages?"}
   all -- "no" --> rangeDone["range done"]
   all -- "yes (always)" --> pages["pages 2..lastPage sequentially<br/>(given up page skipped)"]
@@ -90,6 +92,7 @@ flowchart TD
    - an open range (`500000-`) splits into `[min, 2·min-1]` and `[2·min-]`, up to 1 000 000 zł;
    - a single-value range is not split.
    - the last page of every range (per category) is kept in memory between runs; a given up page 1 uses the last known value to split or paginate, none known → range skipped.
+   - a range split in an earlier run goes straight to its halves without its own page 1 (its newest products are on the halves' first pages) while the halves' known last pages sum to ≥ 400 (an unknown half counts as 400); once they sum to less, page 1 of the range is fetched again and decides anew.
 5. `allPages` → pages 2..lastPage sequentially; a given up page is skipped, the range goes on.
 6. Parsing (`AmazonPlpBuilder`):
    - products: `div[role='listitem']` (ASIN `data-asin`, `img`, name `a > h2 > span`);

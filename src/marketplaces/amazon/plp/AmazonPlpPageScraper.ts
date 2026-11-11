@@ -1,3 +1,4 @@
+import _ from "lodash";
 import { AmazonPlpBuilder } from "@/marketplaces/amazon/plp/AmazonPlpBuilder";
 import { AmazonPlpCrawl } from "@/marketplaces/amazon/plp/AmazonPlpCrawl";
 import { AmazonPlpPageFetcher } from "@/marketplaces/amazon/plp/AmazonPlpPageFetcher";
@@ -44,16 +45,21 @@ export class AmazonPlpPageScraper {
   }
 
   private async scrapeRange(crawl: AmazonPlpCrawl, range: AmazonPriceRange) {
-    const key = `${crawl.category}:${range.toFilter()}`;
+    const halves = range.split();
+    if (halves && this.isStillSplit(crawl, range, halves)) {
+      await this.scrapeHalves(crawl, halves);
+      return;
+    }
+
+    const key = this.getKey(crawl, range);
     const first = await this.scrapePage(crawl, range, 1);
     if (first) this.lastPages.set(key, first.lastPage);
 
     const lastPage = this.lastPages.get(key);
     if (lastPage === undefined) return;
 
-    const halves = lastPage >= MAX_PAGES ? range.split() : undefined;
-    if (halves) {
-      await Promise.all(halves.map((half) => this.scrapeRange(crawl, half)));
+    if (halves && lastPage >= MAX_PAGES) {
+      await this.scrapeHalves(crawl, halves);
       return;
     }
 
@@ -61,6 +67,23 @@ export class AmazonPlpPageScraper {
     for (let number = 2; number <= lastPage; number++) {
       await this.scrapePage(crawl, range, number);
     }
+  }
+
+  // Split in an earlier run and its halves still hold 400 pages together
+  private isStillSplit(crawl: AmazonPlpCrawl, range: AmazonPriceRange, halves: AmazonPriceRange[]) {
+    const lastPage = this.lastPages.get(this.getKey(crawl, range)) ?? 0;
+    if (lastPage < MAX_PAGES) return false;
+
+    const halvesPages = _.sumBy(halves, (half) => this.lastPages.get(this.getKey(crawl, half)) ?? MAX_PAGES);
+    return halvesPages >= MAX_PAGES;
+  }
+
+  private async scrapeHalves(crawl: AmazonPlpCrawl, halves: AmazonPriceRange[]) {
+    await Promise.all(halves.map((half) => this.scrapeRange(crawl, half)));
+  }
+
+  private getKey(crawl: AmazonPlpCrawl, range: AmazonPriceRange) {
+    return `${crawl.category}:${range.toFilter()}`;
   }
 
   private async scrapePage(crawl: AmazonPlpCrawl, range: AmazonPriceRange, number: number) {

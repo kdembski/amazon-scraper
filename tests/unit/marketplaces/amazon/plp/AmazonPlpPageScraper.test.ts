@@ -111,6 +111,31 @@ describe("AmazonPlpPageScraper", () => {
     expect(second).toHaveLength(seeds.length + 2);
   });
 
+  it("goes straight to the halves of a range split before while they hold 400 pages together", async () => {
+    let run = 1;
+    const { requests, scraper, crawl } = setup((price) => {
+      if (price === "-999") return { lastPage: 400 };
+      if (price === "-499" || price === "500-999") return { lastPage: run === 1 ? 200 : 100 };
+      return {};
+    });
+    await scraper.execute(crawl);
+    run = 2;
+
+    await scraper.execute(crawl);
+    const second = requests().slice(seeds.length + 2);
+    run = 3;
+
+    await scraper.execute(crawl);
+    const third = requests().slice(2 * (seeds.length + 2) - 1);
+
+    expect(second).not.toContainEqual({ price: "-999", number: 1 });
+    expect(second).toContainEqual({ price: "-499", number: 1 });
+    expect(second).toContainEqual({ price: "500-999", number: 1 });
+    expect(second).toHaveLength(seeds.length + 1);
+    expect(third).toContainEqual({ price: "-999", number: 1 });
+    expect(third).toHaveLength(seeds.length + 2);
+  });
+
   it("does not split a given up range without a known last page", async () => {
     const { requests, scraper, crawl } = setup((price) => ({
       lastPage: price === "-999" ? 400 : 1,
