@@ -6,7 +6,7 @@ export class AmazonPlpCategoryScraper {
   constructor(private pageScraper = new AmazonPlpPageScraper()) {}
 
   async execute(category: AmazonAdCategory) {
-    const crawl = new AmazonPlpCrawl(category.name, !category.scrapedAt);
+    const crawl = new AmazonPlpCrawl(category.name, true);
     await this.pageScraper.execute(crawl);
   }
 }

@@ -125,16 +125,15 @@ describe("PLP", () => {
     expect(searches()).toHaveLength(3 * PRICE_RANGES);
   });
 
-  it("scrapes only the first page in every price range of a category scraped before", async () => {
+  it("follows the pagination to the last page in every price range of a category scraped before", async () => {
     serveCategory("2026-10-18T10:00:00.000Z");
     paginated();
     scrape();
 
-    await waitForAds(PRICE_RANGES);
+    await waitForAds(3 * PRICE_RANGES);
     await sleep(200);
 
-    expect(searches()).toHaveLength(PRICE_RANGES);
-    expect(searches().every(({ url }) => parse(url).number === 1)).toBe(true);
+    expect(searches()).toHaveLength(3 * PRICE_RANGES);
   });
 
   it("does not retry an empty price range", async () => {

@@ -54,13 +54,13 @@ describe("AmazonPlpPageFetcher", () => {
     expect(increment).toHaveBeenCalledWith("responses", { country: "pl", outcome: "data" });
   });
 
-  it("passes the stop markers to the request", async () => {
+  it("passes the stop markers and the mixed proxy type to the request", async () => {
     const { amazon, fetcher } = setup();
 
     fetcher.fetch("url", "ref", () => valid, ["a", "b"]);
     await vi.advanceTimersByTimeAsync(0);
 
-    expect(amazon.get).toHaveBeenCalledWith("url", "ref", { stopAt: ["a", "b"] });
+    expect(amazon.get).toHaveBeenCalledWith("url", "ref", { stopAt: ["a", "b"], proxyType: "mixed1/2" });
   });
 
   it.each([captchaPage, botWallPage, interstitialPage])("retries a captcha without building it", async (page) => {

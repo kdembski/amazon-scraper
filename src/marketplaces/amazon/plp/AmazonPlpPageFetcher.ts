@@ -14,6 +14,8 @@ const QUEUE_FULL_DELAY = 1000;
 
 export const PLP_MAX_FAILED_ATTEMPTS = 10;
 
+const PLP_PROXY_TYPE = "mixed1/2";
+
 export class AmazonPlpPageFetcher {
   constructor(
     private amazonService = AmazonService.getInstance(),
@@ -55,6 +57,8 @@ export class AmazonPlpPageFetcher {
       await sleep(QUEUE_FULL_DELAY);
     }
 
-    return this.amazonService.get<string>(url, referer, { stopAt }).catch(() => undefined);
+    return this.amazonService
+      .get<string>(url, referer, { stopAt, proxyType: PLP_PROXY_TYPE })
+      .catch(() => undefined);
   }
 }

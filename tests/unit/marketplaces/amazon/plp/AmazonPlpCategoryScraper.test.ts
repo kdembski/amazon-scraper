@@ -13,16 +13,16 @@ const setup = () => {
 
 describe("AmazonPlpCategoryScraper", () => {
   it.each([
-    ["all pages of a category never scraped", null, true],
-    ["the first page of a category scraped before", "2026-10-18T10:00:00.000Z", false],
-  ])("scrapes %s", async (_name, scrapedAt, allPages) => {
+    ["all pages of a category never scraped", null],
+    ["all pages of a category scraped before", "2026-10-18T10:00:00.000Z"],
+  ])("scrapes %s", async (_name, scrapedAt) => {
     const { scraper, executePages } = setup();
 
     await scraper.execute({ id: 1, name: "toys", scrapedAt });
 
     const crawl = executePages.mock.calls[0][0];
     expect(crawl).toBeInstanceOf(AmazonPlpCrawl);
-    expect(crawl).toMatchObject({ category: "toys", allPages });
+    expect(crawl).toMatchObject({ category: "toys", allPages: true });
   });
 
   it("resolves only after the listings are searched", async () => {
