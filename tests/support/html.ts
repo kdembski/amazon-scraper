@@ -154,7 +154,7 @@ export const plpPage = ({
     ${asins
       .map(
         (asin) => `
-          <div role="listitem" data-asin="${asin}">
+          <div role="listitem" data-asin="${asin}" data-component-type="s-search-result">
             <img src="https://m.media-amazon.com/images/I/${asin}.jpg" />
             <a href="/dp/${asin}"><h2><span>Product ${asin}</span></h2></a>
           </div>

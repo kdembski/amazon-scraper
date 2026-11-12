@@ -12,8 +12,9 @@ const listItem = ({
   asin = "B0TESTASIN",
   src = image,
   name = "Test product",
+  type = "s-search-result",
 } = {}) => `
-  <div role="listitem" ${asin ? `data-asin="${asin}"` : ""}>
+  <div role="listitem" ${asin ? `data-asin="${asin}"` : ""} data-component-type="${type}">
     ${src ? `<img src="${src}" />` : "<img />"}
     <a href="/dp/${asin}"><h2>${name ? `<span>${name}</span>` : ""}</h2></a>
   </div>
@@ -85,5 +86,15 @@ describe("AmazonPlpBuilder", () => {
   ])("skips items without %s", (_field, overrides) => {
     const body = results(`${listItem(overrides)}${listItem({ asin: "B0VALID" })}`);
     expect(build(body).ads.map((ad) => ad.asin)).toEqual(["B0VALID"]);
+  });
+
+  it("skips list items outside the search results", () => {
+    const body = results(`${listItem({ type: "s-impression-logger" })}${listItem({ asin: "B0VALID" })}`);
+    expect(build(body).ads.map((ad) => ad.asin)).toEqual(["B0VALID"]);
+  });
+
+  it("is valid and empty when redirected to all departments", () => {
+    const body = results(`<div data-csa-c-content-id="correction-messages-aps-redirect"></div>${listItem()}`);
+    expect(build(body)).toEqual({ isValid: true, ads: [], lastPage: 1 });
   });
 });

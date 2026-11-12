@@ -6,13 +6,14 @@ export class AmazonPlpBuilder {
   stopAt = ["s-pagination-item", "MAIN-FEEDBACK"];
 
   build(document: Document, category: string) {
-    const listItemSelector = "div[role='listitem']";
+    const listItemSelector = "div[role='listitem'][data-component-type='s-search-result']";
     const items = findAll(listItemSelector, document);
 
-    const ads = _.compact(items.map((item) => this.buildItem(item, category)));
+    const isRedirected = !!find("[data-csa-c-content-id='correction-messages-aps-redirect']", document);
+    const ads = isRedirected ? [] : _.compact(items.map((item) => this.buildItem(item, category)));
 
     const hasResults = !!find("[data-component-type='s-search-results']", document);
-    const isEmpty = !!find("[data-csa-c-content-id='messaging-messages-no-results']", document);
+    const isEmpty = isRedirected || !!find("[data-csa-c-content-id='messaging-messages-no-results']", document);
 
     return {
       isValid: hasResults && (ads.length > 0 || isEmpty),
