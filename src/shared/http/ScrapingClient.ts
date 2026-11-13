@@ -9,6 +9,7 @@ import { ProxyService } from "@/shared/http/proxy/ProxyService";
 import { StopAtReader } from "@/shared/http/StopAtReader";
 import { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
 import { MetricsService } from "@/shared/metrics/MetricsService";
+import { toNetworkError } from "@/shared/metrics/toNetworkError";
 import { toRequestOutcome } from "@/shared/metrics/toRequestOutcome";
 import type { Route, ScrapingRequest } from "@/shared/http/http.types";
 import type { MetricLabels, RequestOutcome } from "@/shared/metrics/metrics.types";
@@ -86,7 +87,11 @@ export class ScrapingClient {
     } catch (e: any) {
       if (stopAt) e?.response?.data?.resume?.();
       if ([403, 429].includes(e?.status)) this.proxyService.block(httpsAgent, host);
-      this.record(toRequestOutcome(e), route, labels, startedAt);
+      const outcome = toRequestOutcome(e);
+      this.record(outcome, route, labels, startedAt);
+      if (outcome === "network") {
+        this.metricsService.increment(`network_errors_${route}`, { ...labels, outcome: toNetworkError(e) });
+      }
       throw e;
     }
   }

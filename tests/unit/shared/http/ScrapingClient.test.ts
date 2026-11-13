@@ -207,6 +207,28 @@ describe("ScrapingClient", () => {
         });
       });
 
+      it("counts a network error under its code and route", async () => {
+        const { service, metrics } = setupMetrics();
+        get.mockRejectedValue(Object.assign(new Error("reset"), { code: "ECONNRESET" }));
+
+        await service.get(url, labels).catch(() => {});
+
+        expect(metrics.increment).toHaveBeenCalledWith("network_errors_direct6", {
+          country: "de",
+          outcome: "ECONNRESET",
+        });
+      });
+
+      it("counts no network error for other outcomes", async () => {
+        const { service, metrics } = setupMetrics();
+        get.mockRejectedValue({ status: 503, response: { status: 503 } });
+
+        await service.get(url, labels).catch(() => {});
+
+        const names = metrics.increment.mock.calls.map(([name]) => name);
+        expect(names).not.toContain("network_errors_direct6");
+      });
+
       it("passes the country of the host to the proxy service", async () => {
         const { service, proxy } = setupMetrics();
         get.mockResolvedValue({ data: "" });
