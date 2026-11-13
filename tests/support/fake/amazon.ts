@@ -1,5 +1,5 @@
 import http from "http";
-import https from "https";
+import http2 from "http2";
 import { AddressInfo, Socket } from "net";
 import { generate } from "selfsigned";
 
@@ -7,13 +7,18 @@ export type AmazonRequest = {
   country: string;
   // Url the way AmazonService gets it, starting with the TLD (de/dp/...)
   url: string;
-  headers: http.IncomingHttpHeaders;
+  headers: http2.IncomingHttpHeaders;
   at: number;
 };
 
 export type AmazonReply =
   | string
-  | { status?: number; body?: string; delay?: number }
+  | {
+      status?: number;
+      body?: string | Buffer;
+      delay?: number;
+      headers?: Record<string, string>;
+    }
   | { destroy: true };
 
 type Responder = (request: AmazonRequest) => AmazonReply;
@@ -39,7 +44,7 @@ export class FakeAmazon {
   private proxy = http.createServer((_req, res) =>
     res.writeHead(405).end()
   );
-  private site!: https.Server;
+  private site!: http2.Http2SecureServer;
   private sockets = new Set<Socket>();
   private port = 0;
 
@@ -48,8 +53,9 @@ export class FakeAmazon {
   constructor(private host = "127.0.0.1") {}
 
   async start() {
-    this.site = https.createServer(await getCertificate(), (req, res) =>
-      this.handle(req, res)
+    this.site = http2.createSecureServer(
+      { ...(await getCertificate()), allowHTTP1: true },
+      (req, res) => this.handle(req, res)
     );
     this.proxy.on("connect", (req, socket, head) =>
       this.tunnel(req, socket as Socket, head)
@@ -99,11 +105,16 @@ export class FakeAmazon {
     socket.on("close", () => this.sockets.delete(socket));
     socket.on("error", () => {});
 
-    const credentials = Buffer.from(`${this.user}:${this.password}`);
-    const expected = `Basic ${credentials.toString("base64")}`;
+    const [user, password] = Buffer.from(
+      (req.headers["proxy-authorization"] ?? "").replace(/^Basic /, ""),
+      "base64"
+    )
+      .toString()
+      .split(":");
+    const isAuthorized = user?.split("-")[0] === this.user && password === this.password;
     const isAmazon = /^www\.amazon\.[a-z.]+:443$/.test(req.url ?? "");
 
-    if (req.headers["proxy-authorization"] !== expected || !isAmazon) {
+    if (!isAuthorized || !isAmazon) {
       this.rejectedTunnels++;
       socket.end("HTTP/1.1 407 Proxy Authentication Required\r\n\r\n");
       return;
@@ -114,8 +125,12 @@ export class FakeAmazon {
     this.site.emit("connection", socket);
   }
 
-  private async handle(req: http.IncomingMessage, res: http.ServerResponse) {
-    const country = (req.headers.host ?? "").replace(/^www\.amazon\./, "");
+  private async handle(
+    req: http2.Http2ServerRequest,
+    res: http2.Http2ServerResponse
+  ) {
+    const host = req.headers.host ?? req.headers[":authority"] ?? "";
+    const country = host.replace(/^www\.amazon\./, "");
     const request: AmazonRequest = {
       country,
       url: `${country}${req.url}`,
@@ -136,9 +151,9 @@ export class FakeAmazon {
       return;
     }
 
-    const { status = 200, body = "", delay } = reply;
+    const { status = 200, body = "", delay, headers } = reply;
     if (delay) await new Promise((resolve) => setTimeout(resolve, delay));
 
-    res.writeHead(status, { "Content-Type": "text/html" }).end(body);
+    res.writeHead(status, { "Content-Type": "text/html", ...headers }).end(body);
   }
 }

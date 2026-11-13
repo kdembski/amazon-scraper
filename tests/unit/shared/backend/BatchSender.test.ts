@@ -27,7 +27,7 @@ const calls = (increment: ReturnType<typeof vi.fn>, metric: string) =>
   increment.mock.calls.filter(([name]) => name === metric);
 
 const networkError = () => new Error("socket hang up");
-const httpError = (status: number) => Object.assign(new Error("failed"), { response: { status } });
+const httpError = (status: number) => Object.assign(new Error("failed"), { status, response: { status } });
 
 describe("BatchSender", () => {
   beforeEach(() => {

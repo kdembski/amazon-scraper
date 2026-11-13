@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ProxyService } from "@/shared/http/proxy/ProxyService";
+import { Http2Endpoint } from "@/shared/http/proxy/Http2Endpoint";
 import type { ProxyAgentPool } from "@/shared/http/proxy/ProxyAgentPool";
 import type { ProxyList } from "@/shared/http/proxy/ProxyList";
 import type { ProxyTrafficMeter } from "@/shared/http/proxy/ProxyTrafficMeter";
@@ -352,6 +353,36 @@ describe("ProxyService", () => {
     service.pool.onConnect(socket, "www.amazon.de", "direct4");
 
     expect(track).toHaveBeenCalledWith(socket, "www.amazon.de", "direct4");
+    resetSingleton(ProxyService);
+  });
+
+  it("uses sessions of Http2Endpoint with env HTTP2", () => {
+    vi.stubEnv("HTTP2", "1");
+    resetSingleton(ProxyService);
+    const service = ProxyService.getInstance();
+    vi.unstubAllEnvs();
+
+    expect(service.getAgent("www.amazon.de", "direct")).toBeInstanceOf(Http2Endpoint);
+    resetSingleton(ProxyService);
+  });
+
+  it("uses http agents without env HTTP2", () => {
+    vi.stubEnv("HTTP2", "");
+    resetSingleton(ProxyService);
+    const service = ProxyService.getInstance();
+    vi.unstubAllEnvs();
+
+    expect(service.getAgent("www.amazon.de", "direct")).not.toBeInstanceOf(Http2Endpoint);
+    resetSingleton(ProxyService);
+  });
+
+  it("uses http agents with env HTTP2=0", () => {
+    vi.stubEnv("HTTP2", "0");
+    resetSingleton(ProxyService);
+    const service = ProxyService.getInstance();
+    vi.unstubAllEnvs();
+
+    expect(service.getAgent("www.amazon.de", "direct")).not.toBeInstanceOf(Http2Endpoint);
     resetSingleton(ProxyService);
   });
 
