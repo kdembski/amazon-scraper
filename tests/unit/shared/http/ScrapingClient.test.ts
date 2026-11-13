@@ -112,7 +112,7 @@ describe("ScrapingClient", () => {
 
     it.each([403, 429])("blocks the agent for the host on a %s before rejecting", async (status) => {
       const { service, agent, proxy } = setup();
-      get.mockRejectedValue({ response: { status } });
+      get.mockRejectedValue({ status, response: { status } });
 
       const onRejected = vi.fn(() => {
         expect(proxy.block).toHaveBeenCalledWith(agent, "www.amazon.de");
@@ -125,7 +125,7 @@ describe("ScrapingClient", () => {
 
     it.each([404, 503])("does not block the agent on a %s", async (status) => {
       const { service, proxy } = setup();
-      get.mockRejectedValue({ response: { status } });
+      get.mockRejectedValue({ status, response: { status } });
 
       await expect(service.get("https://www.amazon.de/dp/B0TESTASIN")).rejects.toBeDefined();
 
@@ -194,7 +194,7 @@ describe("ScrapingClient", () => {
 
       it("counts the request also under the route of its agent", async () => {
         const { service, metrics } = setupMetrics();
-        get.mockRejectedValue({ response: { status: 503 } });
+        get.mockRejectedValue({ status: 503, response: { status: 503 } });
 
         await service.get(url, labels).catch(() => {});
 
@@ -296,7 +296,7 @@ describe("ScrapingClient", () => {
         const { run } = setupStream([]);
         const body = Readable.from([Buffer.from("not found")]);
         get.mockReset();
-        const error = { response: { status: 404, data: body } };
+        const error = { status: 404, response: { status: 404, data: body } };
         get.mockRejectedValue(error);
 
         await expect(run()).rejects.toBe(error);

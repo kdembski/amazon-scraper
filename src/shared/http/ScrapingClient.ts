@@ -75,7 +75,7 @@ export class ScrapingClient {
       return data;
     } catch (e: any) {
       if (stopAt) e?.response?.data?.resume?.();
-      if ([403, 429].includes(e?.response?.status)) this.proxyService.block(httpsAgent, host);
+      if ([403, 429].includes(e?.status)) this.proxyService.block(httpsAgent, host);
       this.record(toRequestOutcome(e), route, labels, startedAt);
       throw e;
     }

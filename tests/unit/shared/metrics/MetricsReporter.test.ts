@@ -188,7 +188,7 @@ describe("MetricsReporter", () => {
 
   it("resends a failed report unchanged with its key before the next one", async () => {
     const { api, metrics, reporter } = setup();
-    api.send.mockRejectedValueOnce({ response: { status: 503 } });
+    api.send.mockRejectedValueOnce({ status: 503, response: { status: 503 } });
     metrics.increment("requests", { country: "de", outcome: "ok" }, 2);
     reporter.start("amazon");
 
@@ -234,7 +234,7 @@ describe("MetricsReporter", () => {
 
   it("drops a report rejected with a 4xx and goes on with the next one", async () => {
     const { api, metrics, reporter } = setup();
-    api.send.mockRejectedValueOnce({ response: { status: 400 } });
+    api.send.mockRejectedValueOnce({ status: 400, response: { status: 400 } });
     metrics.increment("requests", { country: "de", outcome: "ok" }, 2);
     reporter.start("amazon");
 
