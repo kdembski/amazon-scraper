@@ -90,7 +90,7 @@ describe("AmazonPdpScraper", () => {
   });
 
   describe("scrape", () => {
-    it("loads no batch at night and resumes in the morning", async () => {
+    it("loads a batch at night while the night pause is disabled", async () => {
       const log = vi.spyOn(console, "log").mockImplementation(() => {});
       const { api, country, scraper } = setup();
       country.getCountries.mockResolvedValue(countries);
@@ -98,15 +98,8 @@ describe("AmazonPdpScraper", () => {
 
       vi.setSystemTime(new Date("2026-01-15T22:00:00Z"));
       await scraper.scrape();
-      expect(api.get).not.toHaveBeenCalled();
-
-      vi.setSystemTime(new Date("2026-01-16T06:00:00Z"));
-      await scraper.scrape();
       expect(api.get).toHaveBeenCalledTimes(1);
-      expect(log.mock.calls).toEqual([
-        ["pdp: night pause started"],
-        ["pdp: night pause ended"],
-      ]);
+      expect(log).not.toHaveBeenCalled();
     });
 
     it("logs and counts a failed load instead of rejecting", async () => {
