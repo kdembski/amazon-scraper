@@ -5,6 +5,7 @@ import { gzipSync } from "node:zlib";
 import { randomBytes } from "node:crypto";
 
 const REQUESTS = 20000;
+const PROXIES = Number(process.env.PROXIES ?? 200);
 const CONCURRENCY = 200;
 const MARKER = "BENCH-MARKER";
 
@@ -27,7 +28,12 @@ async function bench() {
   const mode = process.env.HTTP2 ? "h2" : "h1";
   const child = fork(import.meta.filename, ["serve"], { execArgv: ["--import", "tsx"] });
   const proxyLine = await new Promise<string>((resolve) => child.once("message", resolve));
-  const list = http.createServer((_req, res) => res.end(proxyLine));
+  const [host, port, name, password] = proxyLine.split(":");
+  const proxyLines = Array.from(
+    { length: PROXIES },
+    (_, i) => [host, port, `${name}-${i}`, password].join(":")
+  ).join("\n");
+  const list = http.createServer((_req, res) => res.end(proxyLines));
   await new Promise<void>((resolve) => list.listen(0, "127.0.0.1", resolve));
 
   process.env.PROXY_LIST_URL = `http://127.0.0.1:${(list.address() as AddressInfo).port}`;

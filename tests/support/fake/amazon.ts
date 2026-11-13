@@ -105,11 +105,16 @@ export class FakeAmazon {
     socket.on("close", () => this.sockets.delete(socket));
     socket.on("error", () => {});
 
-    const credentials = Buffer.from(`${this.user}:${this.password}`);
-    const expected = `Basic ${credentials.toString("base64")}`;
+    const [user, password] = Buffer.from(
+      (req.headers["proxy-authorization"] ?? "").replace(/^Basic /, ""),
+      "base64"
+    )
+      .toString()
+      .split(":");
+    const isAuthorized = user?.split("-")[0] === this.user && password === this.password;
     const isAmazon = /^www\.amazon\.[a-z.]+:443$/.test(req.url ?? "");
 
-    if (req.headers["proxy-authorization"] !== expected || !isAmazon) {
+    if (!isAuthorized || !isAmazon) {
       this.rejectedTunnels++;
       socket.end("HTTP/1.1 407 Proxy Authentication Required\r\n\r\n");
       return;
