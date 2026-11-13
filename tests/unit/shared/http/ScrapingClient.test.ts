@@ -1,8 +1,11 @@
 import axios from "axios";
 import { Readable } from "node:stream";
+import _ from "lodash";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { StopAt } from "@/shared/http/http.types";
+import { HttpStatusError } from "@/shared/http/HttpStatusError";
 import { ScrapingClient } from "@/shared/http/ScrapingClient";
+import { Http2Endpoint } from "@/shared/http/proxy/Http2Endpoint";
 import type { ProxyService } from "@/shared/http/proxy/ProxyService";
 import type { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
 
@@ -312,6 +315,186 @@ describe("ScrapingClient", () => {
         await expect(run()).rejects.toBe(error);
 
         expect(metrics.increment).toHaveBeenCalledWith("requests", { outcome: "timeout" });
+      });
+    });
+
+    describe("over HTTP/2", () => {
+      const url = "https://www.amazon.de/dp/X?th=1";
+
+      const respond = (status: number, body: string | string[] = "", headers = {}) => ({
+        status,
+        headers,
+        body: Readable.from(_.castArray(body).map((chunk) => Buffer.from(chunk))),
+      });
+
+      const setupHttp2 = (route = "proxy") => {
+        const request = vi.fn();
+        const endpoint = Object.assign(Object.create(Http2Endpoint.prototype), {
+          request,
+        }) as Http2Endpoint;
+        const metrics = { increment: vi.fn() };
+        const proxy = {
+          getAgent: vi.fn(() => endpoint),
+          block: vi.fn(),
+          getRoute: vi.fn(() => route),
+          setCountry: vi.fn(),
+        };
+        const queue = {
+          request: vi.fn((cb: () => Promise<unknown>) => {
+            cb();
+          }),
+        };
+        const service = new Client(proxy, queue, metrics);
+
+        return { service, endpoint, request, metrics, proxy };
+      };
+
+      it("requests the path with the query and only the referer header", async () => {
+        const { service, request } = setupHttp2();
+        request.mockResolvedValue(respond(200, "<html>"));
+
+        await expect(
+          service.get(url, { referer: "https://www.amazon.de/s?k=X" })
+        ).resolves.toBe("<html>");
+
+        expect(get).not.toHaveBeenCalled();
+        expect(request).toHaveBeenCalledWith(
+          "www.amazon.de",
+          "/dp/X?th=1",
+          [["referer", "https://www.amazon.de/s?k=X"]],
+          expect.any(AbortSignal)
+        );
+      });
+
+      it("sends no headers without a referer", async () => {
+        const { service, request } = setupHttp2();
+        request.mockResolvedValue(respond(200, "<html>"));
+
+        await service.get(url);
+
+        expect(request.mock.calls[0][2]).toEqual([]);
+      });
+
+      it("cuts the text after the stopAt markers and destroys the stream", async () => {
+        const { service, request, metrics } = setupHttp2();
+        const response = respond(200, ["<a>", "<b>x&&&y", "rest"]);
+        request.mockResolvedValue(response);
+
+        await expect(service.get(url, { stopAt: ["<b>", "&&&"] })).resolves.toBe("<a><b>x&&&y");
+
+        expect(response.body.destroyed).toBe(true);
+        expect(metrics.increment).toHaveBeenCalledWith("requests", { outcome: "ok" });
+      });
+
+      it("rejects an error status, drains its body and records it", async () => {
+        const { service, request, metrics, proxy } = setupHttp2();
+        const response = respond(404, "not found");
+        request.mockResolvedValue(response);
+
+        await expect(service.get(url)).rejects.toMatchObject({ status: 404 });
+        await new Promise((resolve) => response.body.once("end", resolve));
+
+        expect(response.body.readableEnded).toBe(true);
+        expect(proxy.block).not.toHaveBeenCalled();
+        expect(metrics.increment).toHaveBeenCalledWith("requests", { outcome: "http_404" });
+      });
+
+      it.each([403, 429])("blocks the endpoint for the host on a %s", async (status) => {
+        const { service, endpoint, request, proxy } = setupHttp2("direct4");
+        request.mockResolvedValue(respond(status));
+
+        await expect(service.get(url)).rejects.toBeInstanceOf(HttpStatusError);
+
+        expect(proxy.block).toHaveBeenCalledWith(endpoint, "www.amazon.de");
+      });
+
+      it("records an abort after 20 s as timeout", async () => {
+        vi.useFakeTimers();
+        vi.spyOn(AbortSignal, "timeout").mockImplementation((ms) => {
+          const aborter = new AbortController();
+          setTimeout(() => aborter.abort(), ms);
+          return aborter.signal;
+        });
+        const { service, request, metrics } = setupHttp2();
+        request.mockImplementation(
+          (_host: string, _path: string, _headers: unknown, signal: AbortSignal) =>
+            new Promise((_resolve, reject) =>
+              signal.addEventListener("abort", () =>
+                reject(Object.assign(new Error("Request aborted"), { code: "ETIMEDOUT" }))
+              )
+            )
+        );
+
+        const result = service.get(url).catch((e) => e);
+        await vi.advanceTimersByTimeAsync(19_999);
+        expect(metrics.increment).not.toHaveBeenCalled();
+        await vi.advanceTimersByTimeAsync(1);
+        vi.useRealTimers();
+
+        await expect(result).resolves.toMatchObject({ code: "ETIMEDOUT" });
+        expect(metrics.increment).toHaveBeenCalledWith("requests", { outcome: "timeout" });
+      });
+
+      it("follows redirects to the same host and destroys their bodies", async () => {
+        const { service, request } = setupHttp2();
+        const redirect = respond(301, "moved", { location: "/dp/Y" });
+        request
+          .mockResolvedValueOnce(redirect)
+          .mockResolvedValueOnce(respond(302, "", { location: "https://www.amazon.de/dp/Z?a=1" }))
+          .mockResolvedValueOnce(respond(200, "<html>"));
+
+        await expect(service.get(url)).resolves.toBe("<html>");
+
+        expect(redirect.body.destroyed).toBe(true);
+        expect(request.mock.calls.map(([host, path]) => [host, path])).toEqual([
+          ["www.amazon.de", "/dp/X?th=1"],
+          ["www.amazon.de", "/dp/Y"],
+          ["www.amazon.de", "/dp/Z?a=1"],
+        ]);
+      });
+
+      it("rejects a redirect to another host and destroys its body", async () => {
+        const { service, request, metrics } = setupHttp2();
+        const redirect = respond(301, "", { location: "https://www.amazon.com/dp/X" });
+        request.mockResolvedValue(redirect);
+
+        await expect(service.get(url)).rejects.toMatchObject({ status: 301 });
+
+        expect(redirect.body.destroyed).toBe(true);
+        expect(request).toHaveBeenCalledTimes(1);
+        expect(metrics.increment).toHaveBeenCalledWith("requests", { outcome: "http_301" });
+      });
+
+      it("rejects after 5 followed redirects", async () => {
+        const { service, request } = setupHttp2();
+        request.mockImplementation(async () => respond(302, "", { location: "/dp/X" }));
+
+        await expect(service.get(url)).rejects.toMatchObject({ status: 302 });
+
+        expect(request).toHaveBeenCalledTimes(6);
+      });
+
+      it("rejects a redirect without a location", async () => {
+        const { service, request } = setupHttp2();
+        request.mockResolvedValue(respond(304));
+
+        await expect(service.get(url)).rejects.toMatchObject({ status: 304 });
+      });
+
+      it("destroys the body when reading it fails", async () => {
+        const { service, request, metrics } = setupHttp2();
+        const body = Readable.from(
+          (async function* () {
+            yield Buffer.from("<a>");
+            throw new Error("reset");
+          })()
+        );
+        request.mockResolvedValue({ status: 200, headers: {}, body });
+
+        await expect(service.get(url)).rejects.toThrow("reset");
+
+        expect(body.destroyed).toBe(true);
+        expect(metrics.increment).toHaveBeenCalledWith("requests", { outcome: "network" });
       });
     });
 

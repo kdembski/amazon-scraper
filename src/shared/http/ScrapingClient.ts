@@ -1,7 +1,10 @@
 import axios from "axios";
 import type { Readable } from "node:stream";
+import { text } from "node:stream/consumers";
 import { setImmediate } from "node:timers/promises";
 import _ from "lodash";
+import { HttpStatusError } from "@/shared/http/HttpStatusError";
+import { Http2Endpoint } from "@/shared/http/proxy/Http2Endpoint";
 import { ProxyService } from "@/shared/http/proxy/ProxyService";
 import { StopAtReader } from "@/shared/http/StopAtReader";
 import { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
@@ -56,6 +59,13 @@ export class ScrapingClient {
     const startedAt = Date.now();
 
     try {
+      if (httpsAgent instanceof Http2Endpoint) {
+        const signal = AbortSignal.timeout(this.timeout);
+        const data = await this.fetchHttp2(httpsAgent, url, { referer, stopAt }, signal);
+        this.record("ok", route, labels, startedAt);
+        return data as T;
+      }
+
       const response = await axios.get<T>(url, {
         httpsAgent,
         // Hard limit for the whole request; axios `timeout` does not
@@ -77,6 +87,46 @@ export class ScrapingClient {
       if (stopAt) e?.response?.data?.resume?.();
       if ([403, 429].includes(e?.status)) this.proxyService.block(httpsAgent, host);
       this.record(toRequestOutcome(e), route, labels, startedAt);
+      throw e;
+    }
+  }
+
+  private async fetchHttp2(
+    endpoint: Http2Endpoint,
+    url: string,
+    request: ScrapingRequest,
+    signal: AbortSignal,
+    hops = 0
+  ): Promise<string> {
+    const target = new URL(url);
+    const headers: [string, string][] = request.referer ? [["referer", request.referer]] : [];
+    const response = await endpoint.request(
+      target.hostname,
+      target.pathname + target.search,
+      headers,
+      signal
+    );
+    const { status, body } = response;
+
+    if (status >= 300 && status < 400) {
+      body.destroy();
+
+      const location = response.headers.location;
+      const next = location ? new URL(location, target) : undefined;
+      if (!next || next.hostname !== target.hostname || hops >= 5) throw new HttpStatusError(status);
+
+      return this.fetchHttp2(endpoint, next.href, request, signal, hops + 1);
+    }
+
+    if (status >= 400) {
+      body.resume();
+      throw new HttpStatusError(status);
+    }
+
+    try {
+      return request.stopAt ? await this.stopAtReader.read(body, request.stopAt) : await text(body);
+    } catch (e) {
+      body.destroy();
       throw e;
     }
   }

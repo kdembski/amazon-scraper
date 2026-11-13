@@ -1,5 +1,5 @@
 import http from "http";
-import https from "https";
+import http2 from "http2";
 import { AddressInfo, Socket } from "net";
 import { generate } from "selfsigned";
 
@@ -7,7 +7,7 @@ export type AmazonRequest = {
   country: string;
   // Url the way AmazonService gets it, starting with the TLD (de/dp/...)
   url: string;
-  headers: http.IncomingHttpHeaders;
+  headers: http2.IncomingHttpHeaders;
   at: number;
 };
 
@@ -39,7 +39,7 @@ export class FakeAmazon {
   private proxy = http.createServer((_req, res) =>
     res.writeHead(405).end()
   );
-  private site!: https.Server;
+  private site!: http2.Http2SecureServer;
   private sockets = new Set<Socket>();
   private port = 0;
 
@@ -48,8 +48,9 @@ export class FakeAmazon {
   constructor(private host = "127.0.0.1") {}
 
   async start() {
-    this.site = https.createServer(await getCertificate(), (req, res) =>
-      this.handle(req, res)
+    this.site = http2.createSecureServer(
+      { ...(await getCertificate()), allowHTTP1: true },
+      (req, res) => this.handle(req, res)
     );
     this.proxy.on("connect", (req, socket, head) =>
       this.tunnel(req, socket as Socket, head)
@@ -114,8 +115,12 @@ export class FakeAmazon {
     this.site.emit("connection", socket);
   }
 
-  private async handle(req: http.IncomingMessage, res: http.ServerResponse) {
-    const country = (req.headers.host ?? "").replace(/^www\.amazon\./, "");
+  private async handle(
+    req: http2.Http2ServerRequest,
+    res: http2.Http2ServerResponse
+  ) {
+    const host = req.headers.host ?? req.headers[":authority"] ?? "";
+    const country = host.replace(/^www\.amazon\./, "");
     const request: AmazonRequest = {
       country,
       url: `${country}${req.url}`,

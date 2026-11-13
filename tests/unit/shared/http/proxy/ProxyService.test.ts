@@ -1,4 +1,4 @@
-﻿import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ProxyService } from "@/shared/http/proxy/ProxyService";
 import { Http2Endpoint } from "@/shared/http/proxy/Http2Endpoint";
 import type { ProxyAgentPool } from "@/shared/http/proxy/ProxyAgentPool";
