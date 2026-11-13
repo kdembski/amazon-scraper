@@ -11,7 +11,7 @@ import { ScrapingClient } from "@/shared/http/ScrapingClient";
 import { ArgsService } from "@/shared/args/ArgsService";
 import { ScraperNameResolver } from "@/shared/args/ScraperNameResolver";
 import { ScraperConfigService } from "@/shared/backend/ScraperConfigService";
-import type { ProxyAgentPool } from "@/shared/http/proxy/ProxyAgentPool";
+import type { Http2SessionPool } from "@/shared/http/proxy/Http2SessionPool";
 import { ProxyService } from "@/shared/http/proxy/ProxyService";
 import { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
 import { FakeAmazon } from "@@tests/support/fake/amazon";
@@ -74,7 +74,7 @@ export async function stopWorld({ backend, amazon }: World) {
   if (queue) queue.start = () => {};
 
   const proxyService = instanceOf(ProxyService) as unknown as
-    | { pool: ProxyAgentPool }
+    | { pool: Http2SessionPool }
     | undefined;
   proxyService?.pool.retain([]);
 

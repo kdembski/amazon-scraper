@@ -1,14 +1,12 @@
-import axios from "axios";
-import type { Readable } from "node:stream";
 import { text } from "node:stream/consumers";
 import { setImmediate } from "node:timers/promises";
-import _ from "lodash";
 import { HttpStatusError } from "@/shared/http/HttpStatusError";
-import { Http2Endpoint } from "@/shared/http/proxy/Http2Endpoint";
+import type { Http2Endpoint } from "@/shared/http/proxy/Http2Endpoint";
 import { ProxyService } from "@/shared/http/proxy/ProxyService";
 import { StopAtReader } from "@/shared/http/StopAtReader";
 import { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
 import { MetricsService } from "@/shared/metrics/MetricsService";
+import { toNetworkError } from "@/shared/metrics/toNetworkError";
 import { toRequestOutcome } from "@/shared/metrics/toRequestOutcome";
 import type { Route, ScrapingRequest } from "@/shared/http/http.types";
 import type { MetricLabels, RequestOutcome } from "@/shared/metrics/metrics.types";
@@ -16,10 +14,6 @@ import type { MetricLabels, RequestOutcome } from "@/shared/metrics/metrics.type
 export class ScrapingClient {
   private static instance: ScrapingClient;
   private timeout = 20 * 1000;
-  private userAgents = [138, 139, 140, 141].map(
-    (version) =>
-      `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${version}.0.0.0 Safari/537.36`
-  );
 
   private constructor(
     private proxyService = ProxyService.getInstance(),
@@ -53,45 +47,28 @@ export class ScrapingClient {
     if (isCancelled?.()) return;
 
     const host = new URL(url).hostname;
-    const httpsAgent = this.proxyService.getAgent(host, proxyType);
+    const endpoint = this.proxyService.getEndpoint(host, proxyType);
     if (labels.country) this.proxyService.setCountry(host, labels.country);
-    const route = this.proxyService.getRoute(httpsAgent);
+    const route = this.proxyService.getRoute(endpoint);
     const startedAt = Date.now();
 
     try {
-      if (httpsAgent instanceof Http2Endpoint) {
-        const signal = AbortSignal.timeout(this.timeout);
-        const data = await this.fetchHttp2(httpsAgent, url, { referer, stopAt }, signal);
-        this.record("ok", route, labels, startedAt);
-        return data as T;
-      }
-
-      const response = await axios.get<T>(url, {
-        httpsAgent,
-        // Hard limit for the whole request; axios `timeout` does not
-        // cover a proxy that hangs on CONNECT
-        signal: AbortSignal.timeout(this.timeout),
-        headers: {
-          "User-Agent": _.sample(this.userAgents),
-          Referer: referer,
-          "Accept-Encoding": "gzip, deflate, br",
-        },
-        ...(stopAt && { responseType: "stream" }),
-      });
-      const data = stopAt
-        ? ((await this.stopAtReader.read(response.data as Readable, stopAt)) as T)
-        : response.data;
+      const signal = AbortSignal.timeout(this.timeout);
+      const data = await this.fetch(endpoint, url, { referer, stopAt }, signal);
       this.record("ok", route, labels, startedAt);
-      return data;
+      return data as T;
     } catch (e: any) {
-      if (stopAt) e?.response?.data?.resume?.();
-      if ([403, 429].includes(e?.status)) this.proxyService.block(httpsAgent, host);
-      this.record(toRequestOutcome(e), route, labels, startedAt);
+      if ([403, 429].includes(e?.status)) this.proxyService.block(endpoint, host);
+      const outcome = toRequestOutcome(e);
+      this.record(outcome, route, labels, startedAt);
+      if (outcome === "network") {
+        this.metricsService.increment(`network_errors_${route}`, { ...labels, outcome: toNetworkError(e) });
+      }
       throw e;
     }
   }
 
-  private async fetchHttp2(
+  private async fetch(
     endpoint: Http2Endpoint,
     url: string,
     request: ScrapingRequest,
@@ -115,7 +92,7 @@ export class ScrapingClient {
       const next = location ? new URL(location, target) : undefined;
       if (!next || next.hostname !== target.hostname || hops >= 5) throw new HttpStatusError(status);
 
-      return this.fetchHttp2(endpoint, next.href, request, signal, hops + 1);
+      return this.fetch(endpoint, next.href, request, signal, hops + 1);
     }
 
     if (status >= 400) {

@@ -17,7 +17,6 @@ jobs:
       - run: npm ci
       - run: npx tsc --noEmit
       - run: npx vitest run --project unit --project integration --project e2e
-      - run: HTTP2=1 npx vitest run --project integration --project e2e
 
   deploy:
     needs: test

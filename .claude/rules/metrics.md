@@ -27,11 +27,12 @@ Types: counters = sum over the minute; gauges = value at report time. `*_ms` as 
 |---|---|---|
 | `requests` | `country` (from the URL: `de`, `co.uk`, `pl`...), `outcome`: `ok` / `timeout` / `network` / `http_<status>` | Every HTTP request to Amazon. `timeout` = 20 s exceeded or a connect timeout (`ETIMEDOUT`). |
 | `requests_proxy` / `requests_direct4` / `requests_direct6` | same as `requests` | The same requests split by route: through a proxy, direct over IPv4, direct over IPv6. Their sum = `requests`. |
+| `network_errors_proxy` / `network_errors_direct4` / `network_errors_direct6` | `country`, `outcome`: error code (`toNetworkError`, max 31 chars) | Every `network` request again, by route and cause: `RST_<h2 code>` (stream reset by the server, e.g. `RST_ENHANCE_YOUR_CALM`, or our own `RST_CANCEL`), `SESSION_<h2 code>` (HTTP/2 session closed with an error), otherwise the Node error code (`ECONNRESET`, `ERR_PROXY_502`, `Z_BUF_ERROR`...), `unknown` without one. |
 | `request_ms` | `country` | Sum of request durations (all outcomes). Mean = `request_ms / requests`. |
 | `connections` | `country`, `outcome`: route (`proxy` / `direct4` / `direct6`) | New sockets to shops opened in the minute. |
 | `bytes_in` / `bytes_out` | `country`, `outcome`: route (`proxy` / `direct4` / `direct6`) | Bytes received / sent through shop sockets (raw socket: TLS, CONNECT and headers included). A socket is dropped from tracking on `close`, its last bytes go into the next report. |
 
-Under `HTTP2` a shop socket is the raw TCP socket of one HTTP/2 session (many requests per socket on `direct`), so `connections` and `open_connections` count sessions; `bytes_*` still include TLS and CONNECT.
+A shop socket is the raw TCP socket of one HTTP/2 session (many requests per socket on `direct`), so `connections` and `open_connections` count sessions; `bytes_*` include TLS and CONNECT.
 
 `connections` and `bytes_*` take the country from the host: `ScrapingClient` hands `ProxyService.setCountry(host, country)` the country of every request; a host never requested with a country has none. `outcome` holds the route there, not a result.
 
