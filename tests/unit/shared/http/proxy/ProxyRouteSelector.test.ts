@@ -22,12 +22,21 @@ describe("ProxyRouteSelector", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.unstubAllEnvs();
   });
 
   it("gives no direct agent for a proxy pool", () => {
     const { selector } = setup();
 
     expect(selector.getDirect(pl, "datacenter")).toBeUndefined();
+  });
+
+  it("gives no direct agent with NO_DIRECT", () => {
+    vi.stubEnv("NO_DIRECT", "1");
+    const { selector } = setup();
+
+    expect(selector.getDirect(pl, "direct")).toBeUndefined();
+    expect(selector.getDirect(pl, "mixed1/2")).toBeUndefined();
   });
 
   it("goes over the IP families in turn", () => {
