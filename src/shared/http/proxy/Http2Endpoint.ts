@@ -157,7 +157,10 @@ export class Http2Endpoint extends EventEmitter {
   private attach(host: string, session: Session, client: http2.ClientHttp2Session) {
     client.once("connect", () => client.setLocalWindowSize(15663105));
     client.on("error", () => this.remove(host, session));
-    client.on("goaway", () => this.remove(host, session));
+    client.on("goaway", (code: number) => {
+      if (code !== http2.constants.NGHTTP2_NO_ERROR) console.warn(`HTTP/2 GOAWAY ${host} code ${code}`);
+      this.remove(host, session);
+    });
     client.on("close", () => this.remove(host, session));
     client.setTimeout(this.idleTimeout, () => {
       if (session.streams === 0) this.retire(host, session);

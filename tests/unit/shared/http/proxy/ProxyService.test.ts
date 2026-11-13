@@ -376,6 +376,16 @@ describe("ProxyService", () => {
     resetSingleton(ProxyService);
   });
 
+  it("uses http agents with env HTTP2=0", () => {
+    vi.stubEnv("HTTP2", "0");
+    resetSingleton(ProxyService);
+    const service = ProxyService.getInstance();
+    vi.unstubAllEnvs();
+
+    expect(service.getAgent("www.amazon.de", "direct")).not.toBeInstanceOf(Http2Endpoint);
+    resetSingleton(ProxyService);
+  });
+
   it("passes a block of an agent for a host to the pool", () => {
     const { service, pool } = setup();
     const agent = { direct: 4 };

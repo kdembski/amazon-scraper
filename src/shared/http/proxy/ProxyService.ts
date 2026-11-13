@@ -34,7 +34,7 @@ export class ProxyService {
   }
 
   private static createPool(onConnect: (socket: net.Socket, host: string, route: Route) => void) {
-    if (process.env.HTTP2) return new Http2SessionPool(onConnect);
+    if (process.env.HTTP2 === "1") return new Http2SessionPool(onConnect);
 
     return new ProxyAgentPool(onConnect);
   }

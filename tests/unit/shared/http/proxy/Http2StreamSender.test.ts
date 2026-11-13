@@ -83,6 +83,27 @@ describe("Http2StreamSender", () => {
     expect(await readBody((await send(client)).body)).toBe("plain");
   });
 
+  it("resolves a raw body that matches its content-length", async () => {
+    const client = await open((stream) => {
+      stream.respond({ ":status": 200, "content-length": "5" });
+      stream.end("plain");
+    });
+
+    expect(await readBody((await send(client)).body)).toBe("plain");
+  });
+
+  it("rejects a raw body cut short of its content-length", async () => {
+    const client = await open((stream) => {
+      stream.respond({ ":status": 200, "content-length": "1000" });
+      stream.write(Buffer.alloc(500));
+      setTimeout(() => stream.session!.destroy(), 20);
+    });
+
+    const response = await send(client);
+
+    await expect(readBody(response.body)).rejects.toMatchObject({ code: "ECONNRESET" });
+  });
+
   it("calls onClose once when the stream ends", async () => {
     const client = await open((stream) => respond(stream));
     const onClose = vi.fn();

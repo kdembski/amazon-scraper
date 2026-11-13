@@ -180,10 +180,30 @@ describe("Http2Endpoint", () => {
       respond(stream);
     });
     create(connect);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     expect(await readBody((await get()).body)).toBe("ok");
     expect(await readBody((await get()).body)).toBe("ok");
     expect(connect).toHaveBeenCalledTimes(2);
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("warns on a GOAWAY with an error code", async () => {
+    const connect = await start((stream) => {
+      stream.session!.goaway(http2.constants.NGHTTP2_INTERNAL_ERROR);
+    });
+    create(connect);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    await get().catch(() => {});
+
+    await vi.waitFor(() =>
+      expect(warn).toHaveBeenCalledWith(
+        `HTTP/2 GOAWAY ${host} code ${http2.constants.NGHTTP2_INTERNAL_ERROR}`
+      )
+    );
+    warn.mockRestore();
   });
 
   it("keeps the session when a body is destroyed", async () => {

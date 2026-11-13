@@ -25,7 +25,7 @@ async function serve() {
 }
 
 async function bench() {
-  const mode = process.env.HTTP2 ? "h2" : "h1";
+  const mode = process.env.HTTP2 === "1" ? "h2" : "h1";
   const child = fork(import.meta.filename, ["serve"], { execArgv: ["--import", "tsx"] });
   const proxyLine = await new Promise<string>((resolve) => child.once("message", resolve));
   const [host, port, name, password] = proxyLine.split(":");

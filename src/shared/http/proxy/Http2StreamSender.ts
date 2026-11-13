@@ -1,5 +1,5 @@
 import http2 from "node:http2";
-import type { Readable, Transform } from "node:stream";
+import { type Readable, Transform } from "node:stream";
 import zlib from "node:zlib";
 import type { Fingerprint, ShopResponse } from "@/shared/http/http.types";
 
@@ -71,8 +71,29 @@ export class Http2StreamSender {
     ]);
   }
 
+  private guard(headers: http2.IncomingHttpHeaders) {
+    const expected = Number(headers["content-length"]);
+    if (!headers["content-length"] || !Number.isFinite(expected)) return undefined;
+
+    return () => {
+      let received = 0;
+
+      return new Transform({
+        transform(chunk, _encoding, callback) {
+          received += chunk.length;
+          callback(null, chunk);
+        },
+        flush(callback) {
+          if (received >= expected) return callback();
+
+          callback(Object.assign(new Error("Body cut off"), { code: "ECONNRESET" }));
+        },
+      });
+    };
+  }
+
   private decode(stream: http2.ClientHttp2Stream, headers: http2.IncomingHttpHeaders) {
-    const create = decoders[String(headers["content-encoding"])];
+    const create = decoders[String(headers["content-encoding"])] ?? this.guard(headers);
     if (!create) return stream;
 
     const decoder = create();
