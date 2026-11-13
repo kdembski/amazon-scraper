@@ -4,9 +4,9 @@ import { DirectBlockList } from "@/shared/http/proxy/DirectBlockList";
 import { FreeProxyTracker } from "@/shared/http/proxy/FreeProxyTracker";
 import { MeteredAgent } from "@/shared/http/proxy/MeteredAgent";
 import { MeteredProxyAgent } from "@/shared/http/proxy/MeteredProxyAgent";
-import type { Route } from "@/shared/http/http.types";
+import type { Route, ShopPool } from "@/shared/http/http.types";
 
-export class ProxyAgentPool {
+export class ProxyAgentPool implements ShopPool<http.Agent> {
   private agents = new Map<string, MeteredProxyAgent>();
   // Direct agents per IP family, keyed "direct4" / "direct6"
   private directs = new Map<Route, MeteredAgent>();

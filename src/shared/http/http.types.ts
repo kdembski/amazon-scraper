@@ -1,6 +1,21 @@
+import type http from "node:http";
 import type http2 from "node:http2";
 import type { Readable } from "node:stream";
+import type { Http2Endpoint } from "@/shared/http/proxy/Http2Endpoint";
 import type { MetricLabels } from "@/shared/metrics/metrics.types";
+
+export interface ShopPool<H> {
+  get(url: string): H;
+  getDirect(family: 4 | 6): H;
+  isDirectBlocked(family: 4 | 6, host: string): boolean;
+  getRoute(handle: H): Route;
+  takeLastFree(host: string, accept: (url: string) => boolean): string | undefined;
+  block(handle: H, host: string): void;
+  retain(urls: string[]): void;
+  countConnections(): number;
+}
+
+export type ShopHandle = http.Agent | Http2Endpoint;
 
 // Markers that must arrive in this order; a step given as an array is done by
 // whichever of its markers comes first

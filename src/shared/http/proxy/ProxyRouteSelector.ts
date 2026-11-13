@@ -1,10 +1,10 @@
-import type { ProxyAgentPool } from "@/shared/http/proxy/ProxyAgentPool";
+import type { ShopHandle, ShopPool } from "@/shared/http/http.types";
 
 export class ProxyRouteSelector {
   directFamilies: (4 | 6)[] = [4];
   private nextDirect = 0;
 
-  constructor(private pool: ProxyAgentPool) {}
+  constructor(private pool: ShopPool<ShopHandle>) {}
 
   // Direct agent when the proxy type asks for one now and the host blocks not
   // every IP family: "direct" over the server's IPv4 and IPv6 in turn,

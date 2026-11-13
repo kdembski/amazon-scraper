@@ -1,12 +1,13 @@
 import { CronJob } from "cron";
 import _ from "lodash";
-import type http from "node:http";
+import type net from "node:net";
+import { Http2SessionPool } from "@/shared/http/proxy/Http2SessionPool";
 import { ProxyAgentPool } from "@/shared/http/proxy/ProxyAgentPool";
 import { ProxyList } from "@/shared/http/proxy/ProxyList";
 import { ProxyRouteSelector } from "@/shared/http/proxy/ProxyRouteSelector";
 import { ProxyTrafficMeter } from "@/shared/http/proxy/ProxyTrafficMeter";
 import { tcpPing } from "@/shared/utils/tcpPing";
-import type { ProxyPlan } from "@/shared/http/http.types";
+import type { ProxyPlan, Route, ShopHandle, ShopPool } from "@/shared/http/http.types";
 
 // IPv6 address of one.one.one.one, reachable only when the server has IPv6
 const IPV6_PING_HOST = "2606:4700:4700::1111";
@@ -20,7 +21,7 @@ export class ProxyService {
 
   private constructor(
     private meter = new ProxyTrafficMeter(),
-    private pool = new ProxyAgentPool((socket, host, route) =>
+    private pool: ShopPool<ShopHandle> = ProxyService.createPool((socket, host, route) =>
       meter.track(socket, host, route)
     ),
     private list = new ProxyList(),
@@ -30,6 +31,12 @@ export class ProxyService {
     new CronJob("0 0 */1 * * *", async () => {
       await this.loadProxies();
     }).start();
+  }
+
+  private static createPool(onConnect: (socket: net.Socket, host: string, route: Route) => void) {
+    if (process.env.HTTP2) return new Http2SessionPool(onConnect);
+
+    return new ProxyAgentPool(onConnect);
   }
 
   public static getInstance(): ProxyService {
@@ -52,11 +59,11 @@ export class ProxyService {
     return this.pool.get(url);
   }
 
-  block(agent: http.Agent, host: string) {
+  block(agent: ShopHandle, host: string) {
     this.pool.block(agent, host);
   }
 
-  getRoute(agent: http.Agent) {
+  getRoute(agent: ShopHandle) {
     return this.pool.getRoute(agent);
   }
 
