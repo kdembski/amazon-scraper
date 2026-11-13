@@ -10,6 +10,7 @@ export class ProxyRouteSelector {
   // every IP family: "direct" over the server's IPv4 and IPv6 in turn,
   // "mixedN/M" the same for N minutes out of N + M (M = N when left out)
   getDirect(host: string, proxyType: string) {
+    if (process.env.NO_DIRECT) return;
     if (proxyType !== "direct" && !this.isDirectWindow(proxyType)) return;
 
     const families = this.directFamilies.filter(
