@@ -162,4 +162,34 @@ describe("ShopConnector", () => {
     ).rejects.toMatchObject({ code: "ETIMEDOUT" });
     expect(onConnect).not.toHaveBeenCalled();
   });
+
+  it("destroys the socket and never connects when aborted during CONNECT", async () => {
+    const proxy = http.createServer();
+    let answer: (() => void) | undefined;
+    const closed = new Promise<void>((resolve) => {
+      proxy.on("connect", (_req, socket) => {
+        socket.on("end", resolve);
+        socket.resume();
+        socket.on("error", () => {});
+        answer = () => socket.write("HTTP/1.1 200 OK\r\n\r\n");
+      });
+    });
+    const port = await listen(proxy);
+    const controller = new AbortController();
+    const onConnect = vi.fn();
+
+    const result = new ShopConnector(onConnect).connect(
+      "www.amazon.de",
+      "proxy",
+      fingerprint,
+      controller.signal,
+      `http://u:p@127.0.0.1:${port}`
+    );
+    await vi.waitFor(() => expect(answer).toBeDefined());
+    controller.abort();
+
+    await expect(result).rejects.toMatchObject({ code: "ETIMEDOUT" });
+    await closed;
+    expect(onConnect).not.toHaveBeenCalled();
+  });
 });

@@ -22,20 +22,34 @@ export class ShopConnector {
     if (signal.aborted) throw fail("Connect aborted", "ETIMEDOUT");
 
     let raw: net.Socket | undefined;
+    let request: http.ClientRequest | undefined;
     let secure: tls.TLSSocket | undefined;
     let onAbort!: () => void;
 
+    const destroyAll = () => {
+      secure?.destroy();
+      raw?.destroy();
+      request?.destroy();
+    };
+
     const aborted = new Promise<never>((_, reject) => {
       onAbort = () => {
-        raw?.destroy();
-        secure?.destroy();
+        destroyAll();
         reject(fail("Connect aborted", "ETIMEDOUT"));
       };
       signal.addEventListener("abort", onAbort, { once: true });
     });
 
     const establish = async () => {
-      raw = await this.open(host, route, proxyUrl, (socket) => (raw = socket));
+      raw = await this.open(
+        host,
+        route,
+        proxyUrl,
+        (socket) => (raw = socket),
+        (pending) => (request = pending)
+      );
+      if (signal.aborted) throw fail("Connect aborted", "ETIMEDOUT");
+
       this.onConnect(raw, host, route);
 
       secure = tls.connect({
@@ -46,19 +60,17 @@ export class ShopConnector {
       });
       await new Promise<void>((resolve, reject) => {
         secure!.once("secureConnect", resolve);
-        secure!.once("error", reject);
+        secure!.on("error", reject);
       });
       if (secure.alpnProtocol === "h2") return secure;
 
-      secure.destroy();
       throw fail(`ALPN ${secure.alpnProtocol}`, "ERR_ALPN");
     };
 
     try {
       return await Promise.race([establish(), aborted]);
     } catch (error) {
-      raw?.destroy();
-      secure?.destroy();
+      destroyAll();
       throw error;
     } finally {
       signal.removeEventListener("abort", onAbort);
@@ -70,7 +82,8 @@ export class ShopConnector {
     host: string,
     route: Route,
     proxyUrl: string | undefined,
-    track: (socket: net.Socket) => void
+    track: (socket: net.Socket) => void,
+    trackRequest: (request: http.ClientRequest) => void
   ) {
     if (!proxyUrl) {
       return new Promise<net.Socket>((resolve, reject) => {
@@ -81,12 +94,17 @@ export class ShopConnector {
         });
         track(socket);
         socket.once("connect", () => resolve(socket));
-        socket.once("error", reject);
+        socket.on("error", reject);
       });
     }
 
     const url = new URL(proxyUrl);
     const credentials = `${decodeURIComponent(url.username)}:${decodeURIComponent(url.password)}`;
+    const headers = url.username
+      ? {
+          "Proxy-Authorization": `Basic ${Buffer.from(credentials).toString("base64")}`,
+        }
+      : {};
 
     return new Promise<net.Socket>((resolve, reject) => {
       const request = http.request({
@@ -94,12 +112,12 @@ export class ShopConnector {
         port: url.port,
         method: "CONNECT",
         path: `${host}:${this.port}`,
-        headers: {
-          "Proxy-Authorization": `Basic ${Buffer.from(credentials).toString("base64")}`,
-        },
+        headers,
       });
+      trackRequest(request);
       request.once("connect", (response, socket) => {
         track(socket);
+        socket.on("error", reject);
         if (response.statusCode === 200) return resolve(socket);
 
         socket.destroy();
@@ -107,7 +125,7 @@ export class ShopConnector {
           fail(`Proxy ${response.statusCode}`, `ERR_PROXY_${response.statusCode}`)
         );
       });
-      request.once("error", reject);
+      request.on("error", reject);
       request.end();
     });
   }
