@@ -1,4 +1,5 @@
 import type http2 from "node:http2";
+import type { Readable } from "node:stream";
 import type { MetricLabels } from "@/shared/metrics/metrics.types";
 
 // Markers that must arrive in this order; a step given as an array is done by
@@ -35,4 +36,11 @@ export type Fingerprint = {
   headers: [string, string][];
   tls: { ciphers: string; sigalgs: string; ecdhCurve: string };
   settings: http2.Settings;
+};
+
+// Body already decompressed
+export type ShopResponse = {
+  status: number;
+  headers: http2.IncomingHttpHeaders;
+  body: Readable;
 };
