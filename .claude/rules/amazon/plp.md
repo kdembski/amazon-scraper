@@ -43,7 +43,7 @@ flowchart TD
     reader -- "HTTP error / timeout / empty /<br/>captcha / invalid" --> retry{"failed < 10?"}
     retry -- yes --> backoff["backoff 1 s, 2 s, 4 s ... with jitter"] --> req
     retry -- no --> givenup["given_up"]
-    reader -- "ok" --> page["products (div[role=listitem]) + lastPage"]
+    reader -- "ok" --> page["products (div[role=listitem] s-search-result) + lastPage"]
   end
 
   page --> post["crawl.post(ads): dedup by ASIN within the run"]
@@ -95,9 +95,10 @@ flowchart TD
    - a range split in an earlier run goes straight to its halves without its own page 1 (its newest products are on the halves' first pages) while the halves' known last pages sum to ≥ 400 (an unknown half counts as 400); once they sum to less, page 1 of the range is fetched again and decides anew.
 5. `allPages` → pages 2..lastPage sequentially; a given up page is skipped, the range goes on.
 6. Parsing (`AmazonPlpBuilder`):
-   - products: `div[role='listitem']` (ASIN `data-asin`, `img`, name `a > h2 > span`);
+   - products: `div[role='listitem'][data-component-type='s-search-result']` (ASIN `data-asin`, `img`, name `a > h2 > span`);
    - lastPage: max of `.s-pagination-item`;
    - valid = `s-search-results` present **and** (products present **or** "no results" message);
+   - "no results in the category" redirect to all departments (`correction-messages-aps-redirect`) → valid and empty, its products belong to other categories;
    - download stops at `MAIN-FEEDBACK` after the pagination (no pagination → whole page).
 7. Metrics: `items`, `item_attempts` (`data` / `no_data` / `given_up`).
 
