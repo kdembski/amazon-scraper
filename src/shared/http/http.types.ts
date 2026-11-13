@@ -1,3 +1,4 @@
+import type http2 from "node:http2";
 import type { MetricLabels } from "@/shared/metrics/metrics.types";
 
 // Markers that must arrive in this order; a step given as an array is done by
@@ -26,4 +27,12 @@ export type Traffic = {
 export type ProxyPlan = {
   urls: string[];
   weight: number;
+};
+
+export type Fingerprint = {
+  chromeVersion: number;
+  // In send order, after the pseudo-headers
+  headers: [string, string][];
+  tls: { ciphers: string; sigalgs: string; ecdhCurve: string };
+  settings: http2.Settings;
 };
