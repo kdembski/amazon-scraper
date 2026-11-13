@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ProxyService } from "@/shared/http/proxy/ProxyService";
 import { Http2Endpoint } from "@/shared/http/proxy/Http2Endpoint";
-import type { ProxyAgentPool } from "@/shared/http/proxy/ProxyAgentPool";
+import type { Http2SessionPool } from "@/shared/http/proxy/Http2SessionPool";
 import type { ProxyList } from "@/shared/http/proxy/ProxyList";
 import type { ProxyTrafficMeter } from "@/shared/http/proxy/ProxyTrafficMeter";
 import { cronJobs } from "@@tests/support/cron";
@@ -41,13 +41,13 @@ const setup = () => {
   resetSingleton(ProxyService);
   const Service = ProxyService as unknown as new (
     meter: ProxyTrafficMeter,
-    pool: ProxyAgentPool,
+    pool: Http2SessionPool,
     list: ProxyList,
     pingIpv6: () => Promise<number | undefined>
   ) => ProxyService;
   const service = new Service(
     meter as unknown as ProxyTrafficMeter,
-    pool as unknown as ProxyAgentPool,
+    pool as unknown as Http2SessionPool,
     list as unknown as ProxyList,
     pingIpv6
   );
@@ -132,19 +132,19 @@ describe("ProxyService", () => {
     });
   });
 
-  describe("getAgent", () => {
+  describe("getEndpoint", () => {
     it("returns the pool agent of a random proxy of a plan picked by weight without idle connections", async () => {
       const { service, pool } = setup();
       await service.loadProxies();
 
       vi.spyOn(Math, "random").mockReturnValue(0);
-      expect(service.getAgent("www.amazon.de")).toEqual({ url: urls[0] });
+      expect(service.getEndpoint("www.amazon.de")).toEqual({ url: urls[0] });
 
       vi.spyOn(Math, "random").mockReturnValue(0.74);
-      expect(service.getAgent("www.amazon.de")).toEqual({ url: urls[1] });
+      expect(service.getEndpoint("www.amazon.de")).toEqual({ url: urls[1] });
 
       vi.spyOn(Math, "random").mockReturnValue(0.75);
-      expect(service.getAgent("www.amazon.de")).toEqual({ url: otherUrls[0] });
+      expect(service.getEndpoint("www.amazon.de")).toEqual({ url: otherUrls[0] });
       expect(pool.get).toHaveBeenCalledTimes(3);
     });
 
@@ -154,7 +154,7 @@ describe("ProxyService", () => {
       await service.loadProxies();
 
       vi.spyOn(Math, "random").mockReturnValue(0);
-      expect(service.getAgent("www.amazon.de")).toEqual({ url: otherUrls[0] });
+      expect(service.getEndpoint("www.amazon.de")).toEqual({ url: otherUrls[0] });
     });
 
     it("picks any plan when none has bandwidth left", async () => {
@@ -163,7 +163,7 @@ describe("ProxyService", () => {
       await service.loadProxies();
 
       vi.spyOn(Math, "random").mockReturnValue(0.99);
-      expect(service.getAgent("www.amazon.de")).toEqual({ url: otherUrls[0] });
+      expect(service.getEndpoint("www.amazon.de")).toEqual({ url: otherUrls[0] });
     });
 
     it("skips a plan without proxies", async () => {
@@ -172,7 +172,7 @@ describe("ProxyService", () => {
       await service.loadProxies();
 
       vi.spyOn(Math, "random").mockReturnValue(0);
-      expect(service.getAgent("www.amazon.de")).toEqual({ url: urls[0] });
+      expect(service.getEndpoint("www.amazon.de")).toEqual({ url: urls[0] });
       expect(pool.retain).toHaveBeenCalledWith(urls);
     });
 
@@ -182,7 +182,7 @@ describe("ProxyService", () => {
       pool.takeLastFree.mockReturnValue(urls[1]);
 
       vi.spyOn(Math, "random").mockReturnValue(0);
-      expect(service.getAgent("www.amazon.de")).toEqual({ url: urls[1] });
+      expect(service.getEndpoint("www.amazon.de")).toEqual({ url: urls[1] });
       expect(pool.takeLastFree).toHaveBeenCalledWith("www.amazon.de", expect.any(Function));
     });
 
@@ -190,7 +190,7 @@ describe("ProxyService", () => {
       const { service, pool } = setup();
       await service.loadProxies();
 
-      service.getAgent("www.amazon.de");
+      service.getEndpoint("www.amazon.de");
       const accept = pool.takeLastFree.mock.calls[0][1];
 
       expect(accept(urls[0])).toBe(true);
@@ -203,8 +203,8 @@ describe("ProxyService", () => {
         const { service, pool } = setup();
         await service.loadProxies();
 
-        expect(service.getAgent("www.amazon.pl", "direct")).toEqual({ direct: 4 });
-        expect(service.getAgent("www.amazon.pl", "direct")).toEqual({ direct: 4 });
+        expect(service.getEndpoint("www.amazon.pl", "direct")).toEqual({ direct: 4 });
+        expect(service.getEndpoint("www.amazon.pl", "direct")).toEqual({ direct: 4 });
         expect(pool.get).not.toHaveBeenCalled();
         expect(pool.takeLastFree).not.toHaveBeenCalled();
       });
@@ -214,7 +214,7 @@ describe("ProxyService", () => {
         pingIpv6.mockResolvedValue(12);
         await service.loadProxies();
 
-        const agents = [1, 2, 3].map(() => service.getAgent("www.amazon.pl", "direct"));
+        const agents = [1, 2, 3].map(() => service.getEndpoint("www.amazon.pl", "direct"));
 
         expect(agents).toEqual([{ direct: 4 }, { direct: 6 }, { direct: 4 }]);
       });
@@ -225,8 +225,8 @@ describe("ProxyService", () => {
         await service.loadProxies();
         pool.isDirectBlocked.mockImplementation((family, host) => family === 6 && host === "www.amazon.pl");
 
-        expect(service.getAgent("www.amazon.pl", "direct")).toEqual({ direct: 4 });
-        expect(service.getAgent("www.amazon.pl", "direct")).toEqual({ direct: 4 });
+        expect(service.getEndpoint("www.amazon.pl", "direct")).toEqual({ direct: 4 });
+        expect(service.getEndpoint("www.amazon.pl", "direct")).toEqual({ direct: 4 });
       });
 
       it("falls back to datacenter proxies while the host blocks every IP family", async () => {
@@ -235,7 +235,7 @@ describe("ProxyService", () => {
         pool.isDirectBlocked.mockReturnValue(true);
 
         vi.spyOn(Math, "random").mockReturnValue(0);
-        expect(service.getAgent("www.amazon.pl", "direct")).toEqual({ url: urls[0] });
+        expect(service.getEndpoint("www.amazon.pl", "direct")).toEqual({ url: urls[0] });
       });
     });
 
@@ -248,13 +248,13 @@ describe("ProxyService", () => {
         vi.spyOn(Math, "random").mockReturnValue(0);
 
         vi.setSystemTime(0);
-        expect(service.getAgent("www.amazon.pl", "mixed2")).toEqual({ direct: 4 });
+        expect(service.getEndpoint("www.amazon.pl", "mixed2")).toEqual({ direct: 4 });
         vi.setSystemTime(2 * minute - 1);
-        expect(service.getAgent("www.amazon.pl", "mixed2")).toEqual({ direct: 4 });
+        expect(service.getEndpoint("www.amazon.pl", "mixed2")).toEqual({ direct: 4 });
         vi.setSystemTime(2 * minute);
-        expect(service.getAgent("www.amazon.pl", "mixed2")).toEqual({ url: urls[0] });
+        expect(service.getEndpoint("www.amazon.pl", "mixed2")).toEqual({ url: urls[0] });
         vi.setSystemTime(4 * minute);
-        expect(service.getAgent("www.amazon.pl", "mixed2")).toEqual({ direct: 4 });
+        expect(service.getEndpoint("www.amazon.pl", "mixed2")).toEqual({ direct: 4 });
       });
 
       it("connects directly for N minutes and through datacenter proxies for the next M with mixedN/M", async () => {
@@ -264,7 +264,7 @@ describe("ProxyService", () => {
 
         const agents = [0, 1, 2, 3, 4].map((m) => {
           vi.setSystemTime(m * minute);
-          return service.getAgent("www.amazon.pl", "mixed1/2");
+          return service.getEndpoint("www.amazon.pl", "mixed1/2");
         });
 
         expect(agents).toEqual([
@@ -281,7 +281,7 @@ describe("ProxyService", () => {
         await service.loadProxies();
         vi.setSystemTime(minute);
 
-        service.getAgent("www.amazon.pl", "mixed1");
+        service.getEndpoint("www.amazon.pl", "mixed1");
         const accept = pool.takeLastFree.mock.calls[0][1];
 
         expect(accept(urls[0])).toBe(true);
@@ -295,7 +295,7 @@ describe("ProxyService", () => {
         vi.setSystemTime(0);
 
         vi.spyOn(Math, "random").mockReturnValue(0);
-        expect(service.getAgent("www.amazon.pl", "mixed1")).toEqual({ url: urls[0] });
+        expect(service.getEndpoint("www.amazon.pl", "mixed1")).toEqual({ url: urls[0] });
       });
     });
 
@@ -310,7 +310,7 @@ describe("ProxyService", () => {
       await service.loadProxies();
 
       vi.spyOn(Math, "random").mockReturnValue(0);
-      expect(service.getAgent("www.amazon.de", proxyType)).toEqual({ url: urls[0] });
+      expect(service.getEndpoint("www.amazon.de", proxyType)).toEqual({ url: urls[0] });
     });
   });
 
@@ -345,48 +345,26 @@ describe("ProxyService", () => {
     resetSingleton(ProxyService);
     const service = ProxyService.getInstance() as unknown as {
       meter: ProxyTrafficMeter;
-      pool: { onConnect: (...args: unknown[]) => void };
+      pool: { connector: { onConnect: (...args: unknown[]) => void } };
     };
     const track = vi.spyOn(service.meter, "track").mockImplementation(() => {});
     const socket = {};
 
-    service.pool.onConnect(socket, "www.amazon.de", "direct4");
+    service.pool.connector.onConnect(socket, "www.amazon.de", "direct4");
 
     expect(track).toHaveBeenCalledWith(socket, "www.amazon.de", "direct4");
     resetSingleton(ProxyService);
   });
 
-  it("uses sessions of Http2Endpoint with env HTTP2", () => {
-    vi.stubEnv("HTTP2", "1");
+  it("returns sessions of Http2Endpoint", () => {
     resetSingleton(ProxyService);
     const service = ProxyService.getInstance();
-    vi.unstubAllEnvs();
 
-    expect(service.getAgent("www.amazon.de", "direct")).toBeInstanceOf(Http2Endpoint);
+    expect(service.getEndpoint("www.amazon.de", "direct")).toBeInstanceOf(Http2Endpoint);
     resetSingleton(ProxyService);
   });
 
-  it("uses http agents without env HTTP2", () => {
-    vi.stubEnv("HTTP2", "");
-    resetSingleton(ProxyService);
-    const service = ProxyService.getInstance();
-    vi.unstubAllEnvs();
-
-    expect(service.getAgent("www.amazon.de", "direct")).not.toBeInstanceOf(Http2Endpoint);
-    resetSingleton(ProxyService);
-  });
-
-  it("uses http agents with env HTTP2=0", () => {
-    vi.stubEnv("HTTP2", "0");
-    resetSingleton(ProxyService);
-    const service = ProxyService.getInstance();
-    vi.unstubAllEnvs();
-
-    expect(service.getAgent("www.amazon.de", "direct")).not.toBeInstanceOf(Http2Endpoint);
-    resetSingleton(ProxyService);
-  });
-
-  it("passes a block of an agent for a host to the pool", () => {
+  it("passes a block of an endpoint for a host to the pool", () => {
     const { service, pool } = setup();
     const agent = { direct: 4 };
 

@@ -1,12 +1,12 @@
-import type { ShopHandle, ShopPool } from "@/shared/http/http.types";
+import type { Http2SessionPool } from "@/shared/http/proxy/Http2SessionPool";
 
 export class ProxyRouteSelector {
   directFamilies: (4 | 6)[] = [4];
   private nextDirect = 0;
 
-  constructor(private pool: ShopPool<ShopHandle>) {}
+  constructor(private pool: Http2SessionPool) {}
 
-  // Direct agent when the proxy type asks for one now and the host blocks not
+  // Direct endpoint when the proxy type asks for one now and the host blocks not
   // every IP family: "direct" over the server's IPv4 and IPv6 in turn,
   // "mixedN/M" the same for N minutes out of N + M (M = N when left out)
   getDirect(host: string, proxyType: string) {

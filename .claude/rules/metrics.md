@@ -32,7 +32,7 @@ Types: counters = sum over the minute; gauges = value at report time. `*_ms` as 
 | `connections` | `country`, `outcome`: route (`proxy` / `direct4` / `direct6`) | New sockets to shops opened in the minute. |
 | `bytes_in` / `bytes_out` | `country`, `outcome`: route (`proxy` / `direct4` / `direct6`) | Bytes received / sent through shop sockets (raw socket: TLS, CONNECT and headers included). A socket is dropped from tracking on `close`, its last bytes go into the next report. |
 
-Under `HTTP2` a shop socket is the raw TCP socket of one HTTP/2 session (many requests per socket on `direct`), so `connections` and `open_connections` count sessions; `bytes_*` still include TLS and CONNECT.
+A shop socket is the raw TCP socket of one HTTP/2 session (many requests per socket on `direct`), so `connections` and `open_connections` count sessions; `bytes_*` include TLS and CONNECT.
 
 `connections` and `bytes_*` take the country from the host: `ScrapingClient` hands `ProxyService.setCountry(host, country)` the country of every request; a host never requested with a country has none. `outcome` holds the route there, not a result.
 

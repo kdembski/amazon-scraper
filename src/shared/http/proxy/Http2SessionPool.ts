@@ -4,12 +4,12 @@ import { DirectBlockList } from "@/shared/http/proxy/DirectBlockList";
 import { FreeProxyTracker } from "@/shared/http/proxy/FreeProxyTracker";
 import { Http2Endpoint } from "@/shared/http/proxy/Http2Endpoint";
 import { ShopConnector } from "@/shared/http/proxy/ShopConnector";
-import type { Route, ShopPool } from "@/shared/http/http.types";
+import type { Route } from "@/shared/http/http.types";
 
 const PROXY_MAX_STREAMS = 1;
 const DIRECT_MAX_STREAMS = 100;
 
-export class Http2SessionPool implements ShopPool<Http2Endpoint> {
+export class Http2SessionPool {
   private endpoints = new Map<string, Http2Endpoint>();
   private directs = new Map<Route, Http2Endpoint>();
 

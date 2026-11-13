@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ProxyAgentPool } from "@/shared/http/proxy/ProxyAgentPool";
+import type { Http2SessionPool } from "@/shared/http/proxy/Http2SessionPool";
 import { ProxyRouteSelector } from "@/shared/http/proxy/ProxyRouteSelector";
 
 const pl = "www.amazon.pl";
@@ -10,7 +10,7 @@ const setup = (families: (4 | 6)[] = [4]) => {
     getDirect: vi.fn((family: 4 | 6) => ({ direct: family })),
     isDirectBlocked: vi.fn((_family: 4 | 6, _host: string) => false),
   };
-  const selector = new ProxyRouteSelector(pool as unknown as ProxyAgentPool);
+  const selector = new ProxyRouteSelector(pool as unknown as Http2SessionPool);
   selector.directFamilies = families;
   return { selector, pool };
 };
