@@ -13,7 +13,12 @@ export type AmazonRequest = {
 
 export type AmazonReply =
   | string
-  | { status?: number; body?: string; delay?: number }
+  | {
+      status?: number;
+      body?: string | Buffer;
+      delay?: number;
+      headers?: Record<string, string>;
+    }
   | { destroy: true };
 
 type Responder = (request: AmazonRequest) => AmazonReply;
@@ -141,9 +146,9 @@ export class FakeAmazon {
       return;
     }
 
-    const { status = 200, body = "", delay } = reply;
+    const { status = 200, body = "", delay, headers } = reply;
     if (delay) await new Promise((resolve) => setTimeout(resolve, delay));
 
-    res.writeHead(status, { "Content-Type": "text/html" }).end(body);
+    res.writeHead(status, { "Content-Type": "text/html", ...headers }).end(body);
   }
 }
