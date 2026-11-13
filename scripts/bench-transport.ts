@@ -36,6 +36,7 @@ async function bench() {
 
   const { ProxyService } = await import("@/shared/http/proxy/ProxyService");
   const { ScrapingClient } = await import("@/shared/http/ScrapingClient");
+  const { MetricsService } = await import("@/shared/metrics/MetricsService");
   const { TokenBucketQueue } = await import("@/shared/http/TokenBucketQueue");
 
   const queue = TokenBucketQueue.getInstance();
@@ -44,6 +45,10 @@ async function bench() {
   const proxies = ProxyService.getInstance();
   await proxies.loadProxies();
   const client = ScrapingClient.getInstance();
+  const metrics = MetricsService.getInstance();
+  metrics.drain();
+  let ok = 0;
+  let failed = 0;
 
   let peak = 0;
   const sampler = setInterval(() => (peak = Math.max(peak, proxies.countConnections())), 20);
@@ -55,18 +60,29 @@ async function bench() {
         .get(`https://www.amazon.de/${i % 2 ? "stop" : "page"}?i=${i}`, {
           ...(i % 2 && { stopAt: [MARKER] }),
         })
-        .catch(() => undefined)
+        .then(
+          () => ok++,
+          () => failed++
+        )
     )
   );
   const { user, system } = process.cpuUsage(before);
   clearInterval(sampler);
 
+  const newConnections = metrics
+    .drain()
+    .filter((row) => row.metric === "connections")
+    .reduce((sum, row) => sum + row.value, 0);
+
   const perRequest = ((user + system) / REQUESTS).toFixed(1);
   console.log(
-    `mode=${mode} requests=${REQUESTS} cpu_us_per_request=${perRequest} connections=${peak}`
+    `mode=${mode} requests=${REQUESTS} cpu_us_per_request=${perRequest} connections=${peak} ` +
+      `new_connections=${newConnections} ok=${ok} failed=${failed}`
   );
   child.kill();
-  process.exit(0);
+
+  const share = ok / REQUESTS;
+  process.exit(share >= 0.85 && share <= 0.95 ? 0 : 1);
 }
 
 await (process.argv[2] === "serve" ? serve() : bench());
