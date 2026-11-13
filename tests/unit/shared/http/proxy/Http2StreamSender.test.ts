@@ -120,6 +120,35 @@ describe("Http2StreamSender", () => {
     await vi.waitFor(() => expect(rstCode).toBe(http2.constants.NGHTTP2_CANCEL));
   });
 
+  it("rejects reading a corrupt gzip body and cancels the stream", async () => {
+    let rstCode: number | undefined;
+    const client = await open((stream) => {
+      stream.on("close", () => (rstCode = stream.rstCode));
+      stream.respond({ ":status": 200, "content-encoding": "gzip" });
+      stream.write(Buffer.from("definitely not gzip"));
+    });
+
+    const response = await send(client);
+
+    await expect(readBody(response.body)).rejects.toThrow();
+    await vi.waitFor(() => expect(rstCode).toBe(http2.constants.NGHTTP2_CANCEL));
+  });
+
+  it("survives an abort after the response when a gzip body is never read", async () => {
+    const client = await open((stream) => {
+      stream.respond({ ":status": 200, "content-encoding": "gzip" });
+      stream.write(zlib.gzipSync(Buffer.alloc(1024)).subarray(0, 20));
+    });
+    const controller = new AbortController();
+    const onClose = vi.fn();
+
+    await send(client, onClose, controller.signal);
+    controller.abort();
+
+    await vi.waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  });
+
   it("calls onClose and rejects when the session is closed", async () => {
     const client = await open((stream) => respond(stream));
     client.close();

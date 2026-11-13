@@ -121,34 +121,40 @@ export class Http2Endpoint extends EventEmitter {
   }
 
   private open(host: string) {
-    const session = {
-      fingerprint: this.fingerprints.next(),
-      aborter: new AbortController(),
+    const fingerprint = this.fingerprints.next();
+    const aborter = new AbortController();
+    const session: Session = {
+      fingerprint,
+      aborter,
       createdAt: Date.now(),
       streams: 0,
-    } as Session;
+      ready: this.establish(host, fingerprint, aborter.signal).then((client) =>
+        this.attach(host, session, client)
+      ),
+    };
 
-    session.ready = this.establish(host, session);
     session.ready.catch(() => this.remove(host, session));
     this.sessions.set(host, [...this.list(host), session]);
 
     return session;
   }
 
-  private async establish(host: string, session: Session) {
-    const signal = AbortSignal.any([AbortSignal.timeout(20_000), session.aborter.signal]);
-    const socket = await this.connect(host, session.fingerprint, signal);
+  private async establish(host: string, fingerprint: Fingerprint, aborted: AbortSignal) {
+    const signal = AbortSignal.any([AbortSignal.timeout(20_000), aborted]);
+    const socket = await this.connect(host, fingerprint, signal);
 
-    if (session.aborter.signal.aborted) {
+    if (aborted.aborted) {
       socket.destroy();
       throw timedOut();
     }
 
-    const client = http2.connect(`https://${host}`, {
+    return http2.connect(`https://${host}`, {
       createConnection: () => socket,
-      settings: session.fingerprint.settings,
+      settings: fingerprint.settings,
     });
+  }
 
+  private attach(host: string, session: Session, client: http2.ClientHttp2Session) {
     client.once("connect", () => client.setLocalWindowSize(15663105));
     client.on("error", () => this.remove(host, session));
     client.on("goaway", () => this.remove(host, session));
