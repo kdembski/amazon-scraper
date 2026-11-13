@@ -101,7 +101,8 @@ export class Http2StreamSender {
     decoder.on("error", () => {});
     stream.on("error", (error) => decoder.destroy(error));
     decoder.on("close", () => {
-      if (!stream.closed && !stream.readableEnded) stream.close(http2.constants.NGHTTP2_CANCEL);
+      stream.close(http2.constants.NGHTTP2_CANCEL);
+      stream.destroy();
     });
 
     return stream.pipe(decoder);

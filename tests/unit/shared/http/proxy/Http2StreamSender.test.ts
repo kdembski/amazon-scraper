@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { once } from "node:events";
 import http2 from "node:http2";
 import zlib from "node:zlib";
@@ -139,6 +140,22 @@ describe("Http2StreamSender", () => {
     response.body.destroy();
 
     await vi.waitFor(() => expect(rstCode).toBe(http2.constants.NGHTTP2_CANCEL));
+  });
+
+  it("closes the stream when a decoded body is destroyed after the whole response arrived", async () => {
+    const client = await open((stream) => {
+      stream.respond({ ":status": 200, "content-encoding": "gzip" });
+      stream.end(zlib.gzipSync(randomBytes(1_000_000).toString("base64")));
+    });
+    client.settings({ initialWindowSize: 6291456 });
+    client.setLocalWindowSize(15663105);
+    const onClose = vi.fn();
+
+    const response = await send(client, onClose);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    response.body.once("data", () => response.body.destroy());
+
+    await vi.waitFor(() => expect(onClose).toHaveBeenCalledOnce());
   });
 
   it("rejects reading a corrupt gzip body and cancels the stream", async () => {
