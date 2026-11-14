@@ -2,7 +2,7 @@ import type { Route } from "@/shared/http/http.types";
 
 const BLOCK_TIME = 3 * 60 * 1000;
 const WINDOW = 60 * 1000;
-const MIN_RESPONSES = 20;
+const MIN_RESPONSES = 100;
 const BLOCKED_SHARE = 0.2;
 
 type Responses = { all: number[]; blocked: number[] };

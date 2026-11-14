@@ -22,14 +22,14 @@ describe("DirectBlockList", () => {
   it("does not block below 20% blocked responses", () => {
     const list = new DirectBlockList();
 
-    expect(record(list, 17, 3)).not.toContain(true);
+    expect(record(list, 83, 17)).not.toContain(true);
     expect(list.isBlocked("direct6", de)).toBe(false);
   });
 
   it("blocks a route for one host for 3 minutes at 20% blocked responses", () => {
     const list = new DirectBlockList();
 
-    expect(record(list, 16, 4).at(-1)).toBe(true);
+    expect(record(list, 80, 20).at(-1)).toBe(true);
 
     expect(list.isBlocked("direct6", de)).toBe(true);
     expect(list.isBlocked("direct4", de)).toBe(false);
@@ -40,29 +40,29 @@ describe("DirectBlockList", () => {
     expect(list.isBlocked("direct6", de)).toBe(false);
   });
 
-  it("does not block with fewer than 20 responses in the window", () => {
+  it("does not block with fewer than 100 responses in the window", () => {
     const list = new DirectBlockList();
 
-    expect(record(list, 0, 19)).not.toContain(true);
+    expect(record(list, 0, 99)).not.toContain(true);
     expect(list.isBlocked("direct6", de)).toBe(false);
   });
 
   it("forgets responses older than a minute", () => {
     const list = new DirectBlockList();
-    record(list, 0, 10);
+    record(list, 0, 50);
 
     vi.advanceTimersByTime(60 * 1000);
 
-    expect(record(list, 18, 2)).not.toContain(true);
+    expect(record(list, 90, 10)).not.toContain(true);
     expect(list.isBlocked("direct6", de)).toBe(false);
   });
 
   it("counts again after a block and extends it", () => {
     const list = new DirectBlockList();
-    record(list, 16, 4);
+    record(list, 80, 20);
 
     vi.advanceTimersByTime(2 * 60 * 1000);
-    expect(record(list, 16, 3)).not.toContain(true);
+    expect(record(list, 80, 19)).not.toContain(true);
     expect(list.record("direct6", de, true)).toBe(true);
     vi.advanceTimersByTime(2 * 60 * 1000);
 

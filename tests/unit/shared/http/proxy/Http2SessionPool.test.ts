@@ -99,7 +99,7 @@ describe("Http2SessionPool", () => {
       const endpoint = pool.get(first);
       const { closeIdle } = stub(endpoint);
 
-      report(pool, endpoint, 0, 30);
+      report(pool, endpoint, 0, 150);
 
       expect(closeIdle).not.toHaveBeenCalled();
     });
@@ -109,7 +109,7 @@ describe("Http2SessionPool", () => {
       const direct = pool.getDirect(6);
       const { closeIdle } = stub(direct);
 
-      report(pool, direct, 17, 3);
+      report(pool, direct, 83, 17);
 
       expect(closeIdle).not.toHaveBeenCalled();
       expect(pool.isDirectBlocked(6, de)).toBe(false);
@@ -121,7 +121,7 @@ describe("Http2SessionPool", () => {
       const direct = pool.getDirect(6);
       const { closeIdle } = stub(direct);
 
-      report(pool, direct, 16, 4);
+      report(pool, direct, 80, 20);
 
       expect(closeIdle).toHaveBeenCalledTimes(1);
       expect(closeIdle).toHaveBeenCalledWith(de);
@@ -136,7 +136,7 @@ describe("Http2SessionPool", () => {
       const { pool } = setup();
       const direct = pool.getDirect(4);
       const { closeIdle } = stub(direct);
-      report(pool, direct, 16, 4);
+      report(pool, direct, 80, 20);
       closeIdle.mockClear();
 
       direct.emit("free", de);
