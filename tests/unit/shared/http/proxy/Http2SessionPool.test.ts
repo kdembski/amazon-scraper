@@ -83,8 +83,8 @@ describe("Http2SessionPool", () => {
 
   describe("report", () => {
     const report = (pool: Http2SessionPool, endpoint: Http2Endpoint, ok: number, blocked: number) => {
-      for (let i = 0; i < ok; i++) pool.report(endpoint, de, "ok");
-      for (let i = 0; i < blocked; i++) pool.report(endpoint, de, "blocked");
+      for (let i = 0; i < ok; i++) pool.report(endpoint, de, false);
+      for (let i = 0; i < blocked; i++) pool.report(endpoint, de, true);
     };
 
     it("leaves proxy endpoints alone", () => {

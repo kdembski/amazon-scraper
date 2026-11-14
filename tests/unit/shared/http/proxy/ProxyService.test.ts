@@ -368,8 +368,8 @@ describe("ProxyService", () => {
     const { service, pool } = setup();
     const endpoint = { direct: 4 };
 
-    service.report(endpoint as never, "www.amazon.de", "blocked");
+    service.report(endpoint as never, "www.amazon.de", true);
 
-    expect(pool.report).toHaveBeenCalledWith(endpoint, "www.amazon.de", "blocked");
+    expect(pool.report).toHaveBeenCalledWith(endpoint, "www.amazon.de", true);
   });
 });

@@ -5,8 +5,8 @@ const de = "www.amazon.de";
 
 const record = (list: DirectBlockList, ok: number, blocked: number, route: "direct4" | "direct6" = "direct6") => {
   const results: boolean[] = [];
-  for (let i = 0; i < ok; i++) results.push(list.record(route, de, "ok"));
-  for (let i = 0; i < blocked; i++) results.push(list.record(route, de, "blocked"));
+  for (let i = 0; i < ok; i++) results.push(list.record(route, de, false));
+  for (let i = 0; i < blocked; i++) results.push(list.record(route, de, true));
   return results;
 };
 
@@ -40,25 +40,6 @@ describe("DirectBlockList", () => {
     expect(list.isBlocked("direct6", de)).toBe(false);
   });
 
-  it("blocks once all responses in the window are throttled or blocked", () => {
-    const list = new DirectBlockList();
-
-    for (let i = 0; i < 90; i++) list.record("direct6", de, "throttled");
-    for (let i = 0; i < 9; i++) list.record("direct6", de, "blocked");
-
-    expect(list.record("direct6", de, "throttled")).toBe(true);
-    expect(list.isBlocked("direct6", de)).toBe(true);
-  });
-
-  it("does not block on throttled responses below 100%", () => {
-    const list = new DirectBlockList();
-
-    list.record("direct6", de, "ok");
-    for (let i = 0; i < 150; i++) expect(list.record("direct6", de, "throttled")).toBe(false);
-
-    expect(list.isBlocked("direct6", de)).toBe(false);
-  });
-
   it("does not block with fewer than 100 responses in the window", () => {
     const list = new DirectBlockList();
 
@@ -82,7 +63,7 @@ describe("DirectBlockList", () => {
 
     vi.advanceTimersByTime(40 * 1000);
     expect(record(list, 80, 19)).not.toContain(true);
-    expect(list.record("direct6", de, "blocked")).toBe(true);
+    expect(list.record("direct6", de, true)).toBe(true);
     vi.advanceTimersByTime(40 * 1000);
 
     expect(list.isBlocked("direct6", de)).toBe(true);
