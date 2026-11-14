@@ -121,7 +121,7 @@ describe("Http2SessionPool", () => {
       expect(pool.isDirectBlocked(6, de)).toBe(true);
       expect(pool.isDirectBlocked(4, de)).toBe(false);
       expect(pool.isDirectBlocked(6, "www.amazon.fr")).toBe(false);
-      vi.advanceTimersByTime(3 * 60 * 1000);
+      vi.advanceTimersByTime(60 * 1000);
       expect(pool.isDirectBlocked(6, de)).toBe(false);
     });
 
