@@ -81,9 +81,9 @@ export class Http2SessionPool {
     );
   }
 
-  block(endpoint: Http2Endpoint, host: string) {
+  report(endpoint: Http2Endpoint, host: string, blocked: boolean) {
     if (endpoint.route === "proxy") return;
-    if (!this.blockList.hit(endpoint.route, host)) return;
+    if (!this.blockList.record(endpoint.route, host, blocked)) return;
 
     endpoint.closeIdle(host);
   }

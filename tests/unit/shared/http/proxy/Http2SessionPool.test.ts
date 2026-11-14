@@ -88,35 +88,40 @@ describe("Http2SessionPool", () => {
     expect((pool.getDirect(4) as any).fingerprints.next().settings.initialWindowSize).toBe(6291456);
   });
 
-  describe("block", () => {
+  describe("report", () => {
+    const report = (pool: Http2SessionPool, endpoint: Http2Endpoint, ok: number, blocked: number) => {
+      for (let i = 0; i < ok; i++) pool.report(endpoint, de, false);
+      for (let i = 0; i < blocked; i++) pool.report(endpoint, de, true);
+    };
+
     it("leaves proxy endpoints alone", () => {
       const { pool } = setup();
       const endpoint = pool.get(first);
       const { closeIdle } = stub(endpoint);
 
-      pool.block(endpoint, de);
+      report(pool, endpoint, 0, 30);
 
       expect(closeIdle).not.toHaveBeenCalled();
     });
 
-    it("does not block a direct endpoint below 5 signals", () => {
+    it("does not block a direct endpoint below 20% blocked responses", () => {
       const { pool } = setup();
       const direct = pool.getDirect(6);
       const { closeIdle } = stub(direct);
 
-      for (let i = 0; i < 4; i++) pool.block(direct, de);
+      report(pool, direct, 17, 3);
 
       expect(closeIdle).not.toHaveBeenCalled();
       expect(pool.isDirectBlocked(6, de)).toBe(false);
     });
 
-    it("blocks a direct endpoint for the host at 5 signals and closes its idle sessions", () => {
+    it("blocks a direct endpoint for the host at 20% blocked responses and closes its idle sessions", () => {
       vi.useFakeTimers();
       const { pool } = setup();
       const direct = pool.getDirect(6);
       const { closeIdle } = stub(direct);
 
-      for (let i = 0; i < 5; i++) pool.block(direct, de);
+      report(pool, direct, 16, 4);
 
       expect(closeIdle).toHaveBeenCalledTimes(1);
       expect(closeIdle).toHaveBeenCalledWith(de);
@@ -131,7 +136,7 @@ describe("Http2SessionPool", () => {
       const { pool } = setup();
       const direct = pool.getDirect(4);
       const { closeIdle } = stub(direct);
-      for (let i = 0; i < 5; i++) pool.block(direct, de);
+      report(pool, direct, 16, 4);
       closeIdle.mockClear();
 
       direct.emit("free", de);

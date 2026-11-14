@@ -24,7 +24,7 @@ const setup = (route = "proxy") => {
   const metrics = { increment: vi.fn() };
   const proxy = {
     getEndpoint: vi.fn(() => endpoint),
-    block: vi.fn(),
+    report: vi.fn(),
     getRoute: vi.fn(() => route),
     setCountry: vi.fn(),
   };
@@ -90,13 +90,13 @@ describe("ScrapingClient", () => {
       expect(order).toEqual(["caller", "slot"]);
     });
 
-    it.each([403, 429])("blocks the endpoint for the host on a %s before rejecting", async (status) => {
+    it.each([403, 429])("reports a %s as blocked before rejecting", async (status) => {
       const { service, endpoint, request, proxy } = setup("direct4");
       request.mockResolvedValue(respond(status));
 
       const onRejected = vi.fn((e) => {
         expect(e).toBeInstanceOf(HttpStatusError);
-        expect(proxy.block).toHaveBeenCalledWith(endpoint, "www.amazon.de");
+        expect(proxy.report).toHaveBeenCalledWith(endpoint, "www.amazon.de", true);
       });
 
       await service.get(url).catch(onRejected);
@@ -104,13 +104,23 @@ describe("ScrapingClient", () => {
       expect(onRejected).toHaveBeenCalled();
     });
 
-    it.each([404, 503])("does not block the endpoint on a %s", async (status) => {
-      const { service, request, proxy } = setup();
+    it.each([404, 503])("reports a %s as not blocked", async (status) => {
+      const { service, endpoint, request, proxy } = setup();
       request.mockResolvedValue(respond(status));
 
       await expect(service.get(url)).rejects.toMatchObject({ status });
 
-      expect(proxy.block).not.toHaveBeenCalled();
+      expect(proxy.report).toHaveBeenCalledWith(endpoint, "www.amazon.de", false);
+    });
+
+    it("reports a success as not blocked", async () => {
+      const { service, endpoint, request, proxy } = setup();
+      request.mockResolvedValue(respond(200, "<html>"));
+
+      await service.get(url);
+
+      expect(proxy.report).toHaveBeenCalledOnce();
+      expect(proxy.report).toHaveBeenCalledWith(endpoint, "www.amazon.de", false);
     });
 
     it("rejects with the error and still finishes the queued task", async () => {
