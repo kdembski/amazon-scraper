@@ -1,31 +1,35 @@
-import type { Route } from "@/shared/http/http.types";
+import type { DirectResponse, Route } from "@/shared/http/http.types";
 
 const BLOCK_TIME = 60 * 1000;
 const WINDOW = 60 * 1000;
 const MIN_RESPONSES = 100;
 const BLOCKED_SHARE = 0.2;
 
-type Responses = { all: number[]; blocked: number[] };
+type Responses = { all: number[]; blocked: number[]; failed: number[] };
 
 export class DirectBlockList {
   // "<route> <host>" pairs blocked by the host, until the given time
   private blocked = new Map<string, number>();
-  // Times of the responses within WINDOW per pair: all and the blocked ones (403 / 429)
+  // Times of the responses within WINDOW per pair: all, the blocked ones and the
+  // failed ones (blocked or throttled)
   private responses = new Map<string, Responses>();
 
   // Counts a response; blocks the pair for BLOCK_TIME and returns true once at
   // least MIN_RESPONSES came within WINDOW and BLOCKED_SHARE of them were blocked
-  record(route: Route, host: string, blocked: boolean) {
+  // or all of them failed
+  record(route: Route, host: string, response: DirectResponse) {
     const key = `${route} ${host}`;
     const now = Date.now();
-    const responses = this.responses.get(key) ?? { all: [], blocked: [] };
+    const responses = this.responses.get(key) ?? { all: [], blocked: [], failed: [] };
     responses.all.push(now);
-    if (blocked) responses.blocked.push(now);
+    if (response === "blocked") responses.blocked.push(now);
+    if (response !== "ok") responses.failed.push(now);
     this.drop(responses, now - WINDOW);
     this.responses.set(key, responses);
 
-    const { all } = responses;
-    if (all.length < MIN_RESPONSES || responses.blocked.length < all.length * BLOCKED_SHARE) return false;
+    const { all, blocked, failed } = responses;
+    if (all.length < MIN_RESPONSES) return false;
+    if (blocked.length < all.length * BLOCKED_SHARE && failed.length < all.length) return false;
 
     this.responses.delete(key);
     this.blocked.set(key, now + BLOCK_TIME);
@@ -42,8 +46,9 @@ export class DirectBlockList {
     return false;
   }
 
-  private drop({ all, blocked }: Responses, before: number) {
-    while (all.length && all[0] <= before) all.shift();
-    while (blocked.length && blocked[0] <= before) blocked.shift();
+  private drop(responses: Responses, before: number) {
+    Object.values(responses).forEach((times) => {
+      while (times.length && times[0] <= before) times.shift();
+    });
   }
 }

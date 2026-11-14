@@ -96,7 +96,7 @@ describe("ScrapingClient", () => {
 
       const onRejected = vi.fn((e) => {
         expect(e).toBeInstanceOf(HttpStatusError);
-        expect(proxy.report).toHaveBeenCalledWith(endpoint, "www.amazon.de", true);
+        expect(proxy.report).toHaveBeenCalledWith(endpoint, "www.amazon.de", "blocked");
       });
 
       await service.get(url).catch(onRejected);
@@ -104,13 +104,31 @@ describe("ScrapingClient", () => {
       expect(onRejected).toHaveBeenCalled();
     });
 
-    it.each([404, 503])("reports a %s as not blocked", async (status) => {
+    it("reports a 503 as throttled", async () => {
+      const { service, endpoint, request, proxy } = setup();
+      request.mockResolvedValue(respond(503));
+
+      await expect(service.get(url)).rejects.toMatchObject({ status: 503 });
+
+      expect(proxy.report).toHaveBeenCalledWith(endpoint, "www.amazon.de", "throttled");
+    });
+
+    it("reports a captcha page as throttled", async () => {
+      const { service, endpoint, request, proxy } = setup();
+      request.mockResolvedValue(respond(200, "<captcha>"));
+
+      await expect(service.get(url, { isCaptcha: (body) => body === "<captcha>" })).resolves.toBe("<captcha>");
+
+      expect(proxy.report).toHaveBeenCalledWith(endpoint, "www.amazon.de", "throttled");
+    });
+
+    it.each([404])("reports a %s as ok", async (status) => {
       const { service, endpoint, request, proxy } = setup();
       request.mockResolvedValue(respond(status));
 
       await expect(service.get(url)).rejects.toMatchObject({ status });
 
-      expect(proxy.report).toHaveBeenCalledWith(endpoint, "www.amazon.de", false);
+      expect(proxy.report).toHaveBeenCalledWith(endpoint, "www.amazon.de", "ok");
     });
 
     it("reports a success as not blocked", async () => {
@@ -120,7 +138,7 @@ describe("ScrapingClient", () => {
       await service.get(url);
 
       expect(proxy.report).toHaveBeenCalledOnce();
-      expect(proxy.report).toHaveBeenCalledWith(endpoint, "www.amazon.de", false);
+      expect(proxy.report).toHaveBeenCalledWith(endpoint, "www.amazon.de", "ok");
     });
 
     it("rejects with the error and still finishes the queued task", async () => {
