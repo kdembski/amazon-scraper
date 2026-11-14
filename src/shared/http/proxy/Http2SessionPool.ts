@@ -1,5 +1,6 @@
 import type net from "node:net";
 import _ from "lodash";
+import { FingerprintGenerator } from "@/shared/http/FingerprintGenerator";
 import { DirectBlockList } from "@/shared/http/proxy/DirectBlockList";
 import { FreeProxyTracker } from "@/shared/http/proxy/FreeProxyTracker";
 import { Http2Endpoint } from "@/shared/http/proxy/Http2Endpoint";
@@ -7,6 +8,7 @@ import { ShopConnector } from "@/shared/http/proxy/ShopConnector";
 import type { Route } from "@/shared/http/http.types";
 
 const PROXY_MAX_STREAMS = 1;
+const PROXY_WINDOW_SIZE = 256 * 1024;
 const DIRECT_MAX_STREAMS = 100;
 
 export class Http2SessionPool {
@@ -28,7 +30,8 @@ export class Http2SessionPool {
         "proxy",
         (host, fingerprint, signal) =>
           this.connector.connect(host, "proxy", fingerprint, signal, url),
-        PROXY_MAX_STREAMS
+        PROXY_MAX_STREAMS,
+        new FingerprintGenerator(Math.random, PROXY_WINDOW_SIZE)
       );
       endpoint.on("free", (host: string) => this.freeProxies.markFree(url, host));
       this.endpoints.set(url, endpoint);
@@ -80,8 +83,8 @@ export class Http2SessionPool {
 
   block(endpoint: Http2Endpoint, host: string) {
     if (endpoint.route === "proxy") return;
+    if (!this.blockList.hit(endpoint.route, host)) return;
 
-    this.blockList.block(endpoint.route, host);
     endpoint.closeIdle(host);
   }
 

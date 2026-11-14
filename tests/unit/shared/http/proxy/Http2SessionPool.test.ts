@@ -81,6 +81,13 @@ describe("Http2SessionPool", () => {
     expect((pool.getDirect(4) as any).maxStreams).toBe(100);
   });
 
+  it("gives proxy sessions a 256 KB stream window and direct ones Chrome's 6 MB", () => {
+    const { pool } = setup();
+
+    expect((pool.get(first) as any).fingerprints.next().settings.initialWindowSize).toBe(262144);
+    expect((pool.getDirect(4) as any).fingerprints.next().settings.initialWindowSize).toBe(6291456);
+  });
+
   describe("block", () => {
     it("leaves proxy endpoints alone", () => {
       const { pool } = setup();
@@ -92,14 +99,26 @@ describe("Http2SessionPool", () => {
       expect(closeIdle).not.toHaveBeenCalled();
     });
 
-    it("blocks a direct endpoint for the host and closes its idle sessions", () => {
+    it("does not block a direct endpoint below 5 signals", () => {
+      const { pool } = setup();
+      const direct = pool.getDirect(6);
+      const { closeIdle } = stub(direct);
+
+      for (let i = 0; i < 4; i++) pool.block(direct, de);
+
+      expect(closeIdle).not.toHaveBeenCalled();
+      expect(pool.isDirectBlocked(6, de)).toBe(false);
+    });
+
+    it("blocks a direct endpoint for the host at 5 signals and closes its idle sessions", () => {
       vi.useFakeTimers();
       const { pool } = setup();
       const direct = pool.getDirect(6);
       const { closeIdle } = stub(direct);
 
-      pool.block(direct, de);
+      for (let i = 0; i < 5; i++) pool.block(direct, de);
 
+      expect(closeIdle).toHaveBeenCalledTimes(1);
       expect(closeIdle).toHaveBeenCalledWith(de);
       expect(pool.isDirectBlocked(6, de)).toBe(true);
       expect(pool.isDirectBlocked(4, de)).toBe(false);
@@ -112,7 +131,7 @@ describe("Http2SessionPool", () => {
       const { pool } = setup();
       const direct = pool.getDirect(4);
       const { closeIdle } = stub(direct);
-      pool.block(direct, de);
+      for (let i = 0; i < 5; i++) pool.block(direct, de);
       closeIdle.mockClear();
 
       direct.emit("free", de);

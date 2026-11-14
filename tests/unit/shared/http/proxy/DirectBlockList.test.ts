@@ -3,6 +3,9 @@ import { DirectBlockList } from "@/shared/http/proxy/DirectBlockList";
 
 const de = "www.amazon.de";
 
+const hit = (list: DirectBlockList, times: number, route: "direct4" | "direct6" = "direct6") =>
+  Array.from({ length: times }, () => list.hit(route, de));
+
 describe("DirectBlockList", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -12,10 +15,17 @@ describe("DirectBlockList", () => {
     vi.useRealTimers();
   });
 
-  it("blocks a route for one host for 3 minutes", () => {
+  it("does not block below 5 signals", () => {
     const list = new DirectBlockList();
 
-    list.block("direct6", de);
+    expect(hit(list, 4)).toEqual([false, false, false, false]);
+    expect(list.isBlocked("direct6", de)).toBe(false);
+  });
+
+  it("blocks a route for one host for 3 minutes at the 5th signal within a minute", () => {
+    const list = new DirectBlockList();
+
+    expect(hit(list, 5)).toEqual([false, false, false, false, true]);
 
     expect(list.isBlocked("direct6", de)).toBe(true);
     expect(list.isBlocked("direct4", de)).toBe(false);
@@ -26,14 +36,24 @@ describe("DirectBlockList", () => {
     expect(list.isBlocked("direct6", de)).toBe(false);
   });
 
-  it("extends the block when it comes again", () => {
+  it("forgets signals older than a minute", () => {
     const list = new DirectBlockList();
-    list.block("direct4", de);
+    hit(list, 4);
+
+    vi.advanceTimersByTime(60 * 1000);
+
+    expect(list.hit("direct6", de)).toBe(false);
+    expect(list.isBlocked("direct6", de)).toBe(false);
+  });
+
+  it("counts signals again after a block and extends it", () => {
+    const list = new DirectBlockList();
+    hit(list, 5);
 
     vi.advanceTimersByTime(2 * 60 * 1000);
-    list.block("direct4", de);
+    expect(hit(list, 5)).toEqual([false, false, false, false, true]);
     vi.advanceTimersByTime(2 * 60 * 1000);
 
-    expect(list.isBlocked("direct4", de)).toBe(true);
+    expect(list.isBlocked("direct6", de)).toBe(true);
   });
 });
