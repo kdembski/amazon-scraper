@@ -91,7 +91,7 @@ flowchart TD
    3. No outcome → `failed++`; at `route.maxAttempts` → `given_up`; otherwise backoff 1 s, 2 s, 4 s ... max 60 s, with jitter.
 3. Result mapping:
    - 404: `twister` → `no_data`; others → `notFound++`, at 2 (`NOT_FOUND_TO_DELETE`) in an active country, at 1 in an inactive one → `deleted`, before that retry. Both final cases add the route to `missingRouteIds`.
-   - other HTTP error / timeout / network → retry; 403 and 429 also block the direct family for the host (see 7).
+   - other HTTP error / timeout / network → retry; 403 and 429 count toward blocking the direct family for the host (see 7).
    - empty response → retry (`responses{outcome=empty}`).
    - captcha → retry (`captcha`), no block.
    - `isValid === false` → retry (`invalid`).
