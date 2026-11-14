@@ -52,8 +52,8 @@ export class ProxyService {
     return this.pool.get(url);
   }
 
-  block(endpoint: Http2Endpoint, host: string) {
-    this.pool.block(endpoint, host);
+  report(endpoint: Http2Endpoint, host: string, blocked: boolean) {
+    this.pool.report(endpoint, host, blocked);
   }
 
   getRoute(endpoint: Http2Endpoint) {

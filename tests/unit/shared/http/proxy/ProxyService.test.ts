@@ -32,7 +32,7 @@ const setup = () => {
         undefined
     ),
     countConnections: vi.fn(() => 7),
-    block: vi.fn(),
+    report: vi.fn(),
     getRoute: vi.fn(),
   };
   const list = { load: vi.fn().mockResolvedValue(plans) };
@@ -364,12 +364,12 @@ describe("ProxyService", () => {
     resetSingleton(ProxyService);
   });
 
-  it("passes a block of an endpoint for a host to the pool", () => {
+  it("passes a response report of an endpoint for a host to the pool", () => {
     const { service, pool } = setup();
-    const agent = { direct: 4 };
+    const endpoint = { direct: 4 };
 
-    service.block(agent as never, "www.amazon.de");
+    service.report(endpoint as never, "www.amazon.de", true);
 
-    expect(pool.block).toHaveBeenCalledWith(agent, "www.amazon.de");
+    expect(pool.report).toHaveBeenCalledWith(endpoint, "www.amazon.de", true);
   });
 });

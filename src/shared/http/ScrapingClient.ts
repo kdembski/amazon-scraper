@@ -55,10 +55,11 @@ export class ScrapingClient {
     try {
       const signal = AbortSignal.timeout(this.timeout);
       const data = await this.fetch(endpoint, url, { referer, stopAt }, signal);
+      this.proxyService.report(endpoint, host, false);
       this.record("ok", route, labels, startedAt);
       return data as T;
     } catch (e: any) {
-      if ([403, 429].includes(e?.status)) this.proxyService.block(endpoint, host);
+      this.proxyService.report(endpoint, host, [403, 429].includes(e?.status));
       const outcome = toRequestOutcome(e);
       this.record(outcome, route, labels, startedAt);
       if (outcome === "network") {

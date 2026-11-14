@@ -81,25 +81,49 @@ describe("Http2SessionPool", () => {
     expect((pool.getDirect(4) as any).maxStreams).toBe(100);
   });
 
-  describe("block", () => {
+  it("gives proxy sessions a 256 KB stream window and direct ones Chrome's 6 MB", () => {
+    const { pool } = setup();
+
+    expect((pool.get(first) as any).fingerprints.next().settings.initialWindowSize).toBe(262144);
+    expect((pool.getDirect(4) as any).fingerprints.next().settings.initialWindowSize).toBe(6291456);
+  });
+
+  describe("report", () => {
+    const report = (pool: Http2SessionPool, endpoint: Http2Endpoint, ok: number, blocked: number) => {
+      for (let i = 0; i < ok; i++) pool.report(endpoint, de, false);
+      for (let i = 0; i < blocked; i++) pool.report(endpoint, de, true);
+    };
+
     it("leaves proxy endpoints alone", () => {
       const { pool } = setup();
       const endpoint = pool.get(first);
       const { closeIdle } = stub(endpoint);
 
-      pool.block(endpoint, de);
+      report(pool, endpoint, 0, 150);
 
       expect(closeIdle).not.toHaveBeenCalled();
     });
 
-    it("blocks a direct endpoint for the host and closes its idle sessions", () => {
+    it("does not block a direct endpoint below 20% blocked responses", () => {
+      const { pool } = setup();
+      const direct = pool.getDirect(6);
+      const { closeIdle } = stub(direct);
+
+      report(pool, direct, 83, 17);
+
+      expect(closeIdle).not.toHaveBeenCalled();
+      expect(pool.isDirectBlocked(6, de)).toBe(false);
+    });
+
+    it("blocks a direct endpoint for the host at 20% blocked responses and closes its idle sessions", () => {
       vi.useFakeTimers();
       const { pool } = setup();
       const direct = pool.getDirect(6);
       const { closeIdle } = stub(direct);
 
-      pool.block(direct, de);
+      report(pool, direct, 80, 20);
 
+      expect(closeIdle).toHaveBeenCalledTimes(1);
       expect(closeIdle).toHaveBeenCalledWith(de);
       expect(pool.isDirectBlocked(6, de)).toBe(true);
       expect(pool.isDirectBlocked(4, de)).toBe(false);
@@ -112,7 +136,7 @@ describe("Http2SessionPool", () => {
       const { pool } = setup();
       const direct = pool.getDirect(4);
       const { closeIdle } = stub(direct);
-      pool.block(direct, de);
+      report(pool, direct, 80, 20);
       closeIdle.mockClear();
 
       direct.emit("free", de);
