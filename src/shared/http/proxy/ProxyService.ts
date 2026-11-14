@@ -6,7 +6,7 @@ import { ProxyList } from "@/shared/http/proxy/ProxyList";
 import { ProxyRouteSelector } from "@/shared/http/proxy/ProxyRouteSelector";
 import { ProxyTrafficMeter } from "@/shared/http/proxy/ProxyTrafficMeter";
 import { tcpPing } from "@/shared/utils/tcpPing";
-import type { ProxyPlan } from "@/shared/http/http.types";
+import type { DirectResponse, ProxyPlan } from "@/shared/http/http.types";
 
 // IPv6 address of one.one.one.one, reachable only when the server has IPv6
 const IPV6_PING_HOST = "2606:4700:4700::1111";
@@ -52,8 +52,8 @@ export class ProxyService {
     return this.pool.get(url);
   }
 
-  report(endpoint: Http2Endpoint, host: string, blocked: boolean) {
-    this.pool.report(endpoint, host, blocked);
+  report(endpoint: Http2Endpoint, host: string, response: DirectResponse) {
+    this.pool.report(endpoint, host, response);
   }
 
   getRoute(endpoint: Http2Endpoint) {

@@ -12,10 +12,14 @@ export type ScrapingRequest = {
   proxyType?: string;
   stopAt?: StopAt;
   isCancelled?: () => boolean;
+  isCaptcha?: (body: string) => boolean;
 };
 
 // How a shop connection goes out: through a proxy or directly over IPv4 / IPv6
 export type Route = "proxy" | "direct4" | "direct6";
+
+// A response of a direct endpoint: blocked = 403 / 429, throttled = 503 / captcha
+export type DirectResponse = "ok" | "throttled" | "blocked";
 
 export type Traffic = {
   labels: MetricLabels;

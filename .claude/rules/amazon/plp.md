@@ -107,9 +107,9 @@ flowchart TD
 1. Backpressure: request queue ≥ `batchSize` → waits 1 s at a time.
 2. Request via `AmazonService.get()` with proxy type `mixed1/2` (direct 1 min, proxy 2 min) with the builder's `stopAt` markers: the stream is destroyed once they arrived in order.
 3. `AmazonPageReader` (shared with PDP) turns the response into a page. Retries up to 10 attempts (`PLP_MAX_FAILED_ATTEMPTS`; PDP and backend keep 6, `MAX_FAILED_ATTEMPTS`), backoff 1 s, 2 s, 4 s ... with jitter, on:
-   - HTTP error / network / timeout (403 and 429 count toward blocking the direct family for the host, see PDP 7);
+   - HTTP error / network / timeout (403 and 429 count toward blocking the direct family for the host, 503 only at 100%, see PDP 7);
    - empty response (`empty`);
-   - captcha (`captcha`, `AmazonCaptchaDetector`, Akamai interstitial included), no block;
+   - captcha (`captcha`, `AmazonCaptchaDetector`, Akamai interstitial included), counts toward blocking only at 100% like 503;
    - invalid page or parse exception (`invalid`).
 4. Success → `responses{outcome=data|no_data}`.
 5. 10 failures → page `given_up`, skipped.
