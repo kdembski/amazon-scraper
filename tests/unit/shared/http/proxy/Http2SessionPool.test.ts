@@ -81,10 +81,10 @@ describe("Http2SessionPool", () => {
     expect((pool.getDirect(4) as any).maxStreams).toBe(100);
   });
 
-  it("gives proxy sessions a 256 KB stream window and direct ones Chrome's 6 MB", () => {
+  it("gives proxy sessions a 64 KB stream window and direct ones Chrome's 6 MB", () => {
     const { pool } = setup();
 
-    expect((pool.get(first) as any).fingerprints.next().settings.initialWindowSize).toBe(262144);
+    expect((pool.get(first) as any).fingerprints.next().settings.initialWindowSize).toBe(65536);
     expect((pool.getDirect(4) as any).fingerprints.next().settings.initialWindowSize).toBe(6291456);
   });
 
