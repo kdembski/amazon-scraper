@@ -8,7 +8,7 @@ import { ShopConnector } from "@/shared/http/proxy/ShopConnector";
 import type { Route } from "@/shared/http/http.types";
 
 const PROXY_MAX_STREAMS = 1;
-const PROXY_WINDOW_SIZE = 256 * 1024;
+const PROXY_WINDOW_SIZE = 64 * 1024;
 const DIRECT_MAX_STREAMS = 100;
 
 export class Http2SessionPool {
