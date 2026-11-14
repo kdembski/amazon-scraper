@@ -8,7 +8,7 @@ import { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
 import { MetricsService } from "@/shared/metrics/MetricsService";
 import { toNetworkError } from "@/shared/metrics/toNetworkError";
 import { toRequestOutcome } from "@/shared/metrics/toRequestOutcome";
-import type { DirectResponse, Route, ScrapingRequest } from "@/shared/http/http.types";
+import type { Route, ScrapingRequest } from "@/shared/http/http.types";
 import type { MetricLabels, RequestOutcome } from "@/shared/metrics/metrics.types";
 
 export class ScrapingClient {
@@ -42,7 +42,7 @@ export class ScrapingClient {
 
   private async execute<T>(
     url: string,
-    { referer, labels = {}, proxyType, stopAt, isCancelled, isCaptcha }: ScrapingRequest
+    { referer, labels = {}, proxyType, stopAt, isCancelled }: ScrapingRequest
   ): Promise<T | undefined> {
     if (isCancelled?.()) return;
 
@@ -55,11 +55,11 @@ export class ScrapingClient {
     try {
       const signal = AbortSignal.timeout(this.timeout);
       const data = await this.fetch(endpoint, url, { referer, stopAt }, signal);
-      this.proxyService.report(endpoint, host, isCaptcha?.(data) ? "throttled" : "ok");
+      this.proxyService.report(endpoint, host, false);
       this.record("ok", route, labels, startedAt);
       return data as T;
     } catch (e: any) {
-      this.proxyService.report(endpoint, host, this.toDirectResponse(e?.status));
+      this.proxyService.report(endpoint, host, [403, 429].includes(e?.status));
       const outcome = toRequestOutcome(e);
       this.record(outcome, route, labels, startedAt);
       if (outcome === "network") {
@@ -67,11 +67,6 @@ export class ScrapingClient {
       }
       throw e;
     }
-  }
-
-  private toDirectResponse(status?: number): DirectResponse {
-    if (status === 403 || status === 429) return "blocked";
-    return status === 503 ? "throttled" : "ok";
   }
 
   private async fetch(

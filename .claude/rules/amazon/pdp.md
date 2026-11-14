@@ -91,9 +91,9 @@ flowchart TD
    3. No outcome → `failed++`; at `route.maxAttempts` → `given_up`; otherwise backoff 1 s, 2 s, 4 s ... max 60 s, with jitter.
 3. Result mapping:
    - 404: `twister` → `no_data`; others → `notFound++`, at 2 (`NOT_FOUND_TO_DELETE`) in an active country, at 1 in an inactive one → `deleted`, before that retry. Both final cases add the route to `missingRouteIds`.
-   - other HTTP error / timeout / network → retry; 403 and 429 count toward blocking the direct family for the host, 503 only when every response is 503 / captcha / 403 / 429 (see 7).
+   - other HTTP error / timeout / network → retry; 403 and 429 count toward blocking the direct family for the host (see 7).
    - empty response → retry (`responses{outcome=empty}`).
-   - captcha → retry (`captcha`); counts like 503 toward blocking (see 7).
+   - captcha → retry (`captcha`), no block.
    - `isValid === false` → retry (`invalid`).
    - parse exception → retry (`parse_error`).
    - price found → `data`, stores `value` + `dispatchFrom`.
@@ -129,7 +129,7 @@ Shared:
 - `TokenBucketQueue` – `concurrency` and `rps` limits from the config.
 - `ProxyService.getEndpoint(host, proxyType)` – proxy with an idle session to the host, otherwise a random proxy of a plan picked by weight (all 0 → any plan); every type other than `direct` / `mixedN/M` → `datacenter`. `direct` → no proxy, one endpoint per IP family (`Http2SessionPool.getDirect(4 | 6)`), IPv4 and IPv6 in turn; IPv6 only when a TCP ping to `2606:4700:4700::1111:443` succeeds at each proxy list load (start, hourly; Docker network needs `enable_ipv6`). `mixedN/M` (e.g. `mixed1/2`) → `direct` for N minutes, then the `datacenter` pool for M minutes, by wall clock (all processes of a server switch together); `mixedN` = `mixedN/N`. While the host blocks every direct family, `direct` and `mixedN/M` use the `datacenter` pool. Env `NO_DIRECT` (set in integration and e2e tests, which reach shops only through the fake proxy) → never direct.
 - Route choice: `ProxyRouteSelector`; idle proxy order: `FreeProxyTracker`.
-- Block (`Http2SessionPool.report`, `DirectBlockList`): `ScrapingClient` reports every response of a direct endpoint (403 / 429 = blocked; 503 and captcha = throttled, `ScrapingRequest.isCaptcha`, which `AmazonService` sets to `AmazonCaptchaDetector` on the untrimmed body). Once the direct family + host has ≥ 100 responses within 60 s and ≥ 20% of them blocked, or all of them blocked or throttled, its idle sessions to the host are closed and the direct family + host is blocked for 1 min (counting starts again after a block): its sessions are closed when freed and picks skip it (all direct families blocked → `datacenter`). Proxy endpoints are never blocked. Amazon limits IPv6 per /64, so the direct IPv6 endpoint stands for the whole /64.
+- Block (`Http2SessionPool.report`, `DirectBlockList`): `ScrapingClient` reports every response of a direct endpoint (403 / 429 = blocked). Once the direct family + host has ≥ 100 responses within 60 s and ≥ 20% of them blocked, its idle sessions to the host are closed and the direct family + host is blocked for 1 min (counting starts again after a block): its sessions are closed when freed and picks skip it (all direct families blocked → `datacenter`). 503 and captcha do not block; proxy endpoints are never blocked. Amazon limits IPv6 per /64, so the direct IPv6 endpoint stands for the whole /64.
 
 ## Where to look
 

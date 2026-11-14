@@ -4,7 +4,7 @@ import { DirectBlockList } from "@/shared/http/proxy/DirectBlockList";
 import { FreeProxyTracker } from "@/shared/http/proxy/FreeProxyTracker";
 import { Http2Endpoint } from "@/shared/http/proxy/Http2Endpoint";
 import { ShopConnector } from "@/shared/http/proxy/ShopConnector";
-import type { DirectResponse, Route } from "@/shared/http/http.types";
+import type { Route } from "@/shared/http/http.types";
 
 const PROXY_MAX_STREAMS = 1;
 const DIRECT_MAX_STREAMS = 100;
@@ -78,9 +78,9 @@ export class Http2SessionPool {
     );
   }
 
-  report(endpoint: Http2Endpoint, host: string, response: DirectResponse) {
+  report(endpoint: Http2Endpoint, host: string, blocked: boolean) {
     if (endpoint.route === "proxy") return;
-    if (!this.blockList.record(endpoint.route, host, response)) return;
+    if (!this.blockList.record(endpoint.route, host, blocked)) return;
 
     endpoint.closeIdle(host);
   }

@@ -1,4 +1,3 @@
-import { AmazonCaptchaDetector } from "@/marketplaces/amazon/AmazonCaptchaDetector";
 import type { ScrapingRequest } from "@/shared/http/http.types";
 import { ScrapingClient } from "@/shared/http/ScrapingClient";
 
@@ -6,10 +5,7 @@ export class AmazonService {
   private static instance: AmazonService;
   private baseUrl = "https://www.amazon.";
 
-  private constructor(
-    private scrapingClient = ScrapingClient.getInstance(),
-    private captchaDetector = new AmazonCaptchaDetector()
-  ) {}
+  private constructor(private scrapingClient = ScrapingClient.getInstance()) {}
 
   public static getInstance(): AmazonService {
     if (!AmazonService.instance) {
@@ -24,7 +20,6 @@ export class AmazonService {
       ...request,
       referer: `${this.baseUrl}${referer}`,
       labels: { country: url.split("/")[0] },
-      isCaptcha: (body) => this.captchaDetector.detect(body),
     });
   }
 }

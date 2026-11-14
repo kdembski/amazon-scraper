@@ -29,18 +29,7 @@ describe("AmazonService", () => {
       proxyType: "isp",
       stopAt: ["a"],
       isCancelled,
-      isCaptcha: expect.any(Function),
     });
-  });
-
-  it("tells captcha pages with the captcha detector", () => {
-    const { service, client } = setup();
-
-    service.get("de/x", "de/");
-    const { isCaptcha } = client.get.mock.calls[0][1];
-
-    expect(isCaptcha('<form action="/errors/validateCaptcha"></form>')).toBe(true);
-    expect(isCaptcha("<html>")).toBe(false);
   });
 
   it("returns the promise of the scraping client", async () => {
