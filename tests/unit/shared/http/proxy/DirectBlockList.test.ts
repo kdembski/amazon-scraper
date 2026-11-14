@@ -26,7 +26,7 @@ describe("DirectBlockList", () => {
     expect(list.isBlocked("direct6", de)).toBe(false);
   });
 
-  it("blocks a route for one host for 3 minutes at 20% blocked responses", () => {
+  it("blocks a route for one host for 1 minute at 20% blocked responses", () => {
     const list = new DirectBlockList();
 
     expect(record(list, 80, 20).at(-1)).toBe(true);
@@ -34,7 +34,7 @@ describe("DirectBlockList", () => {
     expect(list.isBlocked("direct6", de)).toBe(true);
     expect(list.isBlocked("direct4", de)).toBe(false);
     expect(list.isBlocked("direct6", "www.amazon.fr")).toBe(false);
-    vi.advanceTimersByTime(3 * 60 * 1000 - 1);
+    vi.advanceTimersByTime(60 * 1000 - 1);
     expect(list.isBlocked("direct6", de)).toBe(true);
     vi.advanceTimersByTime(1);
     expect(list.isBlocked("direct6", de)).toBe(false);
@@ -61,10 +61,10 @@ describe("DirectBlockList", () => {
     const list = new DirectBlockList();
     record(list, 80, 20);
 
-    vi.advanceTimersByTime(2 * 60 * 1000);
+    vi.advanceTimersByTime(40 * 1000);
     expect(record(list, 80, 19)).not.toContain(true);
     expect(list.record("direct6", de, true)).toBe(true);
-    vi.advanceTimersByTime(2 * 60 * 1000);
+    vi.advanceTimersByTime(40 * 1000);
 
     expect(list.isBlocked("direct6", de)).toBe(true);
   });

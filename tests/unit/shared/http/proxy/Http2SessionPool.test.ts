@@ -81,13 +81,6 @@ describe("Http2SessionPool", () => {
     expect((pool.getDirect(4) as any).maxStreams).toBe(100);
   });
 
-  it("gives proxy sessions a 64 KB stream window and direct ones Chrome's 6 MB", () => {
-    const { pool } = setup();
-
-    expect((pool.get(first) as any).fingerprints.next().settings.initialWindowSize).toBe(65536);
-    expect((pool.getDirect(4) as any).fingerprints.next().settings.initialWindowSize).toBe(6291456);
-  });
-
   describe("report", () => {
     const report = (pool: Http2SessionPool, endpoint: Http2Endpoint, ok: number, blocked: number) => {
       for (let i = 0; i < ok; i++) pool.report(endpoint, de, false);
@@ -128,7 +121,7 @@ describe("Http2SessionPool", () => {
       expect(pool.isDirectBlocked(6, de)).toBe(true);
       expect(pool.isDirectBlocked(4, de)).toBe(false);
       expect(pool.isDirectBlocked(6, "www.amazon.fr")).toBe(false);
-      vi.advanceTimersByTime(3 * 60 * 1000);
+      vi.advanceTimersByTime(60 * 1000);
       expect(pool.isDirectBlocked(6, de)).toBe(false);
     });
 

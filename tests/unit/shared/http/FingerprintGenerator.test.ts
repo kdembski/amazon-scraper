@@ -77,12 +77,6 @@ describe("FingerprintGenerator", () => {
     expect(["X25519:P-256:P-384", "X25519:P-256"]).toContain(tls.ecdhCurve);
   });
 
-  it("uses the given stream window size", () => {
-    const { settings } = new FingerprintGenerator(seeded(4), 262144).next();
-
-    expect(settings.initialWindowSize).toBe(262144);
-  });
-
   it("varies ciphers with Math.random", () => {
     const generator = new FingerprintGenerator();
     const seen = new Set<string>();

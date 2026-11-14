@@ -44,10 +44,7 @@ const accept =
   "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7";
 
 export class FingerprintGenerator {
-  constructor(
-    private random = Math.random,
-    private windowSize = 6291456
-  ) {}
+  constructor(private random = Math.random) {}
 
   next(): Fingerprint {
     const chromeVersion = this.pick(chromeVersions);
@@ -80,7 +77,7 @@ export class FingerprintGenerator {
       settings: {
         headerTableSize: 65536,
         enablePush: false,
-        initialWindowSize: this.windowSize,
+        initialWindowSize: 6291456,
         maxHeaderListSize: 262144,
       },
     };
