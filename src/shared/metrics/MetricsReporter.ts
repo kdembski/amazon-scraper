@@ -1,8 +1,6 @@
-import { ArgsService } from "@/shared/args/ArgsService";
 import { ScraperNameResolver } from "@/shared/args/ScraperNameResolver";
 import { ApiService } from "@/shared/backend/ApiService";
 import { ProxyService } from "@/shared/http/proxy/ProxyService";
-import { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
 import { MetricsService } from "@/shared/metrics/MetricsService";
 import { ProcessMetrics } from "@/shared/metrics/ProcessMetrics";
 import { CronJob } from "cron";
@@ -13,14 +11,13 @@ type UnsentReport = { key: string; body: unknown };
 export class MetricsReporter {
   private static instance: MetricsReporter;
   private marketplace = "";
+  private flow = "";
   private periodStart = new Date();
   private unsent?: UnsentReport;
 
   private constructor(
-    private argsService = ArgsService.getInstance(),
     private apiService = ApiService.getInstance(),
     private metricsService = MetricsService.getInstance(),
-    private queueService = TokenBucketQueue.getInstance(),
     private proxyService = ProxyService.getInstance(),
     private now = () => new Date(),
     private processMetrics = new ProcessMetrics(),
@@ -35,8 +32,9 @@ export class MetricsReporter {
     return MetricsReporter.instance;
   }
 
-  public start(marketplace: string) {
+  public start(marketplace: string, flow: string) {
     this.marketplace = marketplace;
+    this.flow = flow;
     this.periodStart = this.now();
     this.processMetrics.start(this.periodStart);
     new CronJob("0 * * * * *", () => this.send()).start();
@@ -62,19 +60,9 @@ export class MetricsReporter {
       key: randomUUID(),
       body: {
         marketplace: this.marketplace,
-        flow: this.argsService.getTargetFlag(),
+        flow: this.flow,
         periodStart: this.periodStart.toISOString(),
-        metrics: [
-          ...counters,
-          { metric: "pending", value: this.queueService.pending },
-          { metric: "queue_length", value: this.queueService.queue.length },
-          {
-            metric: "open_connections",
-            value: this.proxyService.countConnections(),
-          },
-          ...processRows,
-          ...this.metricsService.readGauges(),
-        ],
+        metrics: [...counters, ...processRows, ...this.metricsService.readGauges()],
       },
     };
     this.periodStart = sentAt;

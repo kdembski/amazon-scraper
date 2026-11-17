@@ -63,13 +63,12 @@ A shop socket is the raw TCP socket of one HTTP/2 session (many requests per soc
 | `backend_items` | `outcome`: `sent` / `dropped` | Items sent / dropped (4xx or 6 attempts). |
 | `backend_buffer` | – (gauge) | Items waiting in the buffer (one `BatchSender` per mode: PDP `amazon/ads/batch`, PLP `amazon/ads`). |
 
-## Process (added by `MetricsReporter`, at report time)
+## Process (at report time)
 
 | Metric | What it describes |
 |---|---|
-| `pending` | Requests in progress in `TokenBucketQueue`. |
-| `queue_length` | Requests waiting in the queue. |
-| `open_connections` | Open shop connections (proxy and `direct`). |
+| `pending` / `queue_length` | Gauge (`TokenBucketQueue`): requests in progress / waiting in the queue. |
+| `open_connections` | Gauge (`ProxyService`): open shop connections (proxy and `direct`). |
 | `event_loop_delay_mean_ms` / `event_loop_delay_max_ms` | Event loop delay over the minute (minus the 10 ms resolution). |
 | `cpu_percent` | % of one core since the previous report. |
 | `memory_rss_mb` / `heap_used_mb` | Process memory. |

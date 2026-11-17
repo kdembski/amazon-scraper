@@ -34,7 +34,7 @@ export class AmazonPdpScraper implements MarketplaceScraper {
   async scrape() {
     const { batchSize, rps, concurrency } = this.configService.get();
     const lowWater = rps ? rps * QUEUE_SECONDS : concurrency * 2;
-    if (this.queueService.queue.length >= lowWater) return;
+    if (this.queueService.length >= lowWater) return;
 
     const missing = batchSize - this.adScraper.inFlight;
     if (missing < Math.max(batchSize / MIN_LOAD_SHARE, 1)) return;

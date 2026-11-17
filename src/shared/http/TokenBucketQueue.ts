@@ -1,15 +1,24 @@
+import { MetricsService } from "@/shared/metrics/MetricsService";
+
 export class TokenBucketQueue {
   private static instance: TokenBucketQueue;
-  queue: (() => any)[] = [];
+  private queue: (() => any)[] = [];
   pending = 0;
   private tokens;
   private lastRefill = Date.now();
 
   constructor(
     public concurrency = 10,
-    public rps = 0
+    public rps = 0,
+    metricsService = MetricsService.getInstance()
   ) {
     this.tokens = rps;
+    metricsService.gauge("pending", () => this.pending);
+    metricsService.gauge("queue_length", () => this.queue.length);
+  }
+
+  get length() {
+    return this.queue.length;
   }
 
   public static getInstance(): TokenBucketQueue {

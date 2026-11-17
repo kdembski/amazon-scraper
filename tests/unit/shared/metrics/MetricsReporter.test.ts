@@ -1,8 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MetricsReporter } from "@/shared/metrics/MetricsReporter";
 import { MetricsService } from "@/shared/metrics/MetricsService";
-import type { ArgsService } from "@/shared/args/ArgsService";
-import type { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
 import type { ProxyService } from "@/shared/http/proxy/ProxyService";
 import type { Traffic } from "@/shared/http/http.types";
 import { cronJobs } from "@@tests/support/cron";
@@ -11,10 +9,7 @@ import { resetSingleton } from "@@tests/support/singleton";
 
 vi.mock("cron", async () => (await import("@@tests/support/cron")).cronModule);
 
-const gauges = [
-  { metric: "pending", value: 12 },
-  { metric: "queue_length", value: 3 },
-  { metric: "open_connections", value: 5 },
+const processRows = [
   { metric: "event_loop_delay_mean_ms", value: 2.5 },
   { metric: "event_loop_delay_max_ms", value: 40 },
   { metric: "cpu_percent", value: 8.3 },
@@ -23,18 +18,14 @@ const gauges = [
   { metric: "ping_ms", value: 24.5 },
 ];
 
-const setup = ({ target = "pdp", traffic = [] as Traffic[] } = {}) => {
-  const args = {
-    getTargetFlag: vi.fn(() => target),
-  } as unknown as ArgsService;
+const gauges = [...processRows, { metric: "pending", value: 12 }];
+
+const setup = ({ traffic = [] as Traffic[] } = {}) => {
   const api = fakeApiService();
   api.send.mockResolvedValue({});
   const metrics = MetricsService.getInstance();
-  const queue = { pending: 12, queue: [() => 1, () => 2, () => 3] } as unknown as TokenBucketQueue;
-  const proxy = {
-    collectTraffic: vi.fn(() => traffic),
-    countConnections: vi.fn(() => 5),
-  } as unknown as ProxyService;
+  metrics.gauge("pending", () => 12);
+  const proxy = { collectTraffic: vi.fn(() => traffic) } as unknown as ProxyService;
   const times = [
     new Date("2026-10-18T10:00:00.000Z"),
     new Date("2026-10-18T10:01:00.000Z"),
@@ -44,7 +35,7 @@ const setup = ({ target = "pdp", traffic = [] as Traffic[] } = {}) => {
   const now = vi.fn(() => times.shift()!);
   const processMetrics = {
     start: vi.fn(),
-    collect: vi.fn(async () => gauges.slice(3)),
+    collect: vi.fn(async () => processRows),
   };
 
   // The constructor is private, it is only called through getInstance()
@@ -52,10 +43,8 @@ const setup = ({ target = "pdp", traffic = [] as Traffic[] } = {}) => {
     ...deps: unknown[]
   ) => MetricsReporter;
   const reporter = new Reporter(
-    args,
     api.service,
     metrics,
-    queue,
     proxy,
     now,
     processMetrics,
@@ -80,10 +69,10 @@ describe("MetricsReporter", () => {
     resetSingleton(MetricsReporter);
   });
 
-  it.each(["pdp", "plp"])("starts a cron every minute (%s)", (target) => {
-    const { reporter } = setup({ target });
+  it("starts a cron every minute", () => {
+    const { reporter } = setup();
 
-    reporter.start("amazon");
+    reporter.start("amazon", "pdp");
 
     expect(cronJobs).toHaveLength(1);
     expect(cronJobs[0].cronTime).toBe("0 * * * * *");
@@ -93,7 +82,7 @@ describe("MetricsReporter", () => {
   it("sends counters and gauges", async () => {
     const { api, metrics, reporter } = setup();
     metrics.increment("requests", { country: "de", outcome: "ok" }, 4);
-    reporter.start("amazon");
+    reporter.start("amazon", "pdp");
 
     await reporter.send();
 
@@ -117,7 +106,7 @@ describe("MetricsReporter", () => {
     let inFlight = 1;
     metrics.gauge("ads_in_flight", () => inFlight);
     metrics.increment("requests", { country: "de", outcome: "ok" });
-    reporter.start("amazon");
+    reporter.start("amazon", "pdp");
     inFlight = 7;
 
     await reporter.send();
@@ -127,7 +116,7 @@ describe("MetricsReporter", () => {
 
   it("starts the process metrics with the period start and collects them only with counters", async () => {
     const { metrics, reporter, processMetrics } = setup();
-    reporter.start("amazon");
+    reporter.start("amazon", "pdp");
     expect(processMetrics.start).toHaveBeenCalledWith(new Date("2026-10-18T10:00:00.000Z"));
 
     await reporter.send();
@@ -139,9 +128,9 @@ describe("MetricsReporter", () => {
   });
 
   it("sends the PLP flow", async () => {
-    const { api, metrics, reporter } = setup({ target: "plp" });
+    const { api, metrics, reporter } = setup();
     metrics.increment("requests", { country: "pl", outcome: "ok" });
-    reporter.start("amazon");
+    reporter.start("amazon", "plp");
 
     await reporter.send();
 
@@ -155,7 +144,7 @@ describe("MetricsReporter", () => {
         { labels: { country: "fr", outcome: "proxy" }, bytesIn: 0, bytesOut: 20 },
       ],
     });
-    reporter.start("amazon");
+    reporter.start("amazon", "pdp");
 
     await reporter.send();
 
@@ -168,7 +157,7 @@ describe("MetricsReporter", () => {
 
   it("sends nothing without counters", async () => {
     const { api, reporter } = setup();
-    reporter.start("amazon");
+    reporter.start("amazon", "pdp");
 
     await reporter.send();
 
@@ -177,7 +166,7 @@ describe("MetricsReporter", () => {
 
   it("keeps the period start when there is nothing to send", async () => {
     const { api, metrics, reporter } = setup();
-    reporter.start("amazon");
+    reporter.start("amazon", "pdp");
     await reporter.send();
 
     metrics.increment("requests", { country: "de", outcome: "ok" });
@@ -190,7 +179,7 @@ describe("MetricsReporter", () => {
     const { api, metrics, reporter } = setup();
     api.send.mockRejectedValueOnce({ status: 503, response: { status: 503 } });
     metrics.increment("requests", { country: "de", outcome: "ok" }, 2);
-    reporter.start("amazon");
+    reporter.start("amazon", "pdp");
 
     await reporter.send();
     metrics.increment("requests", { country: "de", outcome: "ok" }, 3);
@@ -213,7 +202,7 @@ describe("MetricsReporter", () => {
     const { api, metrics, reporter } = setup();
     api.send.mockRejectedValueOnce(new Error("down")).mockRejectedValueOnce(new Error("down"));
     metrics.increment("requests", { country: "de", outcome: "ok" }, 2);
-    reporter.start("amazon");
+    reporter.start("amazon", "pdp");
 
     await reporter.send();
     metrics.increment("requests", { country: "de", outcome: "ok" }, 3);
@@ -236,7 +225,7 @@ describe("MetricsReporter", () => {
     const { api, metrics, reporter } = setup();
     api.send.mockRejectedValueOnce({ status: 400, response: { status: 400 } });
     metrics.increment("requests", { country: "de", outcome: "ok" }, 2);
-    reporter.start("amazon");
+    reporter.start("amazon", "pdp");
 
     await reporter.send();
     metrics.increment("requests", { country: "de", outcome: "ok" }, 3);
@@ -251,7 +240,7 @@ describe("MetricsReporter", () => {
   it("moves the period start to the previous send after a successful one", async () => {
     const { api, metrics, reporter } = setup();
     metrics.increment("requests", { country: "de", outcome: "ok" });
-    reporter.start("amazon");
+    reporter.start("amazon", "pdp");
     await reporter.send();
 
     metrics.increment("requests", { country: "de", outcome: "ok" });
@@ -264,7 +253,7 @@ describe("MetricsReporter", () => {
     const { api, metrics, reporter } = setup();
     api.send.mockRejectedValueOnce(new Error("down"));
     metrics.increment("requests", { country: "de", outcome: "ok" });
-    reporter.start("amazon");
+    reporter.start("amazon", "pdp");
 
     await reporter.send();
     await reporter.send();

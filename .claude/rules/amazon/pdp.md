@@ -54,7 +54,7 @@ flowchart TD
 
 1. `ArgsService` reads the `-t` flag (none = `pdp`).
 2. `ScraperConfigService.load()` fetches `scrapers/<name>/config` (`concurrency`, `rps`, `batchSize`); retries until it succeeds. Then refreshed every minute (cron).
-3. `MetricsReporter.start("amazon")`.
+3. `MetricsReporter.start("amazon", flow)`.
 4. `ProxyService.loadProxies()` – active datacenter plans of both Webshare keys (other subtypes skipped), each weighted by bandwidth left per ms until its period ends (`/stats/aggregate/`; failed stats = unused), refreshed every hour.
 5. `AmazonPdpScraper.execute()`.
 

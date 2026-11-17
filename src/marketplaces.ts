@@ -20,7 +20,7 @@ export async function createScraper(): Promise<MarketplaceScraper> {
   configService.start();
 
   const scraper = scrapers[target]();
-  MetricsReporter.getInstance().start(scraper.marketplace);
+  MetricsReporter.getInstance().start(scraper.marketplace, target);
   await ProxyService.getInstance().loadProxies();
   return scraper;
 }

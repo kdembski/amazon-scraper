@@ -58,8 +58,8 @@ describe("Http2SessionPool", () => {
   it("names the route of an endpoint", () => {
     const { pool } = setup();
 
-    expect(pool.getRoute(pool.getDirect(6))).toBe("direct6");
-    expect(pool.getRoute(pool.get(first))).toBe("proxy");
+    expect(pool.getDirect(6).route).toBe("direct6");
+    expect(pool.get(first).route).toBe("proxy");
   });
 
   it("connects proxy endpoints through the proxy and direct ones directly", async () => {

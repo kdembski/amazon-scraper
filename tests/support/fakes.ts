@@ -63,7 +63,11 @@ export function fakeAmazonService() {
 
 export function fakeTokenBucketQueue() {
   const queue = [] as Function[];
-  const service = { queue } as unknown as TokenBucketQueue;
+  const service = {
+    get length() {
+      return queue.length;
+    },
+  } as unknown as TokenBucketQueue;
   return { service, queue };
 }
 

@@ -7,7 +7,11 @@ export class ApiService {
   private static instance: ApiService;
 
   private constructor(
-    private agent = new http.Agent({ keepAlive: true })
+    private client = axios.create({
+      baseURL: process.env.API_URL,
+      headers: { Authorization: `Bearer ${process.env.API_TOKEN}` },
+      httpAgent: new http.Agent({ keepAlive: true }),
+    })
   ) {}
 
   public static getInstance(): ApiService {
@@ -18,25 +22,12 @@ export class ApiService {
     return ApiService.instance;
   }
 
-  private url(path: string) {
-    return process.env.API_URL + "/" + path;
-  }
-
-  private config(extra: AxiosRequestConfig = {}): AxiosRequestConfig {
-    return {
-      ...extra,
-      headers: { ...extra.headers, Authorization: `Bearer ${process.env.API_TOKEN}` },
-      httpAgent: this.agent,
-    };
-  }
-
   async get<T>(path: string, config: AxiosRequestConfig = {}) {
-    return (await axios.get<T>(this.url(path), this.config(config))).data;
+    return (await this.client.get<T>(path, config)).data;
   }
 
   async send<T>(path: string, data: unknown, idempotencyKey?: string) {
     const headers = idempotencyKey ? { "Idempotency-Key": idempotencyKey } : undefined;
-    const config = this.config({ timeout: SEND_TIMEOUT, headers });
-    return (await axios.post<T>(this.url(path), data, config)).data;
+    return (await this.client.post<T>(path, data, { timeout: SEND_TIMEOUT, headers })).data;
   }
 }

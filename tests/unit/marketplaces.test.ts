@@ -55,7 +55,7 @@ describe("createScraper", () => {
     await createScraper();
 
     expect(calls).toEqual(["load", "start", "metrics", "loadProxies"]);
-    expect(start).toHaveBeenCalledWith("amazon");
+    expect(start).toHaveBeenCalledWith("amazon", "pdp");
   });
 
   it("returns the PDP scraper for pdp", async () => {

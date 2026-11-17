@@ -5,7 +5,6 @@ import { ProxyList } from "@/shared/http/proxy/ProxyList";
 vi.mock("axios", () => ({ default: { get: vi.fn() } }));
 
 const get = vi.mocked(axios.get);
-const RETRY_DELAY = 2 * 60 * 1000;
 const PLANS_URL = "https://proxy.webshare.io/api/v2/subscription/plan/";
 const CONFIG_URL = "https://proxy.webshare.io/api/v2/proxy/config/";
 const SUBSCRIPTION_URL = "https://proxy.webshare.io/api/v2/subscription/";
@@ -149,8 +148,8 @@ describe("ProxyList", () => {
     expect(first.urls).toEqual(["http://u1:p1@1.1.1.1:8080", "http://u2:p2@2.2.2.2:8081"]);
   });
 
-  it("retries every 2 minutes until the token, period, plans and lists are downloaded", async () => {
-    vi.spyOn(console, "log").mockImplementation(() => {});
+  it("retries with backoff until the token, period, plans and lists are downloaded", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
     const config = { data: { proxy_list_download_token: "token" } };
     const period = { data: PERIOD };
     const plans = { data: { results: [plan(1, "default")] } };
@@ -168,11 +167,13 @@ describe("ProxyList", () => {
     const done = vi.fn();
     new ProxyList().load().then(done);
 
-    await vi.advanceTimersByTimeAsync(RETRY_DELAY);
+    // First retry within 1 s, the second 1-2 s after it
+    await vi.advanceTimersByTimeAsync(1000);
     expect(get).toHaveBeenCalledTimes(5);
     expect(done).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalledWith("proxies: load failed", "down");
 
-    await vi.advanceTimersByTimeAsync(RETRY_DELAY);
+    await vi.advanceTimersByTimeAsync(2000);
     expect(get).toHaveBeenCalledTimes(10);
     expect(done).toHaveBeenCalledWith([
       { urls: ["http://user:pass@1.1.1.1:8080"], weight: expect.any(Number) },

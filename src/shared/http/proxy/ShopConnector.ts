@@ -1,10 +1,10 @@
 import http from "node:http";
 import net from "node:net";
 import tls from "node:tls";
+import { codedError, raceAbort, timedOut } from "@/shared/http/abort";
 import type { Fingerprint, Route } from "@/shared/http/http.types";
 
-const fail = (message: string, code: string) =>
-  Object.assign(new Error(message), { code });
+const CONNECT_ABORTED = "Connect aborted";
 
 export class ShopConnector {
   constructor(
@@ -19,26 +19,17 @@ export class ShopConnector {
     signal: AbortSignal,
     proxyUrl?: string
   ): Promise<tls.TLSSocket> {
-    if (signal.aborted) throw fail("Connect aborted", "ETIMEDOUT");
+    if (signal.aborted) throw timedOut(CONNECT_ABORTED);
 
     let raw: net.Socket | undefined;
     let request: http.ClientRequest | undefined;
     let secure: tls.TLSSocket | undefined;
-    let onAbort!: () => void;
 
     const destroyAll = () => {
       secure?.destroy();
       raw?.destroy();
       request?.destroy();
     };
-
-    const aborted = new Promise<never>((_, reject) => {
-      onAbort = () => {
-        destroyAll();
-        reject(fail("Connect aborted", "ETIMEDOUT"));
-      };
-      signal.addEventListener("abort", onAbort, { once: true });
-    });
 
     const establish = async () => {
       raw = await this.open(
@@ -48,7 +39,7 @@ export class ShopConnector {
         (socket) => (raw = socket),
         (pending) => (request = pending)
       );
-      if (signal.aborted) throw fail("Connect aborted", "ETIMEDOUT");
+      if (signal.aborted) throw timedOut(CONNECT_ABORTED);
 
       this.onConnect(raw, host, route);
 
@@ -65,17 +56,14 @@ export class ShopConnector {
       });
       if (secure.alpnProtocol === "h2") return secure;
 
-      throw fail(`ALPN ${secure.alpnProtocol}`, "ERR_ALPN");
+      throw codedError(`ALPN ${secure.alpnProtocol}`, "ERR_ALPN");
     };
 
     try {
-      return await Promise.race([establish(), aborted]);
+      return await raceAbort(establish(), signal, CONNECT_ABORTED, destroyAll);
     } catch (error) {
       destroyAll();
       throw error;
-    } finally {
-      signal.removeEventListener("abort", onAbort);
-      aborted.catch(() => {});
     }
   }
 
@@ -123,7 +111,7 @@ export class ShopConnector {
 
         socket.destroy();
         reject(
-          fail(`Proxy ${response.statusCode}`, `ERR_PROXY_${response.statusCode}`)
+          codedError(`Proxy ${response.statusCode}`, `ERR_PROXY_${response.statusCode}`)
         );
       });
       request.on("error", reject);
