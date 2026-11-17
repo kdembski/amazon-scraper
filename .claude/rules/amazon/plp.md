@@ -9,7 +9,7 @@ paths:
 
 # Amazon PLP – flow
 
-Goal: find new ASINs in a category on amazon.pl (search listing; new releases is disabled) and send them to the backend. Country `pl` only.
+Goal: find new ASINs in a category on amazon.pl (search listing) and send them to the backend. Country `pl` only.
 
 **A PLP logic change (`src/marketplaces/amazon/plp/`, `AmazonService`, shared HTTP/backend) updates this file in the same commit.**
 
@@ -19,7 +19,7 @@ Goal: find new ASINs in a category on amazon.pl (search listing; new releases is
 flowchart TD
   loop["AmazonPlpScraper: non-stop, one category at a time"] --> cat["GET amazon/ads/categories/scrap → name, scrapedAt"]
   cat -- "backend error / exception" --> wait["wait 60 s"] --> loop
-  cat --> crawl["AmazonPlpCrawl(name, allPages = true)"]
+  cat --> crawl["AmazonPlpCrawl(name)"]
   crawl --> seeds["19 seed price ranges (SEEDS), all in parallel"]
 
   seeds --> known{"split before (lastPage ≥ 400)<br/>and halves' last pages sum ≥ 400?"}
@@ -32,10 +32,9 @@ flowchart TD
   p1res -- "page" --> split{"lastPage ≥ 400 (MAX_PAGES)<br/>and range splittable?"}
   split -- "yes" --> halves["AmazonPriceRange.split: two halves<br/>(open range: [min, 2·min-1] + [2·min-], up to 1 000 000 zł)"]
   halves --> known
-  split -- "no" --> all{"allPages?"}
-  all -- "no" --> rangeDone["range done"]
-  all -- "yes (always)" --> pages["pages 2..lastPage sequentially<br/>(given up page skipped)"]
+  split -- "no" --> pages["pages 2..lastPage sequentially<br/>(given up page skipped)"]
   pages --> fetch
+  pages --> rangeDone["range done"]
 
   subgraph fetcher ["Fetching a page (AmazonPlpPageFetcher)"]
     fetch["request queue ≥ batchSize? wait 1 s"] --> req["AmazonService.get(), proxy mixed1/2<br/>pl/s?i=category&rh=p_36:min-max&s=date-desc-rank&page=N<br/>stopAt MAIN-FEEDBACK"]
@@ -61,28 +60,10 @@ flowchart TD
 
 1. Runs non-stop, one category at a time.
 2. `amazon/ads/categories/scrap` → category (`name`, `scrapedAt`).
-3. `AmazonPlpCategoryScraper.execute(category)`.
+3. `AmazonPlpPageScraper.execute(new AmazonPlpCrawl(name))`: all pages of each price range on every scrape; `scrapedAt` is not used. `crawl.post(ads)` – dedup by ASIN within the run, each ASIN sent once.
 4. Error (backend / exception) → waits 60 s, tries again.
 
-## 3. One category (`AmazonPlpCategoryScraper`)
-
-1. Creates `AmazonPlpCrawl(name, allPages = true)`: all pages of each price range on every scrape; `scrapedAt` is not used.
-2. Listing only (`AmazonPlpPageScraper`). New releases (section 4) is disabled: `AmazonNewReleasesScraper` stays in the code but is not called.
-3. `crawl.post(ads)` – dedup by ASIN within the run, each ASIN sent once.
-
-## 4. New releases (`AmazonNewReleasesScraper`, disabled)
-
-1. Start: `pl/gp/new-releases/<category>`.
-2. From each page:
-   - products: `#gridItemRoot [data-asin]` (ASIN, `img`, name from `p13n-sc-css-line-clamp`);
-   - subcategories: links `/gp/new-releases/<category>/<nodeId>`;
-   - page 2: a `pg=2` link exists → fetches `?pg=2`.
-   - download stops at the `</ul>` closing `a-pagination` (after the grid).
-3. Recurses into every new subcategory (set of visited nodes), in parallel.
-4. Valid = `[class*='zg-browse-group']` present.
-5. Metrics: `new_releases_pages`, `new_releases_ads` (new ASINs).
-
-## 5. Search listing (`AmazonPlpPageScraper`)
+## 3. Search listing (`AmazonPlpPageScraper`)
 
 1. 19 seed price ranges (`SEEDS`, in grosze): `-999`, `1000-1999`, ... `500000-`.
 2. All ranges in parallel.
@@ -93,7 +74,7 @@ flowchart TD
    - a single-value range is not split.
    - the last page of every range (per category) is kept in memory between runs; a given up page 1 uses the last known value to split or paginate, none known → range skipped.
    - a range split in an earlier run goes straight to its halves without its own page 1 (its newest products are on the halves' first pages) while the halves' known last pages sum to ≥ 400 (an unknown half counts as 400); once they sum to less, page 1 of the range is fetched again and decides anew.
-5. `allPages` → pages 2..lastPage sequentially; a given up page is skipped, the range goes on.
+5. Pages 2..lastPage sequentially; a given up page is skipped, the range goes on.
 6. Parsing (`AmazonPlpBuilder`):
    - products: `div[role='listitem'][data-component-type='s-search-result']` (ASIN `data-asin`, `img`, name `a > h2 > span`);
    - lastPage: max of `.s-pagination-item`;
@@ -102,7 +83,7 @@ flowchart TD
    - download stops at `MAIN-FEEDBACK` after the pagination (no pagination → whole page).
 7. Metrics: `items`, `item_attempts` (`data` / `no_data` / `given_up`).
 
-## 6. Fetching a page (`AmazonPlpPageFetcher`, shared by 4 and 5)
+## 4. Fetching a page (`AmazonPlpPageFetcher`)
 
 1. Backpressure: request queue ≥ `batchSize` → waits 1 s at a time.
 2. Request via `AmazonService.get()` with proxy type `mixed1/2` (direct 1 min, proxy 2 min) with the builder's `stopAt` markers: the stream is destroyed once they arrived in order.
@@ -114,7 +95,7 @@ flowchart TD
 4. Success → `responses{outcome=data|no_data}`.
 5. 10 failures → page `given_up`, skipped.
 
-## 7. Sending (`AmazonPlpAdSender`)
+## 5. Sending (`AmazonPlpAdSender`)
 
 1. `BatchSender` on `amazon/ads`, max 2000 ASINs, flush every 5 s or when full.
 2. Body: array of `{ asin, name, image, categoryName }`.
@@ -122,6 +103,6 @@ flowchart TD
 
 ## Where to look
 
-- 0 products, many `invalid` → selectors in `AmazonPlpBuilder` / `AmazonNewReleasesBuilder` (break silently) + test in `tests/unit/marketplaces/amazon/plp/`.
+- 0 products, many `invalid` → selectors in `AmazonPlpBuilder` (break silently) + test in `tests/unit/marketplaces/amazon/plp/`.
 - ASINs missing in a large category → `MAX_PAGES`, `SEEDS`, `AmazonPriceRange.split`.
-- Category takes too long → `allPages` or range splitting.
+- Category takes too long → range splitting.

@@ -17,10 +17,8 @@ Goal: for every ASIN, get the price and the shipper (`dispatchFrom`) in every Am
 
 ```mermaid
 flowchart TD
-  tick["AmazonPdpScraper.scrape() every 1 s"] --> night{"night pause, Warsaw?<br/>(disabled: 24–0)"}
-  night -- yes --> skip["skip tick"]
-  night -- no --> load{"queue ≥ rps × 5<br/>or missing < batchSize / 4?"}
-  load -- yes --> skip
+  tick["AmazonPdpScraper.scrape() every 1 s"] --> load{"queue ≥ rps × 5<br/>or missing < batchSize / 4?"}
+  load -- yes --> skip["skip tick"]
   load -- no --> fetch["GET amazon/countries/scrap (cached)<br/>GET amazon/ads/scrap?batchSize=missing"]
   fetch --> ad["AmazonPdpAdScraper.execute(ad) per ASIN, no await"]
 
@@ -63,12 +61,11 @@ flowchart TD
 ## 2. Batch loop (`AmazonPdpScraper`)
 
 1. Calls `scrape()` every second (`POLL_INTERVAL`), the next tick after the previous one finished.
-2. Night pause `NIGHT_START`–`NIGHT_END` `Europe/Warsaw` (`AmazonNightSchedule`; disabled: 24–0, was 23–7) → skips; logs `pdp: night pause started` / `ended` on change. ASINs already loaded finish.
-3. `batchSize` = most ASINs in flight (`AmazonPdpAdScraper.inFlight`, also those in backoff or waiting for a later tier). Skips the tick while the request queue holds ≥ `rps × 5` requests (5 s of work; `concurrency × 2` when `rps` is 0) or fewer than `batchSize / 4` ASINs are missing to `batchSize`.
-4. Gets countries: `AmazonCountryService` (`amazon/countries/scrap`, cached, refreshed every minute). A country has `tld`, `active` and `routes`; a route has `id`, `priority` (unique per country), `proxyType`, `pdpSource` (one source) and `maxAttempts`.
-5. Gets the missing ASINs: `amazon/ads/scrap?batchSize=<batchSize - inFlight>` (`id`, `asin`, `skipRouteIds`: routes the backend remembers the ASIN missing in, 30 days).
-6. Each ASIN → `AmazonPdpAdScraper.execute(ad, countries)` (no `await`, in parallel).
-7. Metric `batch_load`: `ok` / `empty` / `failed`.
+2. `batchSize` = most ASINs in flight (`AmazonPdpAdScraper.inFlight`, also those in backoff or waiting for a later tier). Skips the tick while the request queue holds ≥ `rps × 5` requests (5 s of work; `concurrency × 2` when `rps` is 0) or fewer than `batchSize / 4` ASINs are missing to `batchSize`.
+3. Gets countries: `AmazonCountryService` (`amazon/countries/scrap`, cached, refreshed every minute). A country has `tld`, `active` and `routes`; a route has `id`, `priority` (unique per country), `proxyType`, `pdpSource` (one source) and `maxAttempts`.
+4. Gets the missing ASINs: `amazon/ads/scrap?batchSize=<batchSize - inFlight>` (`id`, `asin`, `skipRouteIds`: routes the backend remembers the ASIN missing in, 30 days).
+5. Each ASIN → `AmazonPdpAdScraper.execute(ad, countries)` (no `await`, in parallel).
+6. Metric `batch_load`: `ok` / `empty` / `failed`.
 
 ## 3. One ASIN (`AmazonPdpAdScraper`)
 

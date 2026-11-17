@@ -2,7 +2,7 @@ import _ from "lodash";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { PLP_MAX_FAILED_ATTEMPTS } from "@/marketplaces/amazon/plp/AmazonPlpPageFetcher";
 import { cronJobs } from "@@tests/support/cron";
-import { newReleasesPage, plpPage } from "@@tests/support/html";
+import { plpPage } from "@@tests/support/html";
 import {
   bootScraper,
   sleep,
@@ -52,16 +52,10 @@ describe("PLP", () => {
 
   const scrape = async () => (await bootScraper(["-t", "plp"])).scraper.execute();
 
-  const isNewReleases = (url: string) => url.startsWith("pl/gp/new-releases/");
-
-  // Answers the search listings, the new releases ranking is empty
   const respondSearch = (responder: Parameters<World["amazon"]["respond"]>[0]) =>
-    world.amazon.respond((request) =>
-      isNewReleases(request.url) ? newReleasesPage() : responder(request)
-    );
+    world.amazon.respond(responder);
 
-  const searches = () =>
-    world.amazon.requests.filter(({ url }) => !isNewReleases(url));
+  const searches = () => world.amazon.requests;
 
   const posted = () =>
     world.backend.find("POST", "amazon/ads").flatMap((post) => post.body);

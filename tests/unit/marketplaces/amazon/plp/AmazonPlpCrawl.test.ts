@@ -10,16 +10,15 @@ const ad = (asin: string) => ({
 });
 
 describe("AmazonPlpCrawl", () => {
-  it("keeps the category and whether to scrape all pages", () => {
-    const crawl = new AmazonPlpCrawl("toys", true, fakeAmazonPlpAdSender().service);
+  it("keeps the category", () => {
+    const crawl = new AmazonPlpCrawl("toys", fakeAmazonPlpAdSender().service);
 
     expect(crawl.category).toBe("toys");
-    expect(crawl.allPages).toBe(true);
   });
 
   it("sends only ads not sent before in the run", () => {
     const sender = fakeAmazonPlpAdSender();
-    const crawl = new AmazonPlpCrawl("electronics", false, sender.service);
+    const crawl = new AmazonPlpCrawl("electronics", sender.service);
 
     expect(crawl.post([ad("B0A"), ad("B0B")])).toBe(2);
     expect(crawl.post([ad("B0B"), ad("B0C")])).toBe(1);
@@ -32,7 +31,7 @@ describe("AmazonPlpCrawl", () => {
 
   it("sends nothing when every ad was sent before", () => {
     const sender = fakeAmazonPlpAdSender();
-    const crawl = new AmazonPlpCrawl("electronics", false, sender.service);
+    const crawl = new AmazonPlpCrawl("electronics", sender.service);
     crawl.post([ad("B0A")]);
 
     expect(crawl.post([ad("B0A")])).toBe(0);

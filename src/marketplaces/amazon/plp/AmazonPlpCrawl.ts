@@ -7,7 +7,6 @@ export class AmazonPlpCrawl {
 
   constructor(
     readonly category: string,
-    readonly allPages: boolean,
     private adSender = AmazonPlpAdSender.getInstance()
   ) {}
 

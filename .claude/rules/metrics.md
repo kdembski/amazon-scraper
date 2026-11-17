@@ -54,13 +54,6 @@ A shop socket is the raw TCP socket of one HTTP/2 session (many requests per soc
 | `ad_duration_ms` | – | Sum of time from start to decision per ASIN. Mean = `ad_duration_ms / ads`. |
 | `ads_in_flight` | – (gauge) | ASINs being processed. |
 
-## PLP
-
-| Metric | Labels | What it describes |
-|---|---|---|
-| `new_releases_pages` | `country=pl`, `outcome`: `data` / `given_up` | New releases pages: fetched / given up. Not sent while new releases is disabled. |
-| `new_releases_ads` | `country=pl` | New (first time in the category run) ASINs from new releases. |
-
 ## Sending to the backend (`BatchSender`)
 
 | Metric | Labels | What it describes |
