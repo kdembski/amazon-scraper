@@ -451,24 +451,24 @@ describe("AmazonPdpCountryScraper", () => {
     });
 
     it("falls back after a twister 404 when the country has another route", async () => {
-    const { amazon, price, outcome, run, increment } = setupRoutes();
-    price.country.routes[0].pdpSource = "twister";
-    const scraper = new AmazonPdpCountryScraper(
-      amazon.service,
-      { aod: fakeAdBuilder().builder, twister: Object.assign(fakeAdBuilder().builder, { notFoundIsNoData: true }) },
-      { increment } as unknown as MetricsService
-    );
-    scraper.execute(price, buildAd(), () => false).then(outcome);
+      const { amazon, price, outcome, increment } = setupRoutes();
+      price.country.routes[0].pdpSource = "twister";
+      const scraper = new AmazonPdpCountryScraper(
+        amazon.service,
+        { aod: fakeAdBuilder().builder, twister: Object.assign(fakeAdBuilder().builder, { notFoundIsNoData: true }) },
+        { increment } as unknown as MetricsService
+      );
+      scraper.execute(price, buildAd(), () => false).then(outcome);
 
-    amazon.fail(0, notFound);
-    await flush();
+      amazon.fail(0, notFound);
+      await flush();
 
-    expect(outcome).toHaveBeenCalledWith("fallback");
-    expect(price.missingRouteIds).toEqual([10]);
-    expect(calls(increment, "items")).toEqual([]);
-  });
+      expect(outcome).toHaveBeenCalledWith("fallback");
+      expect(price.missingRouteIds).toEqual([10]);
+      expect(calls(increment, "items")).toEqual([]);
+    });
 
-  it("counts the attempts of the routes already left", async () => {
+    it("counts the attempts of the routes already left", async () => {
       const { amazon, price, outcome, run, increment } = setupRoutes();
       price.pastAttempts = 2;
       price.nextRoute();
