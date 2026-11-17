@@ -436,7 +436,7 @@ describe("AmazonPdpCountryScraper", () => {
       expect(outcome).toHaveBeenCalledWith("given_up");
     });
 
-    it("does not count the item of a route that falls back after a 404", async () => {
+    it("falls back without counting the item after the final 404 of a route with another left", async () => {
       const { amazon, price, outcome, run, increment } = setupRoutes();
       run();
 
@@ -445,8 +445,26 @@ describe("AmazonPdpCountryScraper", () => {
       amazon.fail(1, notFound);
       await vi.runAllTimersAsync();
 
-      expect(outcome).toHaveBeenCalledWith("deleted");
-      expect(price.isFallingBack).toBe(true);
+      expect(outcome).toHaveBeenCalledWith("fallback");
+      expect(price.missingRouteIds).toEqual([price.route!.id]);
+      expect(calls(increment, "items")).toEqual([]);
+    });
+
+    it("falls back after a twister 404 when the country has another route", async () => {
+      const { amazon, price, outcome, increment } = setupRoutes();
+      price.country.routes[0].pdpSource = "twister";
+      const scraper = new AmazonPdpCountryScraper(
+        amazon.service,
+        { aod: fakeAdBuilder().builder, twister: Object.assign(fakeAdBuilder().builder, { notFoundIsNoData: true }) },
+        { increment } as unknown as MetricsService
+      );
+      scraper.execute(price, buildAd(), () => false).then(outcome);
+
+      amazon.fail(0, notFound);
+      await flush();
+
+      expect(outcome).toHaveBeenCalledWith("fallback");
+      expect(price.missingRouteIds).toEqual([10]);
       expect(calls(increment, "items")).toEqual([]);
     });
 

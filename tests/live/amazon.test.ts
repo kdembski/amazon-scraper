@@ -22,7 +22,6 @@ import { buildAd, buildAmazonCountry } from "@@tests/support/factories";
 vi.mock("cron", async () => (await import("@@tests/support/cron")).cronModule);
 
 if (existsSync(".env")) process.loadEnvFile();
-process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = "0";
 
 // LIVE_ASINS / LIVE_MARKETS override the defaults, comma separated
 const list = (value: string | undefined, fallback: string[]) =>

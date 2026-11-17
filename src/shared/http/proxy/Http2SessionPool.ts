@@ -66,10 +66,6 @@ export class Http2SessionPool {
     return `direct${family}` as const;
   }
 
-  getRoute(endpoint: Http2Endpoint) {
-    return endpoint.route;
-  }
-
   takeLastFree(host: string, accept: (url: string) => boolean) {
     return this.freeProxies.takeLast(
       host,

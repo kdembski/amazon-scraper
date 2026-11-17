@@ -2,6 +2,7 @@ import { EventEmitter } from "node:events";
 import http2 from "node:http2";
 import type tls from "node:tls";
 import _ from "lodash";
+import { raceAbort, timedOut } from "@/shared/http/abort";
 import { FingerprintGenerator } from "@/shared/http/FingerprintGenerator";
 import type { Fingerprint, Route, ShopResponse } from "@/shared/http/http.types";
 import { Http2StreamSender } from "@/shared/http/proxy/Http2StreamSender";
@@ -15,8 +16,6 @@ type Session = {
   ready: Promise<http2.ClientHttp2Session>;
   client?: http2.ClientHttp2Session;
 };
-
-const timedOut = () => Object.assign(new Error("Request aborted"), { code: "ETIMEDOUT" });
 
 export class Http2Endpoint extends EventEmitter {
   private sessions = new Map<string, Session[]>();
@@ -49,7 +48,7 @@ export class Http2Endpoint extends EventEmitter {
     session.streams++;
 
     try {
-      await this.wait(session.ready, signal);
+      await raceAbort(session.ready, signal);
     } catch (error) {
       this.release(host, session);
       throw error;
@@ -168,18 +167,6 @@ export class Http2Endpoint extends EventEmitter {
     session.client = client;
 
     return client;
-  }
-
-  private wait<T>(promise: Promise<T>, signal: AbortSignal) {
-    let onAbort!: () => void;
-    const aborted = new Promise<never>((_, reject) => {
-      onAbort = () => reject(timedOut());
-      signal.addEventListener("abort", onAbort, { once: true });
-    });
-
-    return Promise.race([promise, aborted]).finally(() =>
-      signal.removeEventListener("abort", onAbort)
-    );
   }
 
   private release(host: string, session: Session) {

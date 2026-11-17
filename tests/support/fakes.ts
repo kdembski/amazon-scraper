@@ -31,8 +31,9 @@ export function fakeAmazonPlpAdSender() {
 
 export function fakeAmazonCountryService() {
   const getCountries = vi.fn().mockResolvedValue([]);
-  const service = { getCountries } as unknown as AmazonCountryService;
-  return { service, getCountries };
+  const start = vi.fn();
+  const service = { getCountries, start } as unknown as AmazonCountryService;
+  return { service, getCountries, start };
 }
 
 type FakeRequest = {
@@ -63,7 +64,11 @@ export function fakeAmazonService() {
 
 export function fakeTokenBucketQueue() {
   const queue = [] as Function[];
-  const service = { queue } as unknown as TokenBucketQueue;
+  const service = {
+    get length() {
+      return queue.length;
+    },
+  } as unknown as TokenBucketQueue;
   return { service, queue };
 }
 

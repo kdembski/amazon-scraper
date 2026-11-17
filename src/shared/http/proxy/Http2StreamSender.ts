@@ -1,6 +1,7 @@
 import http2 from "node:http2";
 import { type Readable, Transform } from "node:stream";
 import zlib from "node:zlib";
+import { codedError, timedOut } from "@/shared/http/abort";
 import type { Fingerprint, ShopResponse } from "@/shared/http/http.types";
 
 type StreamRequest = {
@@ -17,8 +18,6 @@ const decoders: Record<string, () => Transform> = {
   br: () => zlib.createBrotliDecompress(),
   zstd: () => zlib.createZstdDecompress(),
 };
-
-const timedOut = () => Object.assign(new Error("Request aborted"), { code: "ETIMEDOUT" });
 
 export class Http2StreamSender {
   send(client: http2.ClientHttp2Session, request: StreamRequest, onClose: () => void) {
@@ -48,11 +47,7 @@ export class Http2StreamSender {
       });
       stream.once("close", () => {
         request.signal.removeEventListener("abort", onAbort);
-        reject(
-          Object.assign(new Error(`Stream closed with code ${stream.rstCode}`), {
-            code: "ERR_HTTP2_STREAM_CLOSED",
-          })
-        );
+        reject(codedError(`Stream closed with code ${stream.rstCode}`, "ERR_HTTP2_STREAM_CLOSED"));
         onClose();
       });
     });
@@ -86,7 +81,7 @@ export class Http2StreamSender {
         flush(callback) {
           if (received >= expected) return callback();
 
-          callback(Object.assign(new Error("Body cut off"), { code: "ECONNRESET" }));
+          callback(codedError("Body cut off", "ECONNRESET"));
         },
       });
     };

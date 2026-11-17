@@ -5,6 +5,7 @@ import { Http2SessionPool } from "@/shared/http/proxy/Http2SessionPool";
 import { ProxyList } from "@/shared/http/proxy/ProxyList";
 import { ProxyRouteSelector } from "@/shared/http/proxy/ProxyRouteSelector";
 import { ProxyTrafficMeter } from "@/shared/http/proxy/ProxyTrafficMeter";
+import { MetricsService } from "@/shared/metrics/MetricsService";
 import { tcpPing } from "@/shared/utils/tcpPing";
 import type { ProxyPlan } from "@/shared/http/http.types";
 
@@ -25,11 +26,10 @@ export class ProxyService {
     ),
     private list = new ProxyList(),
     private pingIpv6 = () => tcpPing(IPV6_PING_HOST, 443, 2000),
-    private routes = new ProxyRouteSelector(pool)
+    private routes = new ProxyRouteSelector(pool),
+    metricsService = MetricsService.getInstance()
   ) {
-    new CronJob("0 0 */1 * * *", async () => {
-      await this.loadProxies();
-    }).start();
+    metricsService.gauge("open_connections", () => pool.countConnections());
   }
 
   public static getInstance(): ProxyService {
@@ -56,10 +56,6 @@ export class ProxyService {
     this.pool.report(endpoint, host, blocked);
   }
 
-  getRoute(endpoint: Http2Endpoint) {
-    return this.pool.getRoute(endpoint);
-  }
-
   setCountry(host: string, country: string) {
     this.meter.setCountry(host, country);
   }
@@ -78,12 +74,12 @@ export class ProxyService {
     return this.plans[Math.floor(Math.random() * this.plans.length)] ?? { urls: [] };
   }
 
-  countConnections() {
-    return this.pool.countConnections();
-  }
-
   collectTraffic() {
     return this.meter.collect();
+  }
+
+  start() {
+    new CronJob("0 0 */1 * * *", () => this.loadProxies()).start();
   }
 
   loadProxies() {

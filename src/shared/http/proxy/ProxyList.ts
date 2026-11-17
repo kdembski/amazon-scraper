@@ -1,6 +1,6 @@
 import axios from "axios";
 import _ from "lodash";
-import { sleep } from "@/shared/utils/sleep";
+import { RetryBackoff } from "@/shared/utils/RetryBackoff";
 import type { ProxyPlan } from "@/shared/http/http.types";
 
 interface WebsharePlan {
@@ -16,17 +16,18 @@ interface WebsharePeriod {
 }
 
 export class ProxyList {
-  private retryDelay = 2 * 60 * 1000;
   private minTimeLeft = 60 * 60 * 1000;
   private webshareUrl = "https://proxy.webshare.io/api/v2";
 
   async load(): Promise<ProxyPlan[]> {
+    const retry = new RetryBackoff();
     while (true) {
       try {
         return await this.downloadPlans();
-      } catch (e) {
-        console.log("Proxy error: " + e);
-        await sleep(this.retryDelay);
+      } catch (e: any) {
+        console.error("proxies: load failed", e?.message);
+        retry.fail();
+        await retry.wait();
       }
     }
   }

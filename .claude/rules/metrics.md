@@ -54,13 +54,6 @@ A shop socket is the raw TCP socket of one HTTP/2 session (many requests per soc
 | `ad_duration_ms` | – | Sum of time from start to decision per ASIN. Mean = `ad_duration_ms / ads`. |
 | `ads_in_flight` | – (gauge) | ASINs being processed. |
 
-## PLP
-
-| Metric | Labels | What it describes |
-|---|---|---|
-| `new_releases_pages` | `country=pl`, `outcome`: `data` / `given_up` | New releases pages: fetched / given up. Not sent while new releases is disabled. |
-| `new_releases_ads` | `country=pl` | New (first time in the category run) ASINs from new releases. |
-
 ## Sending to the backend (`BatchSender`)
 
 | Metric | Labels | What it describes |
@@ -70,13 +63,12 @@ A shop socket is the raw TCP socket of one HTTP/2 session (many requests per soc
 | `backend_items` | `outcome`: `sent` / `dropped` | Items sent / dropped (4xx or 6 attempts). |
 | `backend_buffer` | – (gauge) | Items waiting in the buffer (one `BatchSender` per mode: PDP `amazon/ads/batch`, PLP `amazon/ads`). |
 
-## Process (added by `MetricsReporter`, at report time)
+## Process (at report time)
 
 | Metric | What it describes |
 |---|---|
-| `pending` | Requests in progress in `TokenBucketQueue`. |
-| `queue_length` | Requests waiting in the queue. |
-| `open_connections` | Open shop connections (proxy and `direct`). |
+| `pending` / `queue_length` | Gauge (`TokenBucketQueue`): requests in progress / waiting in the queue. |
+| `open_connections` | Gauge (`ProxyService`): open shop connections (proxy and `direct`). |
 | `event_loop_delay_mean_ms` / `event_loop_delay_max_ms` | Event loop delay over the minute (minus the 10 ms resolution). |
 | `cpu_percent` | % of one core since the previous report. |
 | `memory_rss_mb` / `heap_used_mb` | Process memory. |

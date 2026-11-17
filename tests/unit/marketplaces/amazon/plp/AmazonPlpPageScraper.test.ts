@@ -15,7 +15,7 @@ const parse = (url: string) => ({
   number: Number(url.match(/&page=(\d+)/)?.[1] ?? 1),
 });
 
-const setup = (reply: (price: string, number: number) => Reply = () => ({}), allPages = false) => {
+const setup = (reply: (price: string, number: number) => Reply = () => ({})) => {
   const sender = fakeAmazonPlpAdSender();
   const fetch = vi.fn(async (url: string, _referer: string, _build?: unknown, _stopAt?: string[]) => {
     const { price, number } = parse(url);
@@ -29,7 +29,7 @@ const setup = (reply: (price: string, number: number) => Reply = () => ({}), all
     undefined,
     { increment } as unknown as MetricsService
   );
-  const crawl = new AmazonPlpCrawl("electronics", allPages, sender.service);
+  const crawl = new AmazonPlpCrawl("electronics", sender.service);
   const requests = () => fetch.mock.calls.map(([url]) => parse(url));
   return { sender, fetch, increment, scraper, crawl, requests };
 };
@@ -77,22 +77,16 @@ describe("AmazonPlpPageScraper", () => {
     expect(fetch.mock.calls[0][3]).toEqual(["s-pagination-item", "MAIN-FEEDBACK"]);
   });
 
-  it.each([false, true])(
-    "splits a range with 400 pages and skips its further pages (allPages %s)",
-    async (allPages) => {
-      const { requests, scraper, crawl } = setup(
-        (price) => ({ lastPage: price === "-999" ? 400 : 1 }),
-        allPages
-      );
+  it("splits a range with 400 pages and skips its further pages", async () => {
+    const { requests, scraper, crawl } = setup((price) => ({ lastPage: price === "-999" ? 400 : 1 }));
 
-      await scraper.execute(crawl);
+    await scraper.execute(crawl);
 
-      expect(requests()).toContainEqual({ price: "-499", number: 1 });
-      expect(requests()).toContainEqual({ price: "500-999", number: 1 });
-      expect(requests().filter(({ number }) => number > 1)).toEqual([]);
-      expect(requests()).toHaveLength(seeds.length + 2);
-    }
-  );
+    expect(requests()).toContainEqual({ price: "-499", number: 1 });
+    expect(requests()).toContainEqual({ price: "500-999", number: 1 });
+    expect(requests().filter(({ number }) => number > 1)).toEqual([]);
+    expect(requests()).toHaveLength(seeds.length + 2);
+  });
 
   it("splits a given up range by its last page from an earlier run", async () => {
     let run = 1;
@@ -118,15 +112,16 @@ describe("AmazonPlpPageScraper", () => {
       if (price === "-499" || price === "500-999") return { lastPage: run === 1 ? 200 : 100 };
       return {};
     });
+    const firsts = () => requests().filter(({ number }) => number === 1);
     await scraper.execute(crawl);
     run = 2;
 
     await scraper.execute(crawl);
-    const second = requests().slice(seeds.length + 2);
+    const second = firsts().slice(seeds.length + 2);
     run = 3;
 
     await scraper.execute(crawl);
-    const third = requests().slice(2 * (seeds.length + 2) - 1);
+    const third = firsts().slice(2 * (seeds.length + 2) - 1);
 
     expect(second).not.toContainEqual({ price: "-999", number: 1 });
     expect(second).toContainEqual({ price: "-499", number: 1 });
@@ -155,7 +150,7 @@ describe("AmazonPlpPageScraper", () => {
     }));
     await scraper.execute(crawl);
 
-    await scraper.execute(new AmazonPlpCrawl("toys", false, sender.service));
+    await scraper.execute(new AmazonPlpCrawl("toys", sender.service));
 
     expect(requests().slice(seeds.length + 2)).toHaveLength(seeds.length);
   });
@@ -163,7 +158,6 @@ describe("AmazonPlpPageScraper", () => {
   it("paginates a range with 399 pages instead of splitting it", async () => {
     const { requests, scraper, crawl } = setup(
       (price) => ({ lastPage: price === "-999" ? 399 : 1 }),
-      true
     );
 
     await scraper.execute(crawl);
@@ -183,10 +177,9 @@ describe("AmazonPlpPageScraper", () => {
     expect(requests()).toContainEqual({ price: "1000000-", number: 1 });
   });
 
-  it("follows the pagination of a range below 400 pages when scraping all pages", async () => {
+  it("follows the pagination of a range below 400 pages", async () => {
     const { requests, scraper, crawl } = setup(
       (price) => ({ lastPage: price === "-999" ? 3 : 1 }),
-      true
     );
 
     await scraper.execute(crawl);
@@ -198,18 +191,9 @@ describe("AmazonPlpPageScraper", () => {
     ]);
   });
 
-  it("scrapes only the first page when not scraping all pages", async () => {
-    const { requests, scraper, crawl } = setup(() => ({ lastPage: 3 }));
-
-    await scraper.execute(crawl);
-
-    expect(requests().every(({ number }) => number === 1)).toBe(true);
-  });
-
   it("paginates a single grosz range with 400 pages instead of splitting it", async () => {
     const { requests, scraper, crawl } = setup(
       (price) => ({ lastPage: price.startsWith("-") ? 400 : 1 }),
-      true
     );
 
     await scraper.execute(crawl);
@@ -227,7 +211,6 @@ describe("AmazonPlpPageScraper", () => {
         lastPage: price === "-999" ? 3 : 1,
         givenUp: price === "-999" && number === 2,
       }),
-      true
     );
 
     await scraper.execute(crawl);

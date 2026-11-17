@@ -67,6 +67,16 @@ describe("AmazonPdpScraper", () => {
       expect(api.get).toHaveBeenCalledTimes(2);
     });
 
+    it("starts the country refresh once", async () => {
+      vi.useFakeTimers();
+      const { country, scraper } = setup();
+
+      scraper.execute();
+      await vi.advanceTimersByTimeAsync(2000);
+
+      expect(country.start).toHaveBeenCalledTimes(1);
+    });
+
     it("waits a second after a load finishes before the next one", async () => {
       vi.useFakeTimers({ now: new Date("2026-01-15T12:00:00Z") });
       const { api, country, scraper } = setup();
@@ -90,18 +100,6 @@ describe("AmazonPdpScraper", () => {
   });
 
   describe("scrape", () => {
-    it("loads a batch at night while the night pause is disabled", async () => {
-      const log = vi.spyOn(console, "log").mockImplementation(() => {});
-      const { api, country, scraper } = setup();
-      country.getCountries.mockResolvedValue(countries);
-      api.get.mockResolvedValue([]);
-
-      vi.setSystemTime(new Date("2026-01-15T22:00:00Z"));
-      await scraper.scrape();
-      expect(api.get).toHaveBeenCalledTimes(1);
-      expect(log).not.toHaveBeenCalled();
-    });
-
     it("logs and counts a failed load instead of rejecting", async () => {
       const error = vi.spyOn(console, "error").mockImplementation(() => {});
       const { country, scraper, increment } = setup();
@@ -109,7 +107,7 @@ describe("AmazonPdpScraper", () => {
 
       await expect(scraper.scrape()).resolves.toBeUndefined();
 
-      expect(error).toHaveBeenCalledWith("pdp: batch load failed", expect.any(Error));
+      expect(error).toHaveBeenCalledWith("pdp: batch load failed", "down");
       expect(increment.mock.calls).toEqual([["batch_load", { outcome: "failed" }]]);
     });
 

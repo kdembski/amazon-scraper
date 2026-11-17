@@ -1,14 +1,12 @@
+import axios from "axios";
 import { createScraper } from "@/marketplaces";
-
-// Ignore the certificate
-process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = "0";
 
 createScraper().then((scraper) => scraper.execute());
 
 process.on("uncaughtException", (e, o) => {
-  console.log("uncaught exception", e, o);
+  console.log("uncaught exception", axios.isAxiosError(e) ? e.message : e, o);
 });
 
 process.on("unhandledRejection", (e, o) => {
-  console.log("uncaught rejection", e, o);
+  console.log("uncaught rejection", axios.isAxiosError(e) ? e.message : e, o);
 });

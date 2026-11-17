@@ -4,7 +4,7 @@ import { AmazonAodAdBuilder } from "@/marketplaces/amazon/pdp/builders/AmazonAod
 import { AmazonAwdAdBuilder } from "@/marketplaces/amazon/pdp/builders/AmazonAwdAdBuilder";
 import { AmazonTwisterAdBuilder } from "@/marketplaces/amazon/pdp/builders/AmazonTwisterAdBuilder";
 import type { AmazonCountryPrice } from "@/marketplaces/amazon/pdp/AmazonCountryPrice";
-import { AmazonAd, AmazonAdBuilder } from "@/marketplaces/amazon/types/amazon.types";
+import { AmazonAd, AmazonAdBuilder, AmazonCountryOutcome } from "@/marketplaces/amazon/types/amazon.types";
 import { MetricsService } from "@/shared/metrics/MetricsService";
 import { ItemOutcome } from "@/shared/metrics/metrics.types";
 
@@ -28,7 +28,7 @@ export class AmazonPdpCountryScraper {
     price: AmazonCountryPrice,
     ad: AmazonAd,
     isCancelled: () => boolean
-  ): Promise<ItemOutcome | undefined> {
+  ): Promise<AmazonCountryOutcome | undefined> {
     const builder = this.builders[price.route!.pdpSource] ?? this.builders.aod;
 
     while (!isCancelled()) {
@@ -37,7 +37,9 @@ export class AmazonPdpCountryScraper {
 
       const outcome = this.toOutcome(result, price, builder);
       if (outcome) {
-        if (!price.isFallingBack) this.countItem(price, outcome);
+        if (price.isFallingBack) return "fallback";
+
+        this.countItem(price, outcome);
         return outcome;
       }
 

@@ -53,7 +53,7 @@ export class AmazonPlpPageFetcher {
 
   private async get(url: string, referer: string, stopAt?: string[]) {
     const { batchSize } = this.configService.get();
-    while (this.queueService.queue.length >= batchSize) {
+    while (this.queueService.length >= batchSize) {
       await sleep(QUEUE_FULL_DELAY);
     }
 

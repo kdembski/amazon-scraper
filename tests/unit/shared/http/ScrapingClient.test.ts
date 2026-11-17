@@ -20,12 +20,11 @@ const respond = (status: number, body: string | string[] = "", headers = {}) => 
 
 const setup = (route = "proxy") => {
   const request = vi.fn();
-  const endpoint = { request } as unknown as Http2Endpoint;
+  const endpoint = { request, route } as unknown as Http2Endpoint;
   const metrics = { increment: vi.fn() };
   const proxy = {
     getEndpoint: vi.fn(() => endpoint),
     report: vi.fn(),
-    getRoute: vi.fn(() => route),
     setCountry: vi.fn(),
   };
   const requests: Promise<unknown>[] = [];

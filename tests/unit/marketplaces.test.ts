@@ -7,6 +7,7 @@ import { ArgsService } from "@/shared/args/ArgsService";
 import { MetricsReporter } from "@/shared/metrics/MetricsReporter";
 import { ScraperConfigService } from "@/shared/backend/ScraperConfigService";
 import { ProxyService } from "@/shared/http/proxy/ProxyService";
+import { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
 
 vi.mock("@/marketplaces/amazon/pdp/AmazonPdpScraper", () => ({
   AmazonPdpScraper: vi.fn(function (this: { marketplace: string }) {
@@ -25,6 +26,9 @@ const setup = (target: Target) => {
   vi.spyOn(ArgsService, "getInstance").mockReturnValue({
     getTargetFlag: () => target,
   } as unknown as ArgsService);
+  vi.spyOn(TokenBucketQueue, "getInstance").mockReturnValue({
+    start: vi.fn(() => calls.push("queue")),
+  } as unknown as TokenBucketQueue);
   vi.spyOn(ScraperConfigService, "getInstance").mockReturnValue({
     load: vi.fn(async () => {
       calls.push("load");
@@ -35,6 +39,7 @@ const setup = (target: Target) => {
     loadProxies: vi.fn(async () => {
       calls.push("loadProxies");
     }),
+    start: vi.fn(() => calls.push("proxyRefresh")),
   } as unknown as ProxyService);
   const start = vi.fn(() => calls.push("metrics"));
   vi.spyOn(MetricsReporter, "getInstance").mockReturnValue({
@@ -49,13 +54,13 @@ describe("createScraper", () => {
     vi.mocked(AmazonPlpScraper).mockClear();
   });
 
-  it("loads the config, starts its refresh and the metrics reporting, then loads proxies", async () => {
+  it("starts the queue, loads the config and starts its refresh, the metrics reporting, then loads proxies and starts their refresh", async () => {
     const { calls, start } = setup("pdp");
 
     await createScraper();
 
-    expect(calls).toEqual(["load", "start", "metrics", "loadProxies"]);
-    expect(start).toHaveBeenCalledWith("amazon");
+    expect(calls).toEqual(["queue", "load", "start", "metrics", "loadProxies", "proxyRefresh"]);
+    expect(start).toHaveBeenCalledWith("amazon", "pdp");
   });
 
   it("returns the PDP scraper for pdp", async () => {

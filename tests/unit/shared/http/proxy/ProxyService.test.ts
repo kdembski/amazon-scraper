@@ -4,6 +4,7 @@ import { Http2Endpoint } from "@/shared/http/proxy/Http2Endpoint";
 import type { Http2SessionPool } from "@/shared/http/proxy/Http2SessionPool";
 import type { ProxyList } from "@/shared/http/proxy/ProxyList";
 import type { ProxyTrafficMeter } from "@/shared/http/proxy/ProxyTrafficMeter";
+import { MetricsService } from "@/shared/metrics/MetricsService";
 import { cronJobs } from "@@tests/support/cron";
 import { resetSingleton } from "@@tests/support/singleton";
 
@@ -33,7 +34,6 @@ const setup = () => {
     ),
     countConnections: vi.fn(() => 7),
     report: vi.fn(),
-    getRoute: vi.fn(),
   };
   const list = { load: vi.fn().mockResolvedValue(plans) };
   const pingIpv6 = vi.fn<() => Promise<number | undefined>>().mockResolvedValue(undefined);
@@ -74,8 +74,11 @@ describe("ProxyService", () => {
     resetSingleton(ProxyService);
   });
 
-  it("reloads the proxy list every hour", async () => {
-    const { list } = setup();
+  it("reloads the proxy list every hour once started", async () => {
+    const { list, service } = setup();
+    expect(cronJobs).toHaveLength(0);
+
+    service.start();
 
     expect(cronJobs).toHaveLength(1);
     expect(cronJobs[0].cronTime).toBe("0 0 */1 * * *");
@@ -314,23 +317,17 @@ describe("ProxyService", () => {
     });
   });
 
-  it("counts connections of the pool", () => {
-    expect(setup().service.countConnections()).toBe(7);
+  it("reports open connections of the pool as a gauge", () => {
+    resetSingleton(MetricsService);
+    setup();
+
+    expect(MetricsService.getInstance().readGauges()).toEqual([{ metric: "open_connections", value: 7 }]);
   });
 
   it("collects traffic from the meter", () => {
     expect(setup().service.collectTraffic()).toEqual([
       { labels: { outcome: "proxy" }, bytesIn: 3, bytesOut: 1 },
     ]);
-  });
-
-  it("names the route of an agent by the pool", () => {
-    const { service, pool } = setup();
-    pool.getRoute.mockReturnValue("direct6");
-    const agent = { direct: 6 };
-
-    expect(service.getRoute(agent as never)).toBe("direct6");
-    expect(pool.getRoute).toHaveBeenCalledWith(agent);
   });
 
   it("passes the country of a host to the meter", () => {

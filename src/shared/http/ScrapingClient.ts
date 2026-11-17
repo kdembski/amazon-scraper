@@ -49,7 +49,7 @@ export class ScrapingClient {
     const host = new URL(url).hostname;
     const endpoint = this.proxyService.getEndpoint(host, proxyType);
     if (labels.country) this.proxyService.setCountry(host, labels.country);
-    const route = this.proxyService.getRoute(endpoint);
+    const { route } = endpoint;
     const startedAt = Date.now();
 
     try {

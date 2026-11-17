@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
+import { MetricsService } from "@/shared/metrics/MetricsService";
 import { resetSingleton } from "@@tests/support/singleton";
 
 const setup = ({ concurrency = 2, rps = 0 } = {}) => new TokenBucketQueue(concurrency, rps);
@@ -22,14 +23,26 @@ describe("TokenBucketQueue", () => {
     vi.restoreAllMocks();
   });
 
-  it("is a singleton that starts its loop once", () => {
+  it("reports pending and queued requests as gauges", async () => {
+    resetSingleton(MetricsService);
+    const queue = setup({ concurrency: 1 });
+    queue.request(deferred().callback);
+    queue.request(deferred().callback);
+
+    expect(MetricsService.getInstance().readGauges()).toEqual([
+      { metric: "pending", value: 1 },
+      { metric: "queue_length", value: 1 },
+    ]);
+  });
+
+  it("is a singleton that starts its loop only on start()", () => {
     const start = vi.spyOn(TokenBucketQueue.prototype, "start").mockImplementation(() => {});
     resetSingleton(TokenBucketQueue);
 
     const queue = TokenBucketQueue.getInstance();
 
     expect(TokenBucketQueue.getInstance()).toBe(queue);
-    expect(start).toHaveBeenCalledTimes(1);
+    expect(start).not.toHaveBeenCalled();
     resetSingleton(TokenBucketQueue);
   });
 
@@ -94,7 +107,7 @@ describe("TokenBucketQueue", () => {
       queue.request(second.callback);
 
       expect(second.callback).not.toHaveBeenCalled();
-      expect(queue.queue).toEqual([second.callback]);
+      expect(queue.length).toBe(1);
       expect(queue.pending).toBe(1);
     });
 
@@ -115,7 +128,7 @@ describe("TokenBucketQueue", () => {
       first.finish();
       await vi.advanceTimersByTimeAsync(5);
       expect(second.callback).toHaveBeenCalled();
-      expect(queue.queue).toEqual([]);
+      expect(queue.length).toBe(0);
       expect(queue.pending).toBe(1);
     });
 
@@ -131,7 +144,7 @@ describe("TokenBucketQueue", () => {
       await Promise.resolve();
 
       expect(second.callback).toHaveBeenCalled();
-      expect(queue.queue).toEqual([]);
+      expect(queue.length).toBe(0);
       expect(queue.pending).toBe(1);
     });
 
@@ -196,7 +209,7 @@ describe("TokenBucketQueue", () => {
       requests.forEach((request) => queue.request(request.callback));
 
       expect(queue.pending).toBe(3);
-      expect(queue.queue).toHaveLength(2);
+      expect(queue.length).toBe(2);
     });
 
     it("refills tokens over time", async () => {
@@ -221,7 +234,7 @@ describe("TokenBucketQueue", () => {
       requests.forEach((request) => queue.request(request.callback));
 
       expect(queue.pending).toBe(2);
-      expect(queue.queue).toHaveLength(3);
+      expect(queue.length).toBe(3);
     });
 
     it("does not spend tokens while the queue is empty", async () => {

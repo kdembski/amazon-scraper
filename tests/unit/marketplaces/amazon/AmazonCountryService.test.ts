@@ -45,9 +45,16 @@ describe("AmazonCountryService", () => {
     expect(api.get).toHaveBeenCalledTimes(1);
   });
 
-  it("reloads countries every minute", async () => {
-    const { api } = setup();
+  it("starts nothing until start()", () => {
+    setup();
+
+    expect(cronJobs).toHaveLength(0);
+  });
+
+  it("reloads countries every minute once started", async () => {
+    const { api, service } = setup();
     api.get.mockResolvedValue([]);
+    service.start();
 
     expect(cronJobs).toHaveLength(1);
     expect(cronJobs[0].cronTime).toBe("0 * * * * *");
@@ -61,6 +68,7 @@ describe("AmazonCountryService", () => {
     const { api, service } = setup();
     api.get.mockResolvedValueOnce(countries).mockRejectedValueOnce(new Error("down"));
     await service.loadCountries();
+    service.start();
 
     await expect(cronJobs[0].onTick()).rejects.toThrow("down");
 

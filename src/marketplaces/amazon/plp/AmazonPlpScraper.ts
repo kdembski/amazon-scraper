@@ -1,5 +1,6 @@
 import { MarketplaceScraper } from "@/shared/interfaces/MarketplaceScraper";
-import { AmazonPlpCategoryScraper } from "@/marketplaces/amazon/plp/AmazonPlpCategoryScraper";
+import { AmazonPlpCrawl } from "@/marketplaces/amazon/plp/AmazonPlpCrawl";
+import { AmazonPlpPageScraper } from "@/marketplaces/amazon/plp/AmazonPlpPageScraper";
 import { AmazonAdCategory } from "@/marketplaces/amazon/types/amazon.types";
 import { ApiService } from "@/shared/backend/ApiService";
 import { sleep } from "@/shared/utils/sleep";
@@ -11,7 +12,7 @@ export class AmazonPlpScraper implements MarketplaceScraper {
 
   constructor(
     private apiService = ApiService.getInstance(),
-    private categoryScraper = new AmazonPlpCategoryScraper()
+    private pageScraper = new AmazonPlpPageScraper()
   ) {}
 
   async execute() {
@@ -25,7 +26,7 @@ export class AmazonPlpScraper implements MarketplaceScraper {
       const category = await this.apiService.get<AmazonAdCategory>(
         "amazon/ads/categories/scrap"
       );
-      await this.categoryScraper.execute(category);
+      await this.pageScraper.execute(new AmazonPlpCrawl(category.name));
     } catch {
       await sleep(CATEGORY_RETRY_DELAY);
     }

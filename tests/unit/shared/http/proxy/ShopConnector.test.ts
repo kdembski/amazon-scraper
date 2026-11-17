@@ -69,7 +69,6 @@ describe("ShopConnector", () => {
   };
 
   it("connects through a proxy with h2 and reports the raw socket", async () => {
-    vi.stubEnv("NODE_TLS_REJECT_UNAUTHORIZED", "0");
     const proxy = await startProxy(200, await startH2());
     const onConnect = vi.fn();
 
@@ -95,7 +94,6 @@ describe("ShopConnector", () => {
   });
 
   it("connects directly", async () => {
-    vi.stubEnv("NODE_TLS_REJECT_UNAUTHORIZED", "0");
     const port = await startH2();
     const onConnect = vi.fn();
 
@@ -130,7 +128,6 @@ describe("ShopConnector", () => {
   });
 
   it("rejects with ERR_ALPN when the server negotiates no ALPN", async () => {
-    vi.stubEnv("NODE_TLS_REJECT_UNAUTHORIZED", "0");
     const server = tls.createServer(cert);
     server.on("secureConnection", (socket) => {
       socket.on("error", () => {});

@@ -1,5 +1,4 @@
 import { MarketplaceScraper } from "@/shared/interfaces/MarketplaceScraper";
-import { AmazonNightSchedule } from "@/marketplaces/amazon/pdp/AmazonNightSchedule";
 import { AmazonPdpAdScraper } from "@/marketplaces/amazon/pdp/AmazonPdpAdScraper";
 import { AmazonCountryService } from "@/marketplaces/amazon/AmazonCountryService";
 import { AmazonAd } from "@/marketplaces/amazon/types/amazon.types";
@@ -15,7 +14,6 @@ const MIN_LOAD_SHARE = 4;
 
 export class AmazonPdpScraper implements MarketplaceScraper {
   readonly marketplace = "amazon";
-  private paused = false;
 
   constructor(
     private apiService = ApiService.getInstance(),
@@ -23,11 +21,12 @@ export class AmazonPdpScraper implements MarketplaceScraper {
     private adScraper = new AmazonPdpAdScraper(),
     private countryService = AmazonCountryService.getInstance(),
     private configService = ScraperConfigService.getInstance(),
-    private metricsService = MetricsService.getInstance(),
-    private schedule = new AmazonNightSchedule()
+    private metricsService = MetricsService.getInstance()
   ) {}
 
   async execute() {
+    this.countryService.start();
+
     while (true) {
       await this.scrape();
       await sleep(POLL_INTERVAL);
@@ -35,15 +34,9 @@ export class AmazonPdpScraper implements MarketplaceScraper {
   }
 
   async scrape() {
-    if (this.schedule.isNight() !== this.paused) {
-      this.paused = !this.paused;
-      console.log(`pdp: night pause ${this.paused ? "started" : "ended"}`);
-    }
-    if (this.paused) return;
-
     const { batchSize, rps, concurrency } = this.configService.get();
     const lowWater = rps ? rps * QUEUE_SECONDS : concurrency * 2;
-    if (this.queueService.queue.length >= lowWater) return;
+    if (this.queueService.length >= lowWater) return;
 
     const missing = batchSize - this.adScraper.inFlight;
     if (missing < Math.max(batchSize / MIN_LOAD_SHARE, 1)) return;
@@ -55,9 +48,9 @@ export class AmazonPdpScraper implements MarketplaceScraper {
       );
       this.metricsService.increment("batch_load", { outcome: ads.length ? "ok" : "empty" });
       ads.forEach((ad) => this.adScraper.execute(ad, countries));
-    } catch (e) {
+    } catch (e: any) {
       this.metricsService.increment("batch_load", { outcome: "failed" });
-      console.error("pdp: batch load failed", e);
+      console.error("pdp: batch load failed", e?.message);
     }
   }
 }

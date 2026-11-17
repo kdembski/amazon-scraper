@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { AmazonPdpAdScraper } from "@/marketplaces/amazon/pdp/AmazonPdpAdScraper";
 import type { AmazonPdpCountryScraper } from "@/marketplaces/amazon/pdp/AmazonPdpCountryScraper";
 import type { AmazonCountryPrice } from "@/marketplaces/amazon/pdp/AmazonCountryPrice";
-import type { ItemOutcome } from "@/shared/metrics/metrics.types";
+import type { AmazonCountryOutcome } from "@/marketplaces/amazon/types/amazon.types";
 import type { MetricsService } from "@/shared/metrics/MetricsService";
 import { RetryBackoff } from "@/shared/utils/RetryBackoff";
 import { buildAd, buildAmazonCountry, buildRoute } from "@@tests/support/factories";
@@ -13,11 +13,11 @@ const setup = (count: number, priorities: number[] = [], active: boolean[] = [])
   const runs: {
     price: AmazonCountryPrice;
     isCancelled: () => boolean;
-    finish: (outcome?: ItemOutcome) => void;
+    finish: (outcome?: AmazonCountryOutcome) => void;
   }[] = [];
   const execute = vi.fn(
     (price: AmazonCountryPrice, _ad, isCancelled: () => boolean) =>
-      new Promise<ItemOutcome | undefined>((finish) => runs.push({ price, isCancelled, finish }))
+      new Promise<AmazonCountryOutcome | undefined>((finish) => runs.push({ price, isCancelled, finish }))
   );
   const countryScraper = { execute } as unknown as AmazonPdpCountryScraper;
   const increment = vi.fn();
@@ -83,7 +83,7 @@ describe("AmazonPdpAdScraper", () => {
   describe("skipped routes", () => {
     const setupSkip = (skipRouteIds: number[]) => {
       const sender = fakeAmazonPdpResultSender();
-      const execute = vi.fn((_price: AmazonCountryPrice) => new Promise<ItemOutcome | undefined>(() => {}));
+      const execute = vi.fn((_price: AmazonCountryPrice) => new Promise<AmazonCountryOutcome | undefined>(() => {}));
       const increment = vi.fn();
       const scraper = new AmazonPdpAdScraper(
         { execute } as unknown as AmazonPdpCountryScraper,
@@ -359,10 +359,10 @@ describe("AmazonPdpAdScraper", () => {
   describe("route fallback", () => {
     const setupRoutes = () => {
       const sender = fakeAmazonPdpResultSender();
-      const runs: { price: AmazonCountryPrice; route: string; finish: (outcome?: ItemOutcome) => void }[] = [];
+      const runs: { price: AmazonCountryPrice; route: string; finish: (outcome?: AmazonCountryOutcome) => void }[] = [];
       const execute = vi.fn(
         (price: AmazonCountryPrice) =>
-          new Promise<ItemOutcome | undefined>((finish) =>
+          new Promise<AmazonCountryOutcome | undefined>((finish) =>
             runs.push({ price, route: `${price.country.tld}:${price.route!.id}`, finish })
           )
       );
@@ -389,7 +389,7 @@ describe("AmazonPdpAdScraper", () => {
       expect(started()).toEqual(["de:10"]);
 
       runs[0].price.markMissing();
-      runs[0].finish("deleted");
+      runs[0].finish("fallback");
       await flush();
       expect(started()).toEqual(["de:10", "fr:2"]);
       expect(increment).toHaveBeenCalledWith("route_fallback", { country: "de" });

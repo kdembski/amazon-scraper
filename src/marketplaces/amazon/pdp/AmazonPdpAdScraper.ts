@@ -1,10 +1,10 @@
 import { AmazonAdPrices } from "@/marketplaces/amazon/pdp/AmazonAdPrices";
 import { AmazonCountryPrice } from "@/marketplaces/amazon/pdp/AmazonCountryPrice";
 import { AmazonPdpCountryScraper } from "@/marketplaces/amazon/pdp/AmazonPdpCountryScraper";
-import { AmazonAd, AmazonCountry } from "@/marketplaces/amazon/types/amazon.types";
+import { AmazonAd, AmazonCountry, AmazonCountryOutcome } from "@/marketplaces/amazon/types/amazon.types";
 import { AmazonPdpResultSender } from "@/marketplaces/amazon/pdp/AmazonPdpResultSender";
 import { MetricsService } from "@/shared/metrics/MetricsService";
-import { AdOutcome, ItemOutcome } from "@/shared/metrics/metrics.types";
+import { AdOutcome } from "@/shared/metrics/metrics.types";
 
 export class AmazonPdpAdScraper {
   inFlight = 0;
@@ -66,11 +66,11 @@ export class AmazonPdpAdScraper {
   // The outcome of the ad once it is decided
   private applyOutcome(
     price: AmazonCountryPrice,
-    outcome: ItemOutcome,
+    outcome: AmazonCountryOutcome,
     prices: AmazonAdPrices,
     ad: AmazonAd
   ): AdOutcome | undefined {
-    if (price.isFallingBack) {
+    if (outcome === "fallback") {
       this.metricsService.increment("route_fallback", { country: price.country.tld });
       price.nextRoute();
       return;
