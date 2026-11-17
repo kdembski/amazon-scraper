@@ -54,7 +54,6 @@ export async function startWorld() {
   vi.stubEnv("NO_DIRECT", "1");
   vi.stubEnv("NAME", "it");
   vi.stubEnv("API_TOKEN", "it-token");
-  vi.stubEnv("NODE_TLS_REJECT_UNAUTHORIZED", "0");
 
   return { backend, amazon };
 }

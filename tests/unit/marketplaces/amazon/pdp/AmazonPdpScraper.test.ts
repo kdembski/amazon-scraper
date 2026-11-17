@@ -109,7 +109,7 @@ describe("AmazonPdpScraper", () => {
 
       await expect(scraper.scrape()).resolves.toBeUndefined();
 
-      expect(error).toHaveBeenCalledWith("pdp: batch load failed", expect.any(Error));
+      expect(error).toHaveBeenCalledWith("pdp: batch load failed", "down");
       expect(increment.mock.calls).toEqual([["batch_load", { outcome: "failed" }]]);
     });
 

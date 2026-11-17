@@ -39,8 +39,8 @@ export class ScraperConfigService {
     while (true) {
       try {
         return this.apply(await this.fetch());
-      } catch (e) {
-        console.error("config: load failed", e);
+      } catch (e: any) {
+        console.error("config: load failed", e?.message);
         retry.fail();
         await retry.wait();
       }
@@ -54,8 +54,8 @@ export class ScraperConfigService {
   async refresh() {
     try {
       this.apply(await this.fetch());
-    } catch (e) {
-      console.error("config: refresh failed", e);
+    } catch (e: any) {
+      console.error("config: refresh failed", e?.message);
     }
   }
 

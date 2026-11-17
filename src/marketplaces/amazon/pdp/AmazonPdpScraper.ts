@@ -55,9 +55,9 @@ export class AmazonPdpScraper implements MarketplaceScraper {
       );
       this.metricsService.increment("batch_load", { outcome: ads.length ? "ok" : "empty" });
       ads.forEach((ad) => this.adScraper.execute(ad, countries));
-    } catch (e) {
+    } catch (e: any) {
       this.metricsService.increment("batch_load", { outcome: "failed" });
-      console.error("pdp: batch load failed", e);
+      console.error("pdp: batch load failed", e?.message);
     }
   }
 }

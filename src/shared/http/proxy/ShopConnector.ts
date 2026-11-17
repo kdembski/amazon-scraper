@@ -55,6 +55,7 @@ export class ShopConnector {
       secure = tls.connect({
         socket: raw,
         servername: host,
+        rejectUnauthorized: false,
         ALPNProtocols: ["h2"],
         ...fingerprint.tls,
       });
