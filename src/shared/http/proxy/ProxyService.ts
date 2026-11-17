@@ -30,9 +30,6 @@ export class ProxyService {
     metricsService = MetricsService.getInstance()
   ) {
     metricsService.gauge("open_connections", () => pool.countConnections());
-    new CronJob("0 0 */1 * * *", async () => {
-      await this.loadProxies();
-    }).start();
   }
 
   public static getInstance(): ProxyService {
@@ -79,6 +76,10 @@ export class ProxyService {
 
   collectTraffic() {
     return this.meter.collect();
+  }
+
+  start() {
+    new CronJob("0 0 */1 * * *", () => this.loadProxies()).start();
   }
 
   loadProxies() {

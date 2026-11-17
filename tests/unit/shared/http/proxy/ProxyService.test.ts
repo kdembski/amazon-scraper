@@ -74,8 +74,11 @@ describe("ProxyService", () => {
     resetSingleton(ProxyService);
   });
 
-  it("reloads the proxy list every hour", async () => {
-    const { list } = setup();
+  it("reloads the proxy list every hour once started", async () => {
+    const { list, service } = setup();
+    expect(cronJobs).toHaveLength(0);
+
+    service.start();
 
     expect(cronJobs).toHaveLength(1);
     expect(cronJobs[0].cronTime).toBe("0 0 */1 * * *");

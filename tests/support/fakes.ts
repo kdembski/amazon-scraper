@@ -31,8 +31,9 @@ export function fakeAmazonPlpAdSender() {
 
 export function fakeAmazonCountryService() {
   const getCountries = vi.fn().mockResolvedValue([]);
-  const service = { getCountries } as unknown as AmazonCountryService;
-  return { service, getCountries };
+  const start = vi.fn();
+  const service = { getCountries, start } as unknown as AmazonCountryService;
+  return { service, getCountries, start };
 }
 
 type FakeRequest = {

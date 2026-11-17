@@ -24,7 +24,6 @@ export class TokenBucketQueue {
   public static getInstance(): TokenBucketQueue {
     if (!TokenBucketQueue.instance) {
       TokenBucketQueue.instance = new TokenBucketQueue();
-      TokenBucketQueue.instance.start();
     }
 
     return TokenBucketQueue.instance;

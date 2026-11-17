@@ -67,6 +67,16 @@ describe("AmazonPdpScraper", () => {
       expect(api.get).toHaveBeenCalledTimes(2);
     });
 
+    it("starts the country refresh once", async () => {
+      vi.useFakeTimers();
+      const { country, scraper } = setup();
+
+      scraper.execute();
+      await vi.advanceTimersByTimeAsync(2000);
+
+      expect(country.start).toHaveBeenCalledTimes(1);
+    });
+
     it("waits a second after a load finishes before the next one", async () => {
       vi.useFakeTimers({ now: new Date("2026-01-15T12:00:00Z") });
       const { api, country, scraper } = setup();

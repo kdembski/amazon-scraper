@@ -35,14 +35,14 @@ describe("TokenBucketQueue", () => {
     ]);
   });
 
-  it("is a singleton that starts its loop once", () => {
+  it("is a singleton that starts its loop only on start()", () => {
     const start = vi.spyOn(TokenBucketQueue.prototype, "start").mockImplementation(() => {});
     resetSingleton(TokenBucketQueue);
 
     const queue = TokenBucketQueue.getInstance();
 
     expect(TokenBucketQueue.getInstance()).toBe(queue);
-    expect(start).toHaveBeenCalledTimes(1);
+    expect(start).not.toHaveBeenCalled();
     resetSingleton(TokenBucketQueue);
   });
 

@@ -5,6 +5,7 @@ import { ArgsService } from "@/shared/args/ArgsService";
 import { MetricsReporter } from "@/shared/metrics/MetricsReporter";
 import { ScraperConfigService } from "@/shared/backend/ScraperConfigService";
 import { ProxyService } from "@/shared/http/proxy/ProxyService";
+import { TokenBucketQueue } from "@/shared/http/TokenBucketQueue";
 import { MarketplaceScraper } from "@/shared/interfaces/MarketplaceScraper";
 
 const scrapers: Record<Target, () => MarketplaceScraper> = {
@@ -14,6 +15,7 @@ const scrapers: Record<Target, () => MarketplaceScraper> = {
 
 export async function createScraper(): Promise<MarketplaceScraper> {
   const target = ArgsService.getInstance().getTargetFlag();
+  TokenBucketQueue.getInstance().start();
 
   const configService = ScraperConfigService.getInstance();
   await configService.load();
@@ -21,6 +23,8 @@ export async function createScraper(): Promise<MarketplaceScraper> {
 
   const scraper = scrapers[target]();
   MetricsReporter.getInstance().start(scraper.marketplace, target);
-  await ProxyService.getInstance().loadProxies();
+  const proxyService = ProxyService.getInstance();
+  await proxyService.loadProxies();
+  proxyService.start();
   return scraper;
 }

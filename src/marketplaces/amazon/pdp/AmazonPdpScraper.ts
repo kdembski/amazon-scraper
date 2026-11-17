@@ -25,6 +25,8 @@ export class AmazonPdpScraper implements MarketplaceScraper {
   ) {}
 
   async execute() {
+    this.countryService.start();
+
     while (true) {
       await this.scrape();
       await sleep(POLL_INTERVAL);
