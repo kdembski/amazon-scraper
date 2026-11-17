@@ -1,5 +1,9 @@
 import type { Document } from "domhandler";
 import type { StopAt } from "@/shared/http/http.types";
+import type { ItemOutcome } from "@/shared/metrics/metrics.types";
+
+// Result of one route of a country: final, or "fallback" to its next route
+export type AmazonCountryOutcome = ItemOutcome | "fallback";
 
 export interface AmazonCountryRoute {
   id: number;

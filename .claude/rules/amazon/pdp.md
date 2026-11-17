@@ -72,7 +72,7 @@ flowchart TD
 1. Creates an `AmazonCountryPrice` per country (`complete`, `deleted`, `missingRouteIds`, `retry`, `notFound`, `pastAttempts`) with its routes minus `skipRouteIds`, highest `priority` first; a country without a route left is skipped. Held in `AmazonAdPrices`; none left → `ads{outcome=empty}`, done.
 2. Tiers = route priorities of all countries, highest first.
 3. Tier by tier: every country not complete whose current route has the tier's priority, in parallel; the next tier only after the previous one finishes.
-4. A route ending with a final 404 (added to `missingRouteIds`) while the country has another route → `route_fallback`, the country moves to its next route (new `retry` with that route's `maxAttempts`, `notFound` = 0) and runs in that route's lower tier. Any other outcome (`data`, `no_data` from a page, `given_up`) ends the country, no fallback.
+4. A route ending with `fallback` (final 404, added to `missingRouteIds`, while the country has another route) → `route_fallback`, the country moves to its next route (new `retry` with that route's `maxAttempts`, `notFound` = 0) and runs in that route's lower tier. Any other outcome (`data`, `no_data` from a page, `given_up`) ends the country, no fallback.
 5. After each country, checks whether the ASIN is decided:
    - all **active** countries `deleted` → sends `deleted(id)`, done (`ads{outcome=deleted}`);
    - all countries `complete` **or** ≥ 5 countries with a price (`PRICES_TO_COMPLETE`) → sends prices, done (`prices` / `empty`);
@@ -84,7 +84,7 @@ flowchart TD
 1. Builder from `route.pdpSource`; unknown = `aod`.
 2. Loop until an outcome or cancellation:
    1. `builder.buildUrl()` → request via `AmazonService.get()` with the route's `proxyType`.
-   2. Result → outcome (see below). Outcome present → route done; `items` / `item_attempts` counted unless the country falls back (attempts include the routes already left).
+   2. Result → outcome (see below). Outcome present → route done. A final 404 while the country has another route → returns `fallback`, not counted; otherwise `items` / `item_attempts` counted (attempts include the routes already left).
    3. No outcome → `failed++`; at `route.maxAttempts` → `given_up`; otherwise backoff 1 s, 2 s, 4 s ... max 60 s, with jitter.
 3. Result mapping:
    - 404: `twister` → `no_data`; others → `notFound++`, at 2 (`NOT_FOUND_TO_DELETE`) in an active country, at 1 in an inactive one → `deleted`, before that retry. Both final cases add the route to `missingRouteIds`.
