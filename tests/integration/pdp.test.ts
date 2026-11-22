@@ -186,6 +186,60 @@ describe("PDP", () => {
     expect(world.backend.findMissingRouteIds(7)).toEqual([20]);
   });
 
+  it("falls back to the twister route after the final 404 on the AOD route", async () => {
+    world.backend.on("GET", "amazon/countries/scrap", [
+      buildAmazonCountry({ countryId: 1, tld: "de" }),
+      buildAmazonCountry({
+        countryId: 2,
+        tld: "fr",
+        routes: [
+          buildRoute({ id: 20, priority: 1, pdpSource: "aod" }),
+          buildRoute({ id: 21, priority: 0, pdpSource: "twister" }),
+        ],
+      }),
+      buildAmazonCountry({ countryId: 3, tld: "it" }),
+    ]);
+    const twister = twisterResponse(twisterBuybox({ price: "25,49", soldBy: "Amazon.fr" }));
+    world.amazon.respond(({ country, url }) => {
+      if (country !== "fr") return offers[country as keyof typeof offers][0];
+      if (url.includes("aodAjaxMain")) return { status: 404 };
+      return twister;
+    });
+    scrape();
+
+    const sent = await world.backend.waitForPrices(7);
+
+    expect(sent.body.prices[1]).toEqual(price(2, 25.49, "Amazon"));
+    const urls = world.amazon.requestsTo("fr").map((request) => request.url);
+    expect(urls.filter((url) => url.includes("aodAjaxMain"))).toHaveLength(NOT_FOUND_TO_DELETE);
+    expect(urls.at(-1)).toContain("gp/twister/ajaxv2");
+    expect(world.backend.findMissingRouteIds(7)).toEqual([20]);
+  });
+
+  it("sends the prices again with the same idempotency key after the backend fails", async () => {
+    world.backend.onSequence("POST", "amazon/ads/batch", [{ status: 503 }, { status: 200 }]);
+    world.amazon.respondPerCountry(offers);
+    scrape();
+
+    await expect.poll(() => world.backend.find("POST", "amazon/ads/batch").length, { timeout: 10_000 }).toBe(2);
+
+    const [first, retry] = world.backend.find("POST", "amazon/ads/batch");
+    expect(retry.body).toEqual(first.body);
+    expect(retry.headers["idempotency-key"]).toBe(first.headers["idempotency-key"]);
+  });
+
+  it("does not send the prices again after a 4xx from the backend", async () => {
+    world.backend.on("POST", "amazon/ads/batch", () => ({ status: 422 }));
+    world.amazon.respondPerCountry(offers);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    scrape();
+
+    await world.backend.waitForPrices(7);
+    await sleep(1500);
+
+    expect(world.backend.find("POST", "amazon/ads/batch")).toHaveLength(1);
+  });
+
   it("leaves out a country without an offer", async () => {
     world.amazon.respondPerCountry({ ...offers, it: [aodPage()] });
     scrape();

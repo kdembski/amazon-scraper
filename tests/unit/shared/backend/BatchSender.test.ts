@@ -139,6 +139,21 @@ describe("BatchSender", () => {
     expect(send).toHaveBeenLastCalledWith("amazon/ads", { items: [2] }, expect.any(String));
   });
 
+  it("drops the batch after MAX_FAILED_ATTEMPTS network errors with the error message", async () => {
+    const { sender, send, increment } = setup();
+    send.mockRejectedValue(networkError());
+
+    sender.add(1);
+    await vi.advanceTimersByTimeAsync(10 * 60 * 1000);
+
+    expect(send).toHaveBeenCalledTimes(MAX_FAILED_ATTEMPTS);
+    expect(console.error).toHaveBeenCalledWith(
+      "backend: 1 items for amazon/ads dropped",
+      "socket hang up"
+    );
+    expect(calls(increment, "backend_items")).toEqual([["backend_items", { outcome: "dropped" }, 1]]);
+  });
+
   it("sends one idempotency key for every attempt of a batch and a new one for the next batch", async () => {
     const { sender, send } = setup();
     send.mockRejectedValueOnce(networkError());

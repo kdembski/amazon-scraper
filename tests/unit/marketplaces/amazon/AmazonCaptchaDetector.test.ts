@@ -18,6 +18,8 @@ describe("AmazonCaptchaDetector", () => {
     ["a page with another form", `<form action="/cart/add"></form>`],
     ["another meta refresh", `<meta http-equiv="refresh" content="5; URL='/s'" />`],
     ["a marker outside the captcha markup", `<script>var u = "/errors/validateCaptcha";</script><form action="/cart/add"></form>`],
+    ["a marker without a form", `<script>var u = "/errors/validateCaptcha";</script>`],
+    ["a marker with a form without action", `<script>var u = "bm-verify=1";</script><form></form>`],
   ])("ignores %s", (_name, page) => {
     expect(detector.detect(page)).toBe(false);
   });
