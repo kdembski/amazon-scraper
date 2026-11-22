@@ -179,6 +179,25 @@ describe("ProxyService", () => {
       expect(pool.retain).toHaveBeenCalledWith(urls);
     });
 
+    it("throws ERR_NO_PROXY without a plan with proxies", async () => {
+      const { service, list, pool } = setup();
+      list.load.mockResolvedValueOnce([{ urls: [], weight: 9 }]);
+      await service.loadProxies();
+
+      expect(() => service.getEndpoint("www.amazon.de")).toThrow(
+        expect.objectContaining({ code: "ERR_NO_PROXY" })
+      );
+      expect(pool.get).not.toHaveBeenCalled();
+    });
+
+    it("throws ERR_NO_PROXY before the proxies are loaded", () => {
+      const { service } = setup();
+
+      expect(() => service.getEndpoint("www.amazon.de")).toThrow(
+        expect.objectContaining({ code: "ERR_NO_PROXY" })
+      );
+    });
+
     it("returns the proxy whose idle connection to the host was freed last", async () => {
       const { service, pool } = setup();
       await service.loadProxies();
