@@ -97,7 +97,7 @@ export class ScrapingClient {
     }
 
     if (status >= 400) {
-      body.resume();
+      body.destroy();
       throw new HttpStatusError(status);
     }
 

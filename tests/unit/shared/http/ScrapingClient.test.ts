@@ -270,15 +270,14 @@ describe("ScrapingClient", () => {
         expect(metrics.increment).toHaveBeenCalledWith("requests", { outcome: "ok" });
       });
 
-      it("rejects an error status, drains its body and records it", async () => {
+      it("rejects an error status, destroys its body and records it", async () => {
         const { service, request, metrics } = setup();
         const response = respond(404, "not found");
         request.mockResolvedValue(response);
 
         await expect(service.get(url)).rejects.toMatchObject({ status: 404 });
-        await new Promise((resolve) => response.body.once("end", resolve));
 
-        expect(response.body.readableEnded).toBe(true);
+        expect(response.body.destroyed).toBe(true);
         expect(metrics.increment).toHaveBeenCalledWith("requests", { outcome: "http_404" });
       });
 
