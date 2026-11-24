@@ -7,7 +7,7 @@ import { ShopConnector } from "@/shared/http/proxy/ShopConnector";
 import type { Route } from "@/shared/http/http.types";
 
 const PROXY_MAX_STREAMS = 1;
-const PROXY_STATUS_WINDOW = 64;
+const PROXY_WINDOWS = { status: 64, body: 16 * 1024 };
 const DIRECT_MAX_STREAMS = 100;
 
 export class Http2SessionPool {
@@ -30,7 +30,7 @@ export class Http2SessionPool {
         (host, fingerprint, signal) =>
           this.connector.connect(host, "proxy", fingerprint, signal, url),
         PROXY_MAX_STREAMS,
-        PROXY_STATUS_WINDOW
+        PROXY_WINDOWS
       );
       endpoint.on("free", (host: string) => this.freeProxies.markFree(url, host));
       this.endpoints.set(url, endpoint);

@@ -2,14 +2,14 @@ import http2 from "node:http2";
 import { type Readable, Transform } from "node:stream";
 import zlib from "node:zlib";
 import { codedError, timedOut } from "@/shared/http/abort";
-import type { Fingerprint, ShopResponse } from "@/shared/http/http.types";
+import type { Fingerprint, ShopResponse, StreamWindows } from "@/shared/http/http.types";
 
 type StreamRequest = {
   host: string;
   path: string;
   headers: [string, string][];
   fingerprint: Fingerprint;
-  statusWindow?: number;
+  windows?: StreamWindows;
   signal: AbortSignal;
 };
 
@@ -44,9 +44,9 @@ export class Http2StreamSender {
       request.signal.addEventListener("abort", onAbort, { once: true });
       stream.on("error", reject);
       stream.once("response", (headers) => {
-        if (request.statusWindow && Number(headers[":status"]) < 400) {
+        if (request.windows && Number(headers[":status"]) < 400) {
           widened = true;
-          this.setWindow(client, request.fingerprint.settings.initialWindowSize);
+          this.setWindow(client, request.windows.body);
         }
 
         body = this.decode(stream, headers);
@@ -54,7 +54,7 @@ export class Http2StreamSender {
       });
       stream.once("close", () => {
         request.signal.removeEventListener("abort", onAbort);
-        if (widened) this.setWindow(client, request.statusWindow);
+        if (widened) this.setWindow(client, request.windows?.status);
         reject(codedError(`Stream closed with code ${stream.rstCode}`, "ERR_HTTP2_STREAM_CLOSED"));
         onClose();
       });

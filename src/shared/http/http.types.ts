@@ -38,6 +38,12 @@ export type Fingerprint = {
   settings: http2.Settings;
 };
 
+// Stream windows of a session: until a response status below 400, then for its body
+export type StreamWindows = {
+  status: number;
+  body: number;
+};
+
 // Body already decompressed
 export type ShopResponse = {
   status: number;

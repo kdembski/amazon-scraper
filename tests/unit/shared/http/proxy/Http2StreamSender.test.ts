@@ -188,7 +188,7 @@ describe("Http2StreamSender", () => {
   });
 
   it.each([
-    [200, [6291456, 64]],
+    [200, [16384, 64]],
     [503, []],
   ])("with a status window, widens the stream window on %i until the stream closes", async (status, expected) => {
     const windows: number[] = [];
@@ -207,7 +207,7 @@ describe("Http2StreamSender", () => {
         path: "/",
         headers: [],
         fingerprint: { ...fingerprint, settings: { initialWindowSize: 6291456 } },
-        statusWindow: 64,
+        windows: { status: 64, body: 16384 },
         signal: new AbortController().signal,
       },
       onClose

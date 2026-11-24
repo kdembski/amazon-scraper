@@ -2,7 +2,7 @@ import http2 from "node:http2";
 import zlib from "node:zlib";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { FingerprintGenerator } from "@/shared/http/FingerprintGenerator";
-import type { Fingerprint } from "@/shared/http/http.types";
+import type { Fingerprint, StreamWindows } from "@/shared/http/http.types";
 import { Http2Endpoint } from "@/shared/http/proxy/Http2Endpoint";
 import {
   type H2Handler,
@@ -55,14 +55,14 @@ describe("Http2Endpoint", () => {
       fingerprints?: FingerprintGenerator;
       idleTimeout?: number;
       maxAge?: number;
-      statusWindow?: number;
+      windows?: StreamWindows;
     } = {}
   ) =>
     (endpoint = new Http2Endpoint(
       "direct4",
       connect,
       maxStreams,
-      options.statusWindow,
+      options.windows,
       options.fingerprints ?? generator(),
       options.idleTimeout,
       options.maxAge
@@ -79,7 +79,7 @@ describe("Http2Endpoint", () => {
     });
     create(connect, 1, {
       fingerprints: generator({ ...makeFingerprint("a"), settings: { initialWindowSize: 6291456 } }),
-      statusWindow: 64,
+      windows: { status: 64, body: 16384 },
     });
 
     expect(await readBody((await get()).body)).toBe("ok");
