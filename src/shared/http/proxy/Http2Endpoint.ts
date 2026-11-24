@@ -29,6 +29,8 @@ export class Http2Endpoint extends EventEmitter {
       signal: AbortSignal
     ) => Promise<tls.TLSSocket>,
     private maxStreams: number,
+    // Stream window until a response status below 400, then the fingerprint's
+    private statusWindow?: number,
     private fingerprints = new FingerprintGenerator(),
     private idleTimeout = 15 * 1000,
     private maxAge = 10 * 60 * 1000
@@ -56,7 +58,14 @@ export class Http2Endpoint extends EventEmitter {
 
     return this.sender.send(
       session.client!,
-      { host, path, headers, fingerprint: session.fingerprint, signal },
+      {
+        host,
+        path,
+        headers,
+        fingerprint: session.fingerprint,
+        statusWindow: this.statusWindow,
+        signal,
+      },
       () => this.release(host, session)
     );
   }
@@ -149,7 +158,9 @@ export class Http2Endpoint extends EventEmitter {
 
     return http2.connect(`https://${host}`, {
       createConnection: () => socket,
-      settings: fingerprint.settings,
+      settings: this.statusWindow
+        ? { ...fingerprint.settings, initialWindowSize: this.statusWindow }
+        : fingerprint.settings,
     });
   }
 

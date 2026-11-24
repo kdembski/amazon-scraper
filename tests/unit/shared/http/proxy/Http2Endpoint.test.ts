@@ -51,12 +51,18 @@ describe("Http2Endpoint", () => {
   const create = (
     connect: Awaited<ReturnType<typeof start>>,
     maxStreams = 100,
-    options: { fingerprints?: FingerprintGenerator; idleTimeout?: number; maxAge?: number } = {}
+    options: {
+      fingerprints?: FingerprintGenerator;
+      idleTimeout?: number;
+      maxAge?: number;
+      statusWindow?: number;
+    } = {}
   ) =>
     (endpoint = new Http2Endpoint(
       "direct4",
       connect,
       maxStreams,
+      options.statusWindow,
       options.fingerprints ?? generator(),
       options.idleTimeout,
       options.maxAge
@@ -64,6 +70,21 @@ describe("Http2Endpoint", () => {
 
   const get = (path = "/", signal = new AbortController().signal) =>
     endpoint!.request(host, path, [["referer", "https://www.amazon.de/"]], signal);
+
+  it("opens sessions with the status window as the stream window", async () => {
+    let initialWindowSize: number | undefined;
+    const connect = await start((stream) => {
+      initialWindowSize = stream.session!.remoteSettings.initialWindowSize;
+      respond(stream);
+    });
+    create(connect, 1, {
+      fingerprints: generator({ ...makeFingerprint("a"), settings: { initialWindowSize: 6291456 } }),
+      statusWindow: 64,
+    });
+
+    expect(await readBody((await get()).body)).toBe("ok");
+    expect(initialWindowSize).toBe(64);
+  });
 
   it("reuses one session and sends headers in order", async () => {
     const seen: string[][] = [];
