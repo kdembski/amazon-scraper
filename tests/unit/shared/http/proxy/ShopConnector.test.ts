@@ -35,16 +35,16 @@ describe("ShopConnector", () => {
     vi.unstubAllEnvs();
   });
 
-  const listen = async (server: net.Server) => {
-    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const listen = async (server: net.Server, address = "127.0.0.1") => {
+    await new Promise<void>((resolve) => server.listen(0, address, resolve));
     closers.push(() => server.close());
     return (server.address() as AddressInfo).port;
   };
 
-  const startH2 = () => {
+  const startH2 = (address?: string) => {
     const server = http2.createSecureServer(cert);
     server.on("connection", (socket) => closers.push(() => socket.destroy()));
-    return listen(server);
+    return listen(server, address);
   };
 
   const startProxy = async (status: number, targetPort: number) => {
@@ -65,7 +65,11 @@ describe("ShopConnector", () => {
       closers.push(() => upstream.destroy());
     });
     const port = await listen(proxy);
-    return { url: `http://us%40er:p%3Ass@127.0.0.1:${port}`, auth };
+    return {
+      url: `http://us%40er:p%3Ass@127.0.0.1:${port}`,
+      plainUrl: `http://127.0.0.1:${port}`,
+      auth,
+    };
   };
 
   it("connects through a proxy with h2 and reports the raw socket", async () => {
@@ -111,6 +115,39 @@ describe("ShopConnector", () => {
       "127.0.0.1",
       "direct4"
     );
+  });
+
+  it("sends no Proxy-Authorization without credentials in the proxy url", async () => {
+    const proxy = await startProxy(200, await startH2());
+
+    const socket = await new ShopConnector(vi.fn()).connect(
+      "www.amazon.de",
+      "proxy",
+      fingerprint,
+      new AbortController().signal,
+      proxy.plainUrl
+    );
+    closers.push(() => socket.destroy());
+
+    expect(socket.alpnProtocol).toBe("h2");
+    expect(proxy.auth).toEqual([undefined]);
+  });
+
+  it("connects directly over IPv6 on the direct6 route", async () => {
+    const port = await startH2("::1");
+    const connect = vi.spyOn(net, "connect");
+
+    const socket = await new ShopConnector(vi.fn(), port).connect(
+      "::1",
+      "direct6",
+      fingerprint,
+      new AbortController().signal
+    );
+    closers.push(() => socket.destroy());
+
+    expect(socket.alpnProtocol).toBe("h2");
+    expect(connect).toHaveBeenCalledWith(expect.objectContaining({ family: 6 }));
+    connect.mockRestore();
   });
 
   it("rejects with ERR_PROXY_407 when CONNECT is refused", async () => {

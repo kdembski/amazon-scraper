@@ -143,11 +143,12 @@ describe("AmazonPdpCountryScraper", () => {
       ["an empty response", { price: 10 }, ""],
       ["a captcha", { price: 10 }, captchaPage],
       ["an invalid response", { isValid: false }, html],
+      ["no response", { price: 10 }, undefined],
     ])("on %s", async (_name, result, data) => {
       const { amazon, price, outcome, run } = setup(result);
       run();
 
-      amazon.respond(0, data);
+      amazon.respond(0, data as string);
       await flush();
 
       expect(price.retry.failed).toBe(1);
@@ -158,11 +159,14 @@ describe("AmazonPdpCountryScraper", () => {
       expect(amazon.requests[1].url).toBe("c1/dp/B0TESTASIN");
     });
 
-    it("on a network error", async () => {
+    it.each([
+      ["a network error", new Error("Network error")],
+      ["a rejection without an error", undefined],
+    ])("on %s", async (_name, error) => {
       const { amazon, price, run } = setup();
       run();
 
-      amazon.fail(0);
+      amazon.requests[0].reject(error);
       await flush();
 
       expect(price.retry.failed).toBe(1);

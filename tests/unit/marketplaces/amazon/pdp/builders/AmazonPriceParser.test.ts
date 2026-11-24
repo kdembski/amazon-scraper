@@ -20,6 +20,8 @@ describe("AmazonPriceParser", () => {
     ["£12.5", 12.5],
     ["1 299,50 kr", 1299.5],
     ["129 zł", 129],
+    ["1.234.567,89 €", 1234567.89],
+    ["1,234,567.89 $", 1234567.89],
   ])("reads the accessibility label %s", (label, price) => {
     const box = `<span class="apex-pricetopay-accessibility-label">${label}</span>`;
 
@@ -30,6 +32,28 @@ describe("AmazonPriceParser", () => {
     const box = `<span class="a-price"><span class="a-offscreen">24,99 €</span></span>`;
 
     expect(parser.parse(priceBox(box))).toBe(24.99);
+  });
+
+  it("prefers the accessibility label over .a-offscreen", () => {
+    const box =
+      `<span class="apex-pricetopay-accessibility-label">19,99 €</span>` +
+      `<span class="a-price"><span class="a-offscreen">24,99 €</span></span>`;
+
+    expect(parser.parse(priceBox(box))).toBe(19.99);
+  });
+
+  it("reads the label when the whole part has no fraction", () => {
+    const box =
+      `<span class="a-price"><span class="a-price-whole">24,</span>` +
+      `<span class="a-offscreen">24,99 €</span></span>`;
+
+    expect(parser.parse(priceBox(box))).toBe(24.99);
+  });
+
+  it("gives nothing for a label without digits", () => {
+    const box = `<span class="apex-pricetopay-accessibility-label">—</span>`;
+
+    expect(parser.parse(priceBox(box))).toBeUndefined();
   });
 
   it("prefers the price to pay over another price", () => {

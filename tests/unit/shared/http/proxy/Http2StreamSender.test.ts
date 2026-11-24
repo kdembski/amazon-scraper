@@ -187,6 +187,39 @@ describe("Http2StreamSender", () => {
     await new Promise((resolve) => setTimeout(resolve, 20));
   });
 
+  it.each([
+    [200, [16384, 64]],
+    [503, []],
+  ])("with a status window, widens the stream window on %i until the stream closes", async (status, expected) => {
+    const windows: number[] = [];
+    const client = await open((stream) => {
+      stream.session!.on("remoteSettings", (settings) => windows.push(settings.initialWindowSize!));
+      stream.respond({ ":status": status });
+      stream.end("x".repeat(3000));
+    });
+    client.settings({ initialWindowSize: 64 });
+    const onClose = vi.fn();
+
+    const response = await new Http2StreamSender().send(
+      client,
+      {
+        host,
+        path: "/",
+        headers: [],
+        fingerprint: { ...fingerprint, settings: { initialWindowSize: 6291456 } },
+        windows: { status: 64, body: 16384 },
+        signal: new AbortController().signal,
+      },
+      onClose
+    );
+    if (status < 400) expect(await readBody(response.body)).toHaveLength(3000);
+    if (status >= 400) response.body.destroy();
+    await vi.waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(windows).toEqual(expected);
+  });
+
   it("calls onClose and rejects when the session is closed", async () => {
     const client = await open((stream) => respond(stream));
     client.close();

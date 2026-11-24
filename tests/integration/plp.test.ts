@@ -2,7 +2,7 @@ import _ from "lodash";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { PLP_MAX_FAILED_ATTEMPTS } from "@/marketplaces/amazon/plp/AmazonPlpPageFetcher";
 import { cronJobs } from "@@tests/support/cron";
-import { plpPage } from "@@tests/support/html";
+import { captchaPage, plpPage } from "@@tests/support/html";
 import {
   bootScraper,
   sleep,
@@ -145,6 +145,18 @@ describe("PLP", () => {
     let attempts = 0;
     respondSearch(({ url }) =>
       attempts++ === 0 ? plpPage() : plpPage({ asins: [`B0${parse(url).price}`] })
+    );
+    scrape();
+
+    await waitForAds(PRICE_RANGES);
+
+    expect(searches()).toHaveLength(PRICE_RANGES + 1);
+  });
+
+  it("retries a listing behind a captcha", async () => {
+    let attempts = 0;
+    respondSearch(({ url }) =>
+      attempts++ === 0 ? captchaPage : plpPage({ asins: [`B0${parse(url).price}`] })
     );
     scrape();
 

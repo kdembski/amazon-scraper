@@ -2,7 +2,7 @@ import http2 from "node:http2";
 import zlib from "node:zlib";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { FingerprintGenerator } from "@/shared/http/FingerprintGenerator";
-import type { Fingerprint } from "@/shared/http/http.types";
+import type { Fingerprint, StreamWindows } from "@/shared/http/http.types";
 import { Http2Endpoint } from "@/shared/http/proxy/Http2Endpoint";
 import {
   type H2Handler,
@@ -51,12 +51,18 @@ describe("Http2Endpoint", () => {
   const create = (
     connect: Awaited<ReturnType<typeof start>>,
     maxStreams = 100,
-    options: { fingerprints?: FingerprintGenerator; idleTimeout?: number; maxAge?: number } = {}
+    options: {
+      fingerprints?: FingerprintGenerator;
+      idleTimeout?: number;
+      maxAge?: number;
+      windows?: StreamWindows;
+    } = {}
   ) =>
     (endpoint = new Http2Endpoint(
       "direct4",
       connect,
       maxStreams,
+      options.windows,
       options.fingerprints ?? generator(),
       options.idleTimeout,
       options.maxAge
@@ -64,6 +70,21 @@ describe("Http2Endpoint", () => {
 
   const get = (path = "/", signal = new AbortController().signal) =>
     endpoint!.request(host, path, [["referer", "https://www.amazon.de/"]], signal);
+
+  it("opens sessions with the status window as the stream window", async () => {
+    let initialWindowSize: number | undefined;
+    const connect = await start((stream) => {
+      initialWindowSize = stream.session!.remoteSettings.initialWindowSize;
+      respond(stream);
+    });
+    create(connect, 1, {
+      fingerprints: generator({ ...makeFingerprint("a"), settings: { initialWindowSize: 6291456 } }),
+      windows: { status: 64, body: 16384 },
+    });
+
+    expect(await readBody((await get()).body)).toBe("ok");
+    expect(initialWindowSize).toBe(64);
+  });
 
   it("reuses one session and sends headers in order", async () => {
     const seen: string[][] = [];
@@ -250,5 +271,127 @@ describe("Http2Endpoint", () => {
     await expect(result).rejects.toMatchObject({ code: "ETIMEDOUT" });
     await vi.waitFor(() => expect(free).toHaveBeenCalledWith(host));
     expect(endpoint!.countSessions()).toBe(1);
+  });
+
+  it("drops a session that failed to connect and opens a new one for the next request", async () => {
+    const connect = await start((stream) => respond(stream));
+    const real = connect.getMockImplementation()!;
+    connect.mockRejectedValueOnce(new Error("refused"));
+    create(connect);
+
+    await expect(get()).rejects.toThrow("refused");
+    expect(endpoint!.countSessions()).toBe(0);
+
+    connect.mockImplementation(real);
+    expect(await readBody((await get()).body)).toBe("ok");
+    expect(connect).toHaveBeenCalledTimes(2);
+  });
+
+  it("destroys a socket that connects after the endpoint was destroyed", async () => {
+    const connect = await start((stream) => respond(stream));
+    const real = connect.getMockImplementation()!;
+    let finish!: () => void;
+    let socket: Awaited<ReturnType<typeof real>> | undefined;
+    connect.mockImplementationOnce(
+      (name, fingerprint, signal) =>
+        new Promise((resolve) => {
+          finish = async () => resolve((socket = await real(name, fingerprint, signal)));
+        })
+    );
+    create(connect);
+
+    const result = get();
+    endpoint!.destroy();
+    finish();
+
+    await expect(result).rejects.toMatchObject({ code: "ETIMEDOUT" });
+    expect(socket!.destroyed).toBe(true);
+  });
+
+  it("keeps a session with an open stream after the idle timeout", async () => {
+    const connect = await start((stream) => setTimeout(() => respond(stream), 150));
+    create(connect, 100, { idleTimeout: 50 });
+
+    expect(await readBody((await get()).body)).toBe("ok");
+    expect(connect).toHaveBeenCalledTimes(1);
+  });
+
+  it("closes a session past maxAge when its last stream ends instead of freeing it", async () => {
+    const connect = await start((stream) => setTimeout(() => respond(stream), 80));
+    create(connect, 100, { maxAge: 50 });
+    const free = vi.fn();
+    endpoint!.on("free", free);
+
+    await readBody((await get()).body);
+
+    await vi.waitFor(() => expect(endpoint!.countSessions()).toBe(0));
+    expect(free).not.toHaveBeenCalled();
+  });
+
+  describe("hasIdle", () => {
+    it("is false without a session", async () => {
+      create(await start((stream) => respond(stream)));
+
+      expect(endpoint!.hasIdle(host)).toBe(false);
+    });
+
+    it("is true for a connected session without streams", async () => {
+      create(await start((stream) => respond(stream)));
+      const free = vi.fn();
+      endpoint!.on("free", free);
+
+      await readBody((await get()).body);
+      await vi.waitFor(() => expect(free).toHaveBeenCalled());
+
+      expect(endpoint!.hasIdle(host)).toBe(true);
+      expect(endpoint!.hasIdle("www.amazon.pl")).toBe(false);
+    });
+
+    it("is false while a stream is open", async () => {
+      create(await start(() => {}));
+
+      const result = get().catch(() => {});
+      await vi.waitFor(() => expect(endpoint!.countSessions()).toBe(1));
+
+      expect(endpoint!.hasIdle(host)).toBe(false);
+      endpoint!.destroy();
+      await result;
+    });
+
+    it("is false for a session past maxAge", async () => {
+      create(await start((stream) => respond(stream)), 100, { maxAge: 50 });
+
+      await readBody((await get()).body);
+      await new Promise((resolve) => setTimeout(resolve, 60));
+
+      expect(endpoint!.hasIdle(host)).toBe(false);
+    });
+  });
+
+  describe("closeIdle", () => {
+    it("closes sessions without streams", async () => {
+      create(await start((stream) => respond(stream)));
+      const free = vi.fn();
+      endpoint!.on("free", free);
+
+      await readBody((await get()).body);
+      await vi.waitFor(() => expect(free).toHaveBeenCalled());
+      endpoint!.closeIdle(host);
+
+      expect(endpoint!.countSessions()).toBe(0);
+    });
+
+    it("keeps a session with an open stream", async () => {
+      let answer!: () => void;
+      create(await start((stream) => (answer = () => respond(stream))));
+
+      const result = get();
+      await vi.waitFor(() => expect(answer).toBeDefined());
+      endpoint!.closeIdle(host);
+      answer();
+
+      expect(await readBody((await result).body)).toBe("ok");
+      expect(endpoint!.countSessions()).toBe(1);
+    });
   });
 });

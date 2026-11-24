@@ -1,5 +1,6 @@
 import { CronJob } from "cron";
 import _ from "lodash";
+import { codedError } from "@/shared/http/abort";
 import type { Http2Endpoint } from "@/shared/http/proxy/Http2Endpoint";
 import { Http2SessionPool } from "@/shared/http/proxy/Http2SessionPool";
 import { ProxyList } from "@/shared/http/proxy/ProxyList";
@@ -62,6 +63,8 @@ export class ProxyService {
 
   private getRandomProxy() {
     const { urls } = this.pickPlan();
+    if (!urls.length) throw codedError("No proxies loaded", "ERR_NO_PROXY");
+
     return urls[Math.floor(Math.random() * urls.length)];
   }
 

@@ -4,7 +4,7 @@ import type tls from "node:tls";
 import _ from "lodash";
 import { raceAbort, timedOut } from "@/shared/http/abort";
 import { FingerprintGenerator } from "@/shared/http/FingerprintGenerator";
-import type { Fingerprint, Route, ShopResponse } from "@/shared/http/http.types";
+import type { Fingerprint, Route, ShopResponse, StreamWindows } from "@/shared/http/http.types";
 import { Http2StreamSender } from "@/shared/http/proxy/Http2StreamSender";
 
 type Session = {
@@ -29,6 +29,7 @@ export class Http2Endpoint extends EventEmitter {
       signal: AbortSignal
     ) => Promise<tls.TLSSocket>,
     private maxStreams: number,
+    private windows?: StreamWindows,
     private fingerprints = new FingerprintGenerator(),
     private idleTimeout = 15 * 1000,
     private maxAge = 10 * 60 * 1000
@@ -56,7 +57,14 @@ export class Http2Endpoint extends EventEmitter {
 
     return this.sender.send(
       session.client!,
-      { host, path, headers, fingerprint: session.fingerprint, signal },
+      {
+        host,
+        path,
+        headers,
+        fingerprint: session.fingerprint,
+        windows: this.windows,
+        signal,
+      },
       () => this.release(host, session)
     );
   }
@@ -149,7 +157,9 @@ export class Http2Endpoint extends EventEmitter {
 
     return http2.connect(`https://${host}`, {
       createConnection: () => socket,
-      settings: fingerprint.settings,
+      settings: this.windows
+        ? { ...fingerprint.settings, initialWindowSize: this.windows.status }
+        : fingerprint.settings,
     });
   }
 

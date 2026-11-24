@@ -2,13 +2,14 @@ import http2 from "node:http2";
 import { type Readable, Transform } from "node:stream";
 import zlib from "node:zlib";
 import { codedError, timedOut } from "@/shared/http/abort";
-import type { Fingerprint, ShopResponse } from "@/shared/http/http.types";
+import type { Fingerprint, ShopResponse, StreamWindows } from "@/shared/http/http.types";
 
 type StreamRequest = {
   host: string;
   path: string;
   headers: [string, string][];
   fingerprint: Fingerprint;
+  windows?: StreamWindows;
   signal: AbortSignal;
 };
 
@@ -33,6 +34,7 @@ export class Http2StreamSender {
       }
 
       let body: Readable | undefined;
+      let widened = false;
       const onAbort = () => {
         reject(timedOut());
         stream.close(http2.constants.NGHTTP2_CANCEL);
@@ -42,15 +44,29 @@ export class Http2StreamSender {
       request.signal.addEventListener("abort", onAbort, { once: true });
       stream.on("error", reject);
       stream.once("response", (headers) => {
+        if (request.windows && Number(headers[":status"]) < 400) {
+          widened = true;
+          this.setWindow(client, request.windows.body);
+        }
+
         body = this.decode(stream, headers);
         resolve({ status: Number(headers[":status"]), headers, body });
       });
       stream.once("close", () => {
         request.signal.removeEventListener("abort", onAbort);
+        if (widened) this.setWindow(client, request.windows?.status);
         reject(codedError(`Stream closed with code ${stream.rstCode}`, "ERR_HTTP2_STREAM_CLOSED"));
         onClose();
       });
     });
+  }
+
+  private setWindow(client: http2.ClientHttp2Session, initialWindowSize?: number) {
+    if (!initialWindowSize || client.closed || client.destroyed) return;
+
+    try {
+      client.settings({ initialWindowSize });
+    } catch {}
   }
 
   private buildHeaders({ host, path, headers, fingerprint }: StreamRequest) {
